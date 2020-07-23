@@ -1,0 +1,25 @@
+name: py3dep
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.8
+  - setuptools
+  - pip
+  - pygeoogc
+  - xarray
+  - scipy
+  - rasterio
+  - shapely
+
+  - dask
+  - netCDF4
+  - bottleneck
+
+  - setuptools_scm
+  - pytest-cov
+  - pytest-xdist
+  - pre-commit
+  - codecov
+  - coverage
+  - pip:
+    - numbagg

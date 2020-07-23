@@ -1,0 +1,154 @@
+.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/develop/docs/_static/pynhd_logo.png
+    :target: https://github.com/cheginit/pynhd
+    :align: center
+
+|
+
+.. image:: https://img.shields.io/pypi/v/pynhd.svg
+    :target: https://pypi.python.org/pypi/pynhd
+    :alt: PyPi
+
+.. image:: https://img.shields.io/conda/vn/conda-forge/pynhd.svg
+    :target: https://anaconda.org/conda-forge/pynhd
+    :alt: Conda Version
+
+.. image:: https://codecov.io/gh/cheginit/pynhd/branch/master/graph/badge.svg
+    :target: https://codecov.io/gh/cheginit/pynhd
+    :alt: CodeCov
+
+.. image:: https://github.com/cheginit/pynhd/workflows/build/badge.svg
+    :target: https://github.com/cheginit/pynhd/workflows/build
+    :alt: Github Actions
+
+.. image:: https://mybinder.org/badge_logo.svg
+    :target: https://mybinder.org/v2/gh/cheginit/hydrodata/develop
+    :alt: Binder
+
+|
+
+.. image:: https://www.codefactor.io/repository/github/cheginit/pynhd/badge
+   :target: https://www.codefactor.io/repository/github/cheginit/pynhd
+   :alt: CodeFactor
+
+.. image:: https://img.shields.io/badge/code%20style-black-000000.svg
+    :target: https://github.com/psf/black
+    :alt: black
+
+.. image:: https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white
+    :target: https://github.com/pre-commit/pre-commit
+    :alt: pre-commit
+
+|
+
+Features
+--------
+
+pynhd is a part of `Hydrodata <https://github.com/cheginit/hydrodata>`__ software stack
+and provides access to `3DEP <https://www.usgs.gov/core-science-systems/ngp/3dep>`__ database
+which is a part the `National Map services <https://viewer.nationalmap.gov/services/>`__.
+The 3DEP service has multi-resolution sources and depending on the user provided resolution,
+the data is resampled on server-side based on all the available data sources. pynhd returns
+the requestes as `xarray <https://xarray.pydata.org/en/stable>`__ dataset. The 3DEP includes
+the following layers:
+
+- DEM
+- Hillshade Gray
+- Aspect Degrees
+- Aspect Map
+- GreyHillshade Elevation Fill
+- Hillshade Multidirectional
+- Slope Map
+- Slope Degrees
+- Hillshade Elevation Tinted
+- Height Ellipsoidal
+- Contour 25
+- Contour Smoothed 25
+
+Moreover, pynhd offers some additonal utilities:
+
+- ``elevation_bygrid``: For getting elevations of all the grid points in a 2D grid.
+- ``elevation_byloc``: For getting elevation of a single point which is based on the National
+  Map's `Elevation Point Query Service <https://nationalmap.gov/epqs/>`__.
+- ``deg2mpm``: For converting slope dataset from degree to meter per meter.
+
+Moreover, requests for additional functionalities can be submitted via
+`issue tracker <https://github.com/cheginit/pynhd/issues>`__.
+
+
+Installation
+------------
+
+You can install pynhd using ``pip`` after installing ``libgdal`` on your system
+(for example, in Ubuntu run ``sudo apt install libgdal-dev``):
+
+.. code-block:: console
+
+    $ pip install pynhd
+
+Alternatively, pynhd can be installed from the ``conda-forge`` repository
+using `Conda <https://docs.conda.io/en/latest/>`__:
+
+.. code-block:: console
+
+    $ conda install -c conda-forge pynhd
+
+Quickstart
+----------
+
+pynhd accepts `Shapely <https://shapely.readthedocs.io/en/latest/manual.html>`__'s
+Polygon or a bounding box (a tuple of length four) as an input geometry.
+We can use Hydrodata to get a watershed's geometry, then use it to get DEM and slope data
+in meters/meters from pynhd using ``get_map`` function.
+
+The ``get_map`` has a ``resolution`` argument that sets the target resolution
+in meters. Note that the highest available resolution throughout the CONUS is about 10 m,
+though higher resolutions are available in limited parts of the US. Note that the input
+geometry can be in any valid spatial reference (``geo_crs`` argument). The ``crs`` argument, however,
+is limited to ``CRS:84``, ``EPSG:4326``, and ``EPSG:3857`` since 3DEP only supports these
+spatial references.
+
+.. code-block:: python
+
+    import pynhd
+    from hydrodata import NLDI
+
+    geom = NLDI().getfeature_byid("nwissite", "USGS-01031500", basin=True).geometry[0]
+    dem = pynhd.get_map("DEM", geom, resolution=30, geo_crs="epsg:4326", crs="epsg:3857")
+    slope = pynhd.get_map("Slope Degrees", geom, resolution=30)
+    slope = pynhd.utils.deg2mpm(slope)
+
+.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/develop/docs/_static/example_plots_pynhd.png
+    :target: https://raw.githubusercontent.com/cheginit/hydrodata/develop/docs/_static/example_plots_pynhd.png
+    :align: center
+
+We can get the elevation for a single point within the US:
+
+.. code-block:: python
+
+    elev = pynhd.elevation_byloc((-7766049.665, 5691929.739), "epsg:3857")
+
+Additionally, we can get the elevations of set of x- and y- coordinates of a grid. For example,
+let's get the minimum temperature data within the watershed from Daymet using Hydrodata then
+add the elevation as a new variable to the dataset:
+
+.. code-block:: python
+
+    import hydrodata.datasets as hds
+    import xarray as xr
+    import numpy as np
+
+    clm = hds.daymet_bygeom(geom, dates=("2005-01-01", "2005-01-31"), variables="tmin")
+    gridxy = (clm.x.values, clm.y.values)
+    elev = pynhd.elevation_bygrid(gridxy, clm.crs, clm.res[0] * 1000)
+    clm = xr.merge([clm, elev], combine_attrs="override")
+    clm["elevation"] = clm.elevation.where(~np.isnan(clm.isel(time=0).tmin), drop=True)
+
+
+Contributing
+------------
+
+Contirbutions are very welcomed. Please read
+`CODE_OF_CONDUCT.rst <https://github.com/cheginit/pynhd/blob/master/CODE_OF_CONDUCT.rst>`__
+and
+`CONTRIBUTING.rst <https://github.com/cheginit/pynhd/blob/master/CONTRIBUTING.rst>`__
+files for instructions.

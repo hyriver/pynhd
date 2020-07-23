@@ -1,0 +1,10 @@
+name: pynhd
+channels:
+  - conda-forge
+dependencies:
+  - python=3.7
+  - setuptools
+  - pygeoogc
+  - pygeoutils
+  - networkx
+  - geopandas

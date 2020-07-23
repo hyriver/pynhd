@@ -1,0 +1,11 @@
+name: py3dep
+channels:
+  - conda-forge
+dependencies:
+  - python=3.8
+  - setuptools
+  - pygeoogc
+  - xarray
+  - scipy
+  - rasterio
+  - shapely
