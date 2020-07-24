@@ -37,11 +37,11 @@ class WaterData(WFS):
         super().__init__(ServiceURL().wfs.waterdata, layer, "application/json", "2.0.0", crs)
 
     def bybox(self, bbox: Tuple[float, float, float, float]) -> gpd.GeoDataFrame:
-        resp = self.getfeature_bybox(bbox, self.crs, True)
+        resp = self.getfeature_bybox(bbox, self.crs, always_xy=True)
         return self.to_geodf(resp)
 
     def byid(self, featurename: str, featureids: Union[List[str], str]) -> gpd.GeoDataFrame:
-        resp = self.getfeature_byid(featurename, featureids, "2.0")
+        resp = self.getfeature_byid(featurename, featureids, filter_spec="2.0")
         return self.to_geodf(resp)
 
     def to_geodf(self, resp: Response) -> gpd.GeoDataFrame:
