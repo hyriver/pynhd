@@ -25,7 +25,7 @@ def test_nldi():
     station_id = f"USGS-{STA_ID}"
     site = "nwissite"
 
-    basin = nldi.getfeature_byid(site, station_id, basin=True)
+    nldi.getfeature_byid(site, station_id, basin=True)
 
     stm = nldi.navigate_byid(site, station_id, navigation=UM, source=site)
     st100 = nldi.navigate_byid(site, station_id, navigation=UM, source=site, distance=100)
