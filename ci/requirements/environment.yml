@@ -1,19 +1,12 @@
-name: py3dep
+name: pynhd-dev
 channels:
   - conda-forge
 dependencies:
   - python>=3.8
   - setuptools
-  - pip
   - pygeoogc
-  - xarray
-  - scipy
-  - rasterio
-  - shapely
-
-  - dask
-  - netCDF4
-  - bottleneck
+  - pygeoutils
+  - networkx
 
   - setuptools_scm
   - pytest-cov
@@ -21,5 +14,3 @@ dependencies:
   - pre-commit
   - codecov
   - coverage
-  - pip:
-    - numbagg

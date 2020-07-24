@@ -1,11 +1,9 @@
-name: py3dep
+name: pynhd
 channels:
   - conda-forge
 dependencies:
   - python=3.8
   - setuptools
   - pygeoogc
-  - xarray
-  - scipy
-  - rasterio
-  - shapely
+  - pygeoutils
+  - networkx
