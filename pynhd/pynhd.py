@@ -37,10 +37,12 @@ class WaterData(WFS):
         super().__init__(ServiceURL().wfs.waterdata, layer, "application/json", "2.0.0", crs)
 
     def bybox(self, bbox: Tuple[float, float, float, float]) -> gpd.GeoDataFrame:
-        return self.to_geodf(self.getfeature_bybox(bbox, self.crs, True))
+        resp = self.getfeature_bybox(bbox, self.crs, True)
+        return self.to_geodf(resp)
 
     def byid(self, featurename: str, featureids: Union[List[str], str]) -> gpd.GeoDataFrame:
-        return self.to_geodf(self.getfeature_byid(featurename, featureids, "2.0"))
+        resp = self.getfeature_byid(featurename, featureids, "2.0")
+        return self.to_geodf(resp)
 
     def to_geodf(self, resp: Response) -> gpd.GeoDataFrame:
         """Convert a response from WaterData to a GeoDataFrame.
@@ -93,14 +95,14 @@ class NLDI:
         if fsource not in self.valid_sources:
             raise InvalidInputValue("feature source", self.valid_sources)
 
-        self.url = "/".join([self.base_url, fsource, fid])
+        url = "/".join([self.base_url, fsource, fid])
         if basin:
-            self.url += "/basin"
+            url += "/basin"
 
         if url_only:
-            return self.url
+            return url
 
-        return self._get_url()
+        return self._get_url(url)
 
     def navigate_byid(
         self,
@@ -144,23 +146,23 @@ class NLDI:
         if navigation not in valid_navigations.keys():
             raise InvalidInputValue("navigation", valid_navigations.keys())
 
-        self.url = valid_navigations[navigation]
+        url = valid_navigations[navigation]
 
         if source is not None:
             if source not in self.valid_sources:
                 raise InvalidInputValue("source", self.valid_sources)
-            self.url += f"/{source}"
+            url += f"/{source}"
 
         if distance is not None:
-            self.url += f"?distance={int(distance)}"
+            url += f"?distance={int(distance)}"
 
         if url_only:
-            return self.url
+            return url
 
-        return self._get_url()
+        return self._get_url(url)
 
-    def _get_url(self):
-        return geoutils.json2geodf(self.session.get(self.url).json(), "epsg:4269", "epsg:4326")
+    def _get_url(self, url):
+        return geoutils.json2geodf(self.session.get(url).json(), "epsg:4269", "epsg:4326")
 
 
 def prepare_nhdplus(
