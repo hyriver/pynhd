@@ -66,7 +66,7 @@ def test_nhdplus():
     assert abs(wb.areasqkm.sum() - 87.181) < 1e-3
 
 
-def test_acc(watershed_urb):
+def test_acc():
     wd = WaterData("nhdflowline_network")
     comids = nldi.navigate_byid("nwissite", "USGS-11092450", UT)
     comid_list = comids.nhdplus_comid.tolist()

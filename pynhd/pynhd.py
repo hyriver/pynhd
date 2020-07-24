@@ -13,7 +13,7 @@ from pygeoogc import WFS, RetrySession, ServiceURL
 from requests import Response
 
 from . import utils
-from .exception import InvalidInputValue, ZeroMatched
+from .exceptions import InvalidInputValue, ZeroMatched
 
 
 class WaterData(WFS):
