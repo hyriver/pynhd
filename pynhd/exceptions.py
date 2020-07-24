@@ -52,5 +52,18 @@ class InvalidInputType(Exception):
         return self.message
 
 
-class MissingInputs(ValueError):
-    """Exception raised when there are missing function arguments."""
+class MissingItems(Exception):
+    """Exception raised when a required item is missing.
+
+    Parameters
+    ----------
+    missing : tuple
+        The server url
+    """
+
+    def __init__(self, missing: List[str]) -> None:
+        self.message = "The following items are missing:\n" + f"{', '.join(missing)}"
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return self.message

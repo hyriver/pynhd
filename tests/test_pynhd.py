@@ -1,8 +1,7 @@
 """Tests for PyNHD package."""
 
-from pynhd import NLDI, WaterData
 import pynhd as nhd
-
+from pynhd import NLDI, WaterData
 
 STA_ID = "01031500"
 UM = "upstreamMain"

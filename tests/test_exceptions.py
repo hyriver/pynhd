@@ -1,5 +1,4 @@
 import pytest
-
 from py3dep import InvalidInputType
 
 

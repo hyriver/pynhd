@@ -1,15 +1,19 @@
+"""Access NLDI and WaterData databases."""
 import numbers
+from typing import Callable, Dict, List, Optional, Tuple, Union
+
 import geopandas as gpd
-import pandas as pd
 import networkx as nx
-from pygeoogc import WFS, RetrySession, ServiceURL
-import pygeoutils as geoutils
-import pygeoogc as ogc
-from requests import Response
 import numpy as np
+import pandas as pd
+import pygeoogc as ogc
+import pygeoutils as geoutils
 from pandas._libs.missing import NAType
-from typing import Dict, List, Optional, Tuple, Union, Callable
+from pygeoogc import WFS, RetrySession, ServiceURL
+from requests import Response
+
 from . import utils
+from .exception import InvalidInputValue, ZeroMatched
 
 
 class WaterData(WFS):
@@ -28,11 +32,7 @@ class WaterData(WFS):
         a limited number of CRSs, defaults to ``epsg:4269``.
     """
 
-    def __init__(
-        self,
-        layer: str,
-        crs: str = "epsg:4269",
-    ) -> None:
+    def __init__(self, layer: str, crs: str = "epsg:4269",) -> None:
         layer = layer if ":" in layer else f"wmadata:{layer}"
         super().__init__(ServiceURL().wfs.waterdata, layer, "application/json", "2.0.0", crs)
 

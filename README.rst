@@ -40,36 +40,25 @@
 
 |
 
+🚨 **This package is under heavy development and breaking changes are likely to happen.** 🚨
+
 Features
 --------
 
-pynhd is a part of `Hydrodata <https://github.com/cheginit/hydrodata>`__ software stack
-and provides access to `3DEP <https://www.usgs.gov/core-science-systems/ngp/3dep>`__ database
-which is a part the `National Map services <https://viewer.nationalmap.gov/services/>`__.
-The 3DEP service has multi-resolution sources and depending on the user provided resolution,
-the data is resampled on server-side based on all the available data sources. pynhd returns
-the requestes as `xarray <https://xarray.pydata.org/en/stable>`__ dataset. The 3DEP includes
-the following layers:
+PyNHD is a part of `Hydrodata <https://github.com/cheginit/hydrodata>`__ software stack
+and provides an interface to access
+`WaterData <https://labs.waterdata.usgs.gov/geoserver/web/wicket/bookmarkable/org.geoserver.web.demo.MapPreviewPage?1>`__
+and `NLDI <https://labs.waterdata.usgs.gov/about-nldi/>`_ web services. These two web services
+can be used to navigate and exctract vector data from NHDPlus V2 database such as
+catchments, HUC8, HUC12, GagesII, flowlines, and water bodies. Additionally, PyNHD
+has some extra utilities for processing flowlines:
 
-- DEM
-- Hillshade Gray
-- Aspect Degrees
-- Aspect Map
-- GreyHillshade Elevation Fill
-- Hillshade Multidirectional
-- Slope Map
-- Slope Degrees
-- Hillshade Elevation Tinted
-- Height Ellipsoidal
-- Contour 25
-- Contour Smoothed 25
-
-Moreover, pynhd offers some additonal utilities:
-
-- ``elevation_bygrid``: For getting elevations of all the grid points in a 2D grid.
-- ``elevation_byloc``: For getting elevation of a single point which is based on the National
-  Map's `Elevation Point Query Service <https://nationalmap.gov/epqs/>`__.
-- ``deg2mpm``: For converting slope dataset from degree to meter per meter.
+- ``prepare_nhdplus``: For cleaning up the dataframe by, for example, removing tiny networks,
+  adding a ``to_comid`` column, and finding a terminal point if it doesn't exists.
+- ``topoogical_sort``: For sorting the river network topologically which is useful for routing
+  and flow accumulation.
+- ``vector_accumulation``: For computing flow accumulation in a river network. This function
+  is generic and any routing method can be plugged in.
 
 Moreover, requests for additional functionalities can be submitted via
 `issue tracker <https://github.com/cheginit/pynhd/issues>`__.
@@ -78,14 +67,14 @@ Moreover, requests for additional functionalities can be submitted via
 Installation
 ------------
 
-You can install pynhd using ``pip`` after installing ``libgdal`` on your system
+You can install PyNHD using ``pip`` after installing ``libgdal`` on your system
 (for example, in Ubuntu run ``sudo apt install libgdal-dev``):
 
 .. code-block:: console
 
     $ pip install pynhd
 
-Alternatively, pynhd can be installed from the ``conda-forge`` repository
+Alternatively, PyNHD can be installed from the ``conda-forge`` repository
 using `Conda <https://docs.conda.io/en/latest/>`__:
 
 .. code-block:: console
@@ -95,54 +84,116 @@ using `Conda <https://docs.conda.io/en/latest/>`__:
 Quickstart
 ----------
 
-pynhd accepts `Shapely <https://shapely.readthedocs.io/en/latest/manual.html>`__'s
-Polygon or a bounding box (a tuple of length four) as an input geometry.
-We can use Hydrodata to get a watershed's geometry, then use it to get DEM and slope data
-in meters/meters from pynhd using ``get_map`` function.
-
-The ``get_map`` has a ``resolution`` argument that sets the target resolution
-in meters. Note that the highest available resolution throughout the CONUS is about 10 m,
-though higher resolutions are available in limited parts of the US. Note that the input
-geometry can be in any valid spatial reference (``geo_crs`` argument). The ``crs`` argument, however,
-is limited to ``CRS:84``, ``EPSG:4326``, and ``EPSG:3857`` since 3DEP only supports these
-spatial references.
+Let's explore capabilities of ``NLDI``. We need an instantiate the class first:
 
 .. code-block:: python
 
-    import pynhd
-    from hydrodata import NLDI
+    from pynhd import NLDI
 
-    geom = NLDI().getfeature_byid("nwissite", "USGS-01031500", basin=True).geometry[0]
-    dem = pynhd.get_map("DEM", geom, resolution=30, geo_crs="epsg:4326", crs="epsg:3857")
-    slope = pynhd.get_map("Slope Degrees", geom, resolution=30)
-    slope = pynhd.utils.deg2mpm(slope)
+    nldi = NLDI()
+    station_id = "USGS-01031500"
+    UT = "upstreamTributaries"
+    UM = "upstreamMain"
 
-.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/develop/docs/_static/example_plots_pynhd.png
-    :target: https://raw.githubusercontent.com/cheginit/hydrodata/develop/docs/_static/example_plots_pynhd.png
-    :align: center
-
-We can get the elevation for a single point within the US:
+We can get the basin geometry for the USGS station number 01031500:
 
 .. code-block:: python
 
-    elev = pynhd.elevation_byloc((-7766049.665, 5691929.739), "epsg:3857")
+    basin = nldi.getfeature_byid("nwissite", station_id, basin=True)
 
-Additionally, we can get the elevations of set of x- and y- coordinates of a grid. For example,
-let's get the minimum temperature data within the watershed from Daymet using Hydrodata then
-add the elevation as a new variable to the dataset:
+``NLDI`` offer navigating a river network from any point in the network in the
+upstream or downstream direction. We can limit the navigation distance (in meters). The navigation
+can be done for all the valid NLDI sources which are ``comid``, ``huc12pp``, ``nwissite``,
+``wade``, ``WQP``. For example, let's find all the USGS stations upstream of  01031500,
+accross the whole network (tributaries) and then only in the mail channel.
 
 .. code-block:: python
 
-    import hydrodata.datasets as hds
-    import xarray as xr
-    import numpy as np
+    args = {
+        "fsource": "nwissite",
+        "fid": station_id,
+        "navigation": UM,
+        "source": "nwissite",
+        "distance": None,
+    }
 
-    clm = hds.daymet_bygeom(geom, dates=("2005-01-01", "2005-01-31"), variables="tmin")
-    gridxy = (clm.x.values, clm.y.values)
-    elev = pynhd.elevation_bygrid(gridxy, clm.crs, clm.res[0] * 1000)
-    clm = xr.merge([clm, elev], combine_attrs="override")
-    clm["elevation"] = clm.elevation.where(~np.isnan(clm.isel(time=0).tmin), drop=True)
+    st_main = nldi.navigate_byid(**args)
 
+    args["navigation"] = UT
+    st_trib = nldi.navigate_byid(**args)
+
+    args["distance"] = 100
+    st_d100 = nldi.navigate_byid(**args)
+
+We can set the source to ``huc12pp`` to get HUC12 pour points.
+
+.. code-block:: python
+
+    args.update{
+        "distance": None,
+        "source" : "huc12pp",
+    }
+    pp = nldi.navigate_byid(**args)
+
+``NLDI`` provides only ``comid`` and geometry of the flowlines which can further
+be used to get the other available columns in the NHDPlus databse. Let's see how
+we can combine ``NLDI`` and ``WaterData`` to get the NHDPlus data for our station.
+
+.. code-block:: python
+
+    wd = WaterData("nhdflowline_network")
+
+    args.update{
+        "fsource": "comid",
+        "source" : None,
+        "navigation": UM,
+    }
+    comids = nldi.navigate_byid(**args).nhdplus_comid.tolist()
+    flw_main = wd.byid("comid", comids)
+
+    args["navigation"] = UT
+    comids = nldi.navigate_byid(**args).nhdplus_comid.tolist()
+    flw_trib = wd.byid("comid", comids)
+
+Other feature sources in the WaterData database are ``nhdarea``, ``nhdwaterbody``,
+``catchmentsp``, ``gagesii``, ``huc08``, ``huc12``, ``huc12agg``, and ``huc12all``.
+For example, we can get the contributing catchments of the flowlines using ``catchmentsp``.
+
+.. code-block:: python
+
+    wd = WaterData("catchmentsp")
+    catchments = wd.byid("featureid", comids)
+
+The ``WaterData`` class also has a method called ``bybox`` to get data from the feature
+sources within a bounding box.
+
+.. code-block:: python
+
+    wd = WaterData("nhdwaterbody")
+    wb = wd.bybox((-69.7718, 45.0742, -69.3141, 45.4534))
+
+Next, lets clean up the flowlines and use it to compute flow accumulatin. For simplicity,
+we assume that the flow in each river segment is equal to the length of the segment. Therefore,
+the accumulated flow at each point should be equal to sum of the lengths of all its upstream
+river segments i.e., ``arbolatesu`` column in the NHDPlus database. We can use this to validate
+the flow accumulation result.
+
+.. code-block:: python
+
+    import pynhd as nhd
+
+    flw = nhd.prepare_nhdplus(flw_trib, 1, 1, 1, True, True)
+
+    def routing(qin, q):
+        return qin + q
+
+    qsim = nhd.vector_accumulation(
+        flw[["comid", "tocomid", "lengthkm"]], routing, "lengthkm", ["lengthkm"],
+    )
+    flw = flw.merge(qsim, on="comid")
+    diff = flw.arbolatesu - flw.acc
+
+    print(diff.abs().sum() < 1e-5)
 
 Contributing
 ------------

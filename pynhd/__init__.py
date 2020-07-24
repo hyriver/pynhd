@@ -1,7 +1,7 @@
 """Top-level package for PyNHD."""
 from pkg_resources import DistributionNotFound, get_distribution
 
-from .exceptions import InvalidInputType, InvalidInputValue, ZeroMatched, MissingInputs
+from .exceptions import InvalidInputType, InvalidInputValue, MissingItems, ZeroMatched
 from .pynhd import NLDI, WaterData, prepare_nhdplus, topoogical_sort, vector_accumulation
 
 try:
@@ -9,4 +9,3 @@ try:
 except DistributionNotFound:
     # package is not installed
     pass
-

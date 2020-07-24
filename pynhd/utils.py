@@ -1,6 +1,7 @@
-"""Some utilities for PyNHD"""
+"""Some utilities for PyNHD."""
 from typing import Iterable, List
-from .exceptions import InvalidInputType
+
+from .exceptions import InvalidInputType, MissingItems
 
 
 def check_requirements(reqs: Iterable, cols: List[str]) -> None:
