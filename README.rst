@@ -62,9 +62,7 @@ Additionally, PyNHD offers some extra utilities for processing the flowlines:
   is generic and any routing method can be plugged in.
 
 These utilities are developed based on an ``R`` package called
-`nhdplusTools <https://github.com/USGS-R/nhdplusTools>`__ by `Dave Blodgett <https://github.com/dblodgett-usgs>`__
-
-Moreover, requests for additional functionalities can be submitted via
+`nhdplusTools <https://github.com/USGS-R/nhdplusTools>`__. Moreover, requests for additional functionalities can be submitted via
 `issue tracker <https://github.com/cheginit/pynhd/issues>`__.
 
 
@@ -106,10 +104,10 @@ We can get the basin geometry for the USGS station number 01031500:
     basin = nldi.getfeature_byid("nwissite", station_id, basin=True)
 
 ``NLDI`` offers navigating a river network from any point in the network in the
-upstream or downstream direction. We can limit the navigation distance (in km). The navigation
-can be done for all the valid NLDI sources which are ``comid``, ``huc12pp``, ``nwissite``,
-``wade``, ``WQP``. For example, let's find all the USGS stations upstream of  01031500,
-across the whole network (tributaries), and then only in the mail channel.
+upstream or downstream direction. We can also limit the navigation distance (in km). The
+navigation can be done for all the valid NLDI sources which are ``comid``, ``huc12pp``,
+``nwissite``, ``wade``, ``WQP``. For example, let's find all the USGS stations upstream
+of 01031500, throught the tributaries, and then limit the navigation to only the main channel.
 
 .. code-block:: python
 
@@ -123,17 +121,17 @@ across the whole network (tributaries), and then only in the mail channel.
 
     st_main = nldi.navigate_byid(**args)
 
-    args["navigation"] = UT
-    st_trib = nldi.navigate_byid(**args)
+    args["distance"] = 20  # km
+    st_d150 = nldi.navigate_byid(**args)
 
-    args["distance"] = 20
-    st_d100 = nldi.navigate_byid(**args)
+    args.update({"distance": None, "navigation": UT})
+    st_trib = nldi.navigate_byid(**args)
 
 We can set the source to ``huc12pp`` to get HUC12 pour points.
 
 .. code-block:: python
 
-    args.update({"distance": None, "source" : "huc12pp",})
+    args["source"] = "huc12pp"
     pp = nldi.navigate_byid(**args)
 
 ``NLDI`` provides only ``comid`` and geometry of the flowlines which can further
@@ -144,7 +142,7 @@ we can combine ``NLDI`` and ``WaterData`` to get the NHDPlus data for our statio
 
     wd = WaterData("nhdflowline_network")
 
-    args.update({"fsource": "comid", "source" : None, "navigation": UM})
+    args.update({"source" : None, "navigation": UM})
     comids = nldi.navigate_byid(**args).nhdplus_comid.tolist()
     flw_main = wd.byid("comid", comids)
 
