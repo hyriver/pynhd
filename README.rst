@@ -105,8 +105,8 @@ We can get the basin geometry for the USGS station number 01031500:
 
     basin = nldi.getfeature_byid("nwissite", station_id, basin=True)
 
-``NLDI``offers navigating a river network from any point in the network in the
-upstream or downstream direction. We can limit the navigation distance (in meters). The navigation
+``NLDI`` offers navigating a river network from any point in the network in the
+upstream or downstream direction. We can limit the navigation distance (in km). The navigation
 can be done for all the valid NLDI sources which are ``comid``, ``huc12pp``, ``nwissite``,
 ``wade``, ``WQP``. For example, let's find all the USGS stations upstream of  01031500,
 across the whole network (tributaries), and then only in the mail channel.
@@ -126,17 +126,14 @@ across the whole network (tributaries), and then only in the mail channel.
     args["navigation"] = UT
     st_trib = nldi.navigate_byid(**args)
 
-    args["distance"] = 100
+    args["distance"] = 20
     st_d100 = nldi.navigate_byid(**args)
 
 We can set the source to ``huc12pp`` to get HUC12 pour points.
 
 .. code-block:: python
 
-    args.update{
-        "distance": None,
-        "source" : "huc12pp",
-    }
+    args.update({"distance": None, "source" : "huc12pp",})
     pp = nldi.navigate_byid(**args)
 
 ``NLDI`` provides only ``comid`` and geometry of the flowlines which can further
@@ -147,17 +144,17 @@ we can combine ``NLDI`` and ``WaterData`` to get the NHDPlus data for our statio
 
     wd = WaterData("nhdflowline_network")
 
-    args.update{
-        "fsource": "comid",
-        "source" : None,
-        "navigation": UM,
-    }
+    args.update({"fsource": "comid", "source" : None, "navigation": UM})
     comids = nldi.navigate_byid(**args).nhdplus_comid.tolist()
     flw_main = wd.byid("comid", comids)
 
     args["navigation"] = UT
     comids = nldi.navigate_byid(**args).nhdplus_comid.tolist()
     flw_trib = wd.byid("comid", comids)
+
+.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/develop/docs/_static/example_plots_pynhd.png
+    :target: https://raw.githubusercontent.com/cheginit/hydrodata/develop/docs/_static/example_plots_pynhd.png
+    :align: center
 
 Other feature sources in the WaterData database are ``nhdarea``, ``nhdwaterbody``,
 ``catchmentsp``, ``gagesii``, ``huc08``, ``huc12``, ``huc12agg``, and ``huc12all``.
