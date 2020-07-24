@@ -62,9 +62,14 @@ Additionally, PyNHD offers some extra utilities for processing the flowlines:
   is generic and any routing method can be plugged in.
 
 These utilities are developed based on an ``R`` package called
-`nhdplusTools <https://github.com/USGS-R/nhdplusTools>`__. Moreover, requests for additional functionalities can be submitted via
-`issue tracker <https://github.com/cheginit/pynhd/issues>`__.
+`nhdplusTools <https://github.com/USGS-R/nhdplusTools>`__.
 
+You can try using PyNHD without installing it on you system by clicking on the binder badge
+below the PyNHD banner. A Jupyter notebook instance with the Hydrodata software stack
+pre-installed will be launched in your web browser and you can start coding!
+
+Moreover, requests for additional functionalities can be submitted via
+`issue tracker <https://github.com/cheginit/pynhd/issues>`__.
 
 Installation
 ------------
@@ -152,6 +157,7 @@ we can combine ``NLDI`` and ``WaterData`` to get the NHDPlus data for our statio
 
 .. image:: https://raw.githubusercontent.com/cheginit/hydrodata/develop/docs/_static/example_plots_pynhd.png
     :target: https://raw.githubusercontent.com/cheginit/hydrodata/develop/docs/_static/example_plots_pynhd.png
+    :width: 600
     :align: center
 
 Other feature sources in the WaterData database are ``nhdarea``, ``nhdwaterbody``,
