@@ -49,16 +49,20 @@ PyNHD is a part of `Hydrodata <https://github.com/cheginit/hydrodata>`__ softwar
 and provides an interface to access
 `WaterData <https://labs.waterdata.usgs.gov/geoserver/web/wicket/bookmarkable/org.geoserver.web.demo.MapPreviewPage?1>`__
 and `NLDI <https://labs.waterdata.usgs.gov/about-nldi/>`_ web services. These two web services
-can be used to navigate and exctract vector data from NHDPlus V2 database such as
-catchments, HUC8, HUC12, GagesII, flowlines, and water bodies. Additionally, PyNHD
-has some extra utilities for processing flowlines:
+can be used to navigate and extract vector data from NHDPlus V2 database such as
+catchments, HUC8, HUC12, GagesII, flowlines, and water bodies.
+
+Additionally, PyNHD offers some extra utilities for processing the flowlines:
 
 - ``prepare_nhdplus``: For cleaning up the dataframe by, for example, removing tiny networks,
-  adding a ``to_comid`` column, and finding a terminal point if it doesn't exists.
+  adding a ``to_comid`` column, and finding a terminal flowlines if it doesn't exist.
 - ``topoogical_sort``: For sorting the river network topologically which is useful for routing
   and flow accumulation.
 - ``vector_accumulation``: For computing flow accumulation in a river network. This function
   is generic and any routing method can be plugged in.
+
+These utilities are developed based on an ``R`` package called
+`nhdplusTools <https://github.com/USGS-R/nhdplusTools>`__ by `Dave Blodgett <https://github.com/dblodgett-usgs>`__
 
 Moreover, requests for additional functionalities can be submitted via
 `issue tracker <https://github.com/cheginit/pynhd/issues>`__.
@@ -84,7 +88,7 @@ using `Conda <https://docs.conda.io/en/latest/>`__:
 Quickstart
 ----------
 
-Let's explore capabilities of ``NLDI``. We need an instantiate the class first:
+Let's explore the capabilities of ``NLDI``. We need to instantiate the class first:
 
 .. code-block:: python
 
@@ -101,11 +105,11 @@ We can get the basin geometry for the USGS station number 01031500:
 
     basin = nldi.getfeature_byid("nwissite", station_id, basin=True)
 
-``NLDI`` offer navigating a river network from any point in the network in the
+``NLDI``offers navigating a river network from any point in the network in the
 upstream or downstream direction. We can limit the navigation distance (in meters). The navigation
 can be done for all the valid NLDI sources which are ``comid``, ``huc12pp``, ``nwissite``,
 ``wade``, ``WQP``. For example, let's find all the USGS stations upstream of  01031500,
-accross the whole network (tributaries) and then only in the mail channel.
+across the whole network (tributaries), and then only in the mail channel.
 
 .. code-block:: python
 
@@ -136,7 +140,7 @@ We can set the source to ``huc12pp`` to get HUC12 pour points.
     pp = nldi.navigate_byid(**args)
 
 ``NLDI`` provides only ``comid`` and geometry of the flowlines which can further
-be used to get the other available columns in the NHDPlus databse. Let's see how
+be used to get the other available columns in the NHDPlus database. Let's see how
 we can combine ``NLDI`` and ``WaterData`` to get the NHDPlus data for our station.
 
 .. code-block:: python
@@ -172,9 +176,9 @@ sources within a bounding box.
     wd = WaterData("nhdwaterbody")
     wb = wd.bybox((-69.7718, 45.0742, -69.3141, 45.4534))
 
-Next, lets clean up the flowlines and use it to compute flow accumulatin. For simplicity,
+Next, lets clean up the flowlines and use it to compute flow accumulation. For simplicity,
 we assume that the flow in each river segment is equal to the length of the segment. Therefore,
-the accumulated flow at each point should be equal to sum of the lengths of all its upstream
+the accumulated flow at each point should be equal to the sum of the lengths of all its upstream
 river segments i.e., ``arbolatesu`` column in the NHDPlus database. We can use this to validate
 the flow accumulation result.
 
@@ -198,7 +202,7 @@ the flow accumulation result.
 Contributing
 ------------
 
-Contirbutions are very welcomed. Please read
+Contributions are very welcomed. Please read
 `CODE_OF_CONDUCT.rst <https://github.com/cheginit/pynhd/blob/master/CODE_OF_CONDUCT.rst>`__
 and
 `CONTRIBUTING.rst <https://github.com/cheginit/pynhd/blob/master/CONTRIBUTING.rst>`__
