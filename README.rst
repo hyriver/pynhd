@@ -204,7 +204,5 @@ Contributing
 ------------
 
 Contributions are very welcomed. Please read
-`CODE_OF_CONDUCT.rst <https://github.com/cheginit/pynhd/blob/master/CODE_OF_CONDUCT.rst>`__
-and
-`CONTRIBUTING.rst <https://github.com/cheginit/pynhd/blob/master/CONTRIBUTING.rst>`__
-files for instructions.
+`CONTRIBUTING.rst <https://github.com/cheginit/pygeoogc/blob/master/CONTRIBUTING.rst>`__
+file for instructions.
