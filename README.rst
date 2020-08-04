@@ -109,8 +109,8 @@ using `Conda <https://docs.conda.io/en/latest/>`__:
 
     $ conda install -c conda-forge pynhd
 
-Quickstart
-----------
+Quick start
+-----------
 
 Let's explore the capabilities of ``NLDI``. We need to instantiate the class first:
 
@@ -133,7 +133,7 @@ We can get the basin geometry for the USGS station number 01031500:
 upstream or downstream direction. We can also limit the navigation distance (in km). The
 navigation can be done for all the valid NLDI sources which are ``comid``, ``huc12pp``,
 ``nwissite``, ``wade``, ``WQP``. For example, let's find all the USGS stations upstream
-of 01031500, throught the tributaries, and then limit the navigation to only the main channel.
+of 01031500, through the tributaries, and then limit the navigation to only the main channel.
 
 .. code-block:: python
 
