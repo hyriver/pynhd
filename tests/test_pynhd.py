@@ -1,4 +1,5 @@
 """Tests for PyNHD package."""
+import io
 
 import pynhd as nhd
 from pynhd import NLDI, WaterData
@@ -83,3 +84,9 @@ def test_acc():
     diff = flw.arbolatesu - flw.acc
 
     assert diff.abs().sum() < 1e-5
+
+
+def test_show_versions():
+    f = io.StringIO()
+    nhd.show_versions(file=f)
+    assert "INSTALLED VERSIONS" in f.getvalue()
