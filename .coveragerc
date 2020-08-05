@@ -3,3 +3,4 @@ omit =
     setup.py
     tests/*
     pynhd/__init__.py
+    pynhd/print_versions.py
