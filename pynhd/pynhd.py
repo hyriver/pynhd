@@ -1,6 +1,6 @@
 """Access NLDI and WaterData databases."""
 import numbers
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import geopandas as gpd
 import networkx as nx
@@ -12,8 +12,7 @@ from pandas._libs.missing import NAType
 from pygeoogc import WFS, RetrySession, ServiceURL
 from requests import Response
 
-from . import utils
-from .exceptions import InvalidInputValue, ZeroMatched
+from .exceptions import InvalidInputType, InvalidInputValue, MissingItems, ZeroMatched
 
 
 class WaterData(WFS):
@@ -217,7 +216,7 @@ def prepare_nhdplus(
         "ftype",
     ]
 
-    utils.check_requirements(req_cols, flw)
+    _check_requirements(req_cols, flw)
     flw[req_cols[:-1]] = flw[req_cols[:-1]].astype("Int64")
 
     if not any(flw.terminalfl == 1):
@@ -281,7 +280,7 @@ def _remove_tinynetworks(
         "totdasqkm",
         "pathlength",
     ]
-    utils.check_requirements(req_cols, flw)
+    _check_requirements(req_cols, flw)
 
     flw[req_cols[:-2]] = flw[req_cols[:-2]].astype("Int64")
 
@@ -321,7 +320,7 @@ def _add_tocomid(flw: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         The input dataframe With an additional column named ``tocomid``.
     """
     req_cols = ["comid", "terminalpa", "fromnode", "tonode"]
-    utils.check_requirements(req_cols, flw)
+    _check_requirements(req_cols, flw)
 
     flw[req_cols] = flw[req_cols].astype("Int64")
 
@@ -438,3 +437,21 @@ def vector_accumulation(
     acc = pd.Series(outflow).loc[sorted_nodes[:-1]]
     acc = acc.rename_axis("comid").rename("acc")
     return acc
+
+
+def _check_requirements(reqs: Iterable, cols: List[str]) -> None:
+    """Check for all the required data.
+
+    Parameters
+    ----------
+    reqs : iterable
+        A list of required data names (str)
+    cols : list
+        A list of variable names (str)
+    """
+    if not isinstance(reqs, Iterable):
+        raise InvalidInputType("reqs", "iterable")
+
+    missing = [r for r in reqs if r not in cols]
+    if missing:
+        raise MissingItems(missing)
