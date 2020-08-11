@@ -1,6 +1,8 @@
 """Tests for PyNHD package."""
 import io
 
+import pytest
+
 import pynhd as nhd
 from pynhd import NLDI, WaterData
 
@@ -22,6 +24,7 @@ def test_nldi_urlonly():
     )
 
 
+@pytest.mark.flaky(max_runs=3)
 def test_nldi():
     station_id = f"USGS-{STA_ID}"
     site = "nwissite"
@@ -60,6 +63,7 @@ def test_nldi():
     )
 
 
+@pytest.mark.flaky(max_runs=3)
 def test_nhdplus():
     wd = WaterData("nhdwaterbody")
     print(wd)
@@ -67,6 +71,7 @@ def test_nhdplus():
     assert abs(wb.areasqkm.sum() - 87.181) < 1e-3
 
 
+@pytest.mark.flaky(max_runs=3)
 def test_acc():
     wd = WaterData("nhdflowline_network")
     comids = nldi.navigate_byid("nwissite", "USGS-11092450", UT)
