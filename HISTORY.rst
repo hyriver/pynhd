@@ -2,6 +2,12 @@
 History
 =======
 
+0.1.2 (2020-08-11)
+------------------
+
+- Add ``show_versions`` function for showing versions of the installed deps.
+- Improve documentations
+
 0.1.1 (2020-08-03)
 ------------------
 
