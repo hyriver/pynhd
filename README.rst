@@ -1,4 +1,4 @@
-.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/develop/docs/_static/pynhd_logo.png
+.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/pynhd_logo.png
     :target: https://github.com/cheginit/pynhd
     :align: center
 
@@ -42,7 +42,7 @@ PyNHD: Navigate and extract NHDPlus database
     :alt: Github Actions
 
 .. image:: https://mybinder.org/badge_logo.svg
-    :target: https://mybinder.org/v2/gh/cheginit/hydrodata/develop
+    :target: https://mybinder.org/v2/gh/cheginit/hydrodata/master
     :alt: Binder
 
 |
@@ -175,8 +175,8 @@ we can combine ``NLDI`` and ``WaterData`` to get the NHDPlus data for our statio
     comids = nldi.navigate_byid(**args).nhdplus_comid.tolist()
     flw_trib = wd.byid("comid", comids)
 
-.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/develop/docs/_static/example_plots_pynhd.png
-    :target: https://raw.githubusercontent.com/cheginit/hydrodata/develop/docs/_static/example_plots_pynhd.png
+.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/example_plots_pynhd.png
+    :target: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/example_plots_pynhd.png
     :width: 600
     :align: center
 
