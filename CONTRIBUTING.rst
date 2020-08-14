@@ -39,8 +39,8 @@ and "help wanted" is open to whoever wants to implement it.
 Write Documentation
 ~~~~~~~~~~~~~~~~~~~
 
-pynhd could always use more documentation, whether as part of the
-official pynhd docs, in docstrings, or even on the web in blog posts,
+PyNHD could always use more documentation, whether as part of the
+official PyNHD docs, in docstrings, or even on the web in blog posts,
 articles, and such.
 
 Submit Feedback
@@ -58,10 +58,10 @@ If you are proposing a feature:
 Get Started!
 ------------
 
-Ready to contribute? Here's how to set up pynhd for local development.
+Ready to contribute? Here's how to set up PyNHD for local development.
 
-1. Fork the pynhd repo through the GitHub website.
-2. Clone your fork locally and add the main pynhd as the upstream remote:
+1. Fork the PyNHD repo through the GitHub website.
+2. Clone your fork locally and add the main PyNHD as the upstream remote:
 
 .. code-block:: console
 
@@ -78,11 +78,10 @@ Ready to contribute? Here's how to set up pynhd for local development.
     $ conda activate pynhd-dev
     $ python -m pip install . --no-deps
 
-4. Check out the ``develop`` branch and create a branch for local development:
+4. Create a branch for local development:
 
 .. code-block:: console
 
-    $ git checkout develop
     $ git checkout -b bugfix-or-feature/name-of-your-bugfix-or-feature
     $ git push
 
@@ -103,7 +102,7 @@ Ready to contribute? Here's how to set up pynhd for local development.
 .. code-block:: console
 
     $ git fetch upstream
-    $ git merge upstream/develop
+    $ git merge upstream/name-of-your-branch
 
 7. Then lint and test the code:
 
@@ -121,7 +120,7 @@ Ready to contribute? Here's how to set up pynhd for local development.
 
     $ git add .
     $ git commit -m "Your detailed description of your changes."
-    $ git push origin name-of-your-bugfix-or-feature
+    $ git push origin name-of-your-branch
 
 10. Submit a pull request through the GitHub website.
 
