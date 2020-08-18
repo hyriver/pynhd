@@ -5,7 +5,7 @@ History
 0.1.3 (2020-08-18)
 ------------------
 
-- Replaces ``simplejson`` with ``orjson`` to speed-up JSON operations.
+- Replaced ``simplejson`` with ``orjson`` to speed-up JSON operations.
 
 0.1.2 (2020-08-11)
 ------------------
