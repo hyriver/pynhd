@@ -4,8 +4,6 @@ channels:
 dependencies:
   - python>=3.8
   - setuptools
-  - pygeoogc
-  - pygeoutils
   - networkx
 
   - setuptools_scm
@@ -14,3 +12,7 @@ dependencies:
   - pre-commit
   - codecov
   - coverage
+  - pip
+  - pip:
+    - git+https://github.com/cheginit/pygeoogc.git
+    - git+https://github.com/cheginit/pygeoutils.git
