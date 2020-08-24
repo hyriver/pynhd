@@ -63,7 +63,7 @@ class NLDI:
     """Access the Hydro Network-Linked Data Index (NLDI) service."""
 
     def __init__(self) -> None:
-        self.base_url = ServiceURL().restful.nldi
+        self.base_url = "/".join([ServiceURL().restful.nldi, "linked-data"])
         self.session = RetrySession()
         r = self.session.get(self.base_url).json()
         self.valid_sources = [el for sub in ogc.utils.traverse_json(r, ["source"]) for el in sub]

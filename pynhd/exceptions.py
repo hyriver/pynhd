@@ -1,4 +1,4 @@
-"""Customized Hydrodata exceptions."""
+"""Customized PyNHD exceptions."""
 from typing import Generator, List, Optional, Union
 
 
@@ -20,7 +20,7 @@ class InvalidInputValue(Exception):
     def __init__(
         self, inp: str, valid_inputs: Union[List[str], Generator[str, None, None]]
     ) -> None:
-        self.message = f"Given {inp} is invalid. Valid {inp}s are:\n" + ", ".join(
+        self.message = f"Given {inp} is invalid. Valid options are:\n" + "\n".join(
             str(i) for i in valid_inputs
         )
         super().__init__(self.message)
