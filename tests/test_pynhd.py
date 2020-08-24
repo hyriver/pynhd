@@ -7,6 +7,8 @@ import pynhd as nhd
 from pynhd import NLDI, WaterData
 
 STA_ID = "01031500"
+station_id = f"USGS-{STA_ID}"
+site = "nwissite"
 UM = "upstreamMain"
 UT = "upstreamTributaries"
 nldi = NLDI()
@@ -25,46 +27,40 @@ def test_nldi_urlonly():
 
 
 @pytest.mark.flaky(max_runs=3)
-def test_nldi():
-    station_id = f"USGS-{STA_ID}"
-    site = "nwissite"
-
-    nldi.getfeature_byid(site, station_id, basin=True)
-
+def test_nldi_navigate():
     stm = nldi.navigate_byid(site, station_id, navigation=UM, source=site)
     st100 = nldi.navigate_byid(site, station_id, navigation=UM, source=site, distance=100)
     pp = nldi.navigate_byid(site, station_id, navigation=UT, source="huc12pp")
+    assert st100.shape[0] == 2 and stm.shape[0] == 2 and pp.shape[0] == 12
 
-    wd = WaterData("nhdflowline_network")
 
-    fsource = "comid"
-    comids = nldi.navigate_byid(site, station_id, navigation=UM)
-    comid_list = comids.nhdplus_comid.tolist()
-    main = wd.byid(fsource, comid_list)
-
+@pytest.mark.flaky(max_runs=3)
+def test_waterdata_byid():
     comids = nldi.navigate_byid(site, station_id, navigation=UT)
     comid_list = comids.nhdplus_comid.tolist()
-    trib = wd.byid(fsource, comid_list)
 
-    fl = nhd.prepare_nhdplus(trib, 0, 0, purge_non_dendritic=False)
+    wd = WaterData("nhdflowline_network")
+    trib = wd.byid("comid", comid_list)
 
     wd = WaterData("catchmentsp")
-
     ct = wd.byid("featureid", comid_list)
 
     assert (
         trib.shape[0] == 432
-        and main.shape[0] == 52
-        and st100.shape[0] == 2
-        and stm.shape[0] == 2
-        and pp.shape[0] == 12
-        and abs(fl.lengthkm.sum() - 565.755) < 1e-3
+        and abs(trib.lengthkm.sum() - 565.755) < 1e-3
         and abs(ct.areasqkm.sum() - 773.954) < 1e-3
     )
 
 
 @pytest.mark.flaky(max_runs=3)
-def test_nhdplus():
+def test_nldi_feature():
+    basin = nldi.getfeature_byid(site, station_id, basin=True)
+    eck4 = "+proj=eck4 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
+    assert abs(basin.to_crs(eck4).area.iloc[0] - 774170100.273) < 1e-3
+
+
+@pytest.mark.flaky(max_runs=3)
+def test_waterdata_bybox():
     wd = WaterData("nhdwaterbody")
     print(wd)
     wb = wd.bybox((-69.7718, 45.0742, -69.3141, 45.4534))
@@ -77,6 +73,8 @@ def test_acc():
     comids = nldi.navigate_byid("nwissite", "USGS-11092450", UT)
     comid_list = comids.nhdplus_comid.tolist()
     trib = wd.byid("comid", comid_list)
+
+    nhd.prepare_nhdplus(trib, 0, 0, 0, False, False)
     flw = nhd.prepare_nhdplus(trib, 1, 1, 1, True, True)
 
     def routing(qin, q):
