@@ -55,8 +55,7 @@ def test_waterdata_byid():
 @pytest.mark.flaky(max_runs=3)
 def test_nldi_feature():
     basin = nldi.getfeature_byid(site, station_id, basin=True)
-    eck4 = "+proj=eck4 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
-    assert abs(basin.to_crs(eck4).area.iloc[0] - 774170100.273) < 1e-3
+    assert abs(basin.area.iloc[0] - 0.0887) < 1e-3
 
 
 @pytest.mark.flaky(max_runs=3)
