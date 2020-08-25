@@ -9,7 +9,7 @@ Package     Description
 =========== ===========================================================================
 Hydrodata_  Access NWIS, HCDN 2009, NLCD, and SSEBop databases
 PyGeoOGC_   Query data from any ArcGIS RESTful-, WMS-, and WFS-based services
-PyGeoUtils_ Convert responses from PyGeoOGC's supported web services to datasets
+PyGeoUtils_ Convert responses from pynhd's supported web services to datasets
 PyNHD_      Access NLDI and WaterData web services for navigating the NHDPlus database
 Py3DEP_     Access topographic data through the 3D Elevation Program (3DEP) web service
 PyDaymet_   Access the Daymet database for daily climate data
@@ -224,5 +224,5 @@ Contributing
 ------------
 
 Contributions are very welcomed. Please read
-`CONTRIBUTING.rst <https://github.com/cheginit/pygeoogc/blob/master/CONTRIBUTING.rst>`__
+`CONTRIBUTING.rst <https://github.com/cheginit/pynhd/blob/master/CONTRIBUTING.rst>`__
 file for instructions.
