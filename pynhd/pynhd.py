@@ -18,6 +18,13 @@ from .exceptions import InvalidInputType, InvalidInputValue, MissingItems, ZeroM
 class WaterData(WFS):
     """Access to `Water Data <https://labs.waterdata.usgs.gov/geoserver>`__ service.
 
+    Notes
+    -----
+    ``pygeoogc.WFS`` is the base class for ``WaterData``. Therefore, all the low-level
+    methods are available for ``WaterData`` with the addition of three high-level functions
+    that are intended to be used. For the most use cases, you only need ``bybox`` and ``byid``
+    methods.
+
     Parameters
     ----------
     layer : str
@@ -31,16 +38,22 @@ class WaterData(WFS):
         a limited number of CRSs, defaults to ``epsg:4269``.
     """
 
-    def __init__(self, layer: str, crs: str = "epsg:4269",) -> None:
+    def __init__(
+        self,
+        layer: str,
+        crs: str = "epsg:4269",
+    ) -> None:
         layer = layer if ":" in layer else f"wmadata:{layer}"
         super().__init__(ServiceURL().wfs.waterdata, layer, "application/json", "2.0.0", crs)
 
     def bybox(self, bbox: Tuple[float, float, float, float]) -> gpd.GeoDataFrame:
+        """Get features within a bounding box using ``WFS.getfeature_bybox``."""
         resp = self.getfeature_bybox(bbox, self.crs, always_xy=True)
         return self.to_geodf(resp)
 
     def byid(self, featurename: str, featureids: Union[List[str], str]) -> gpd.GeoDataFrame:
-        resp = self.getfeature_byid(featurename, featureids, filter_spec="2.0")
+        """Get features based on IDs using ``WFS.getfeature_byid``."""
+        resp = self.getfeature_byid(featurename, featureids)
         return self.to_geodf(resp)
 
     def to_geodf(self, resp: Response) -> gpd.GeoDataFrame:
@@ -245,7 +258,10 @@ def prepare_nhdplus(
 
 
 def _remove_tinynetworks(
-    flw: gpd.GeoDataFrame, min_path_size: float, min_path_length: float, min_network_size: float,
+    flw: gpd.GeoDataFrame,
+    min_path_size: float,
+    min_path_length: float,
+    min_network_size: float,
 ) -> gpd.GeoDataFrame:
     """Remove small paths in NHDPlus flowline database.
 
@@ -359,7 +375,10 @@ def topoogical_sort(
     upstream_nodes[pd.NA] = flowlines[flowlines.toID.isna()].ID.tolist()
 
     G = nx.from_pandas_edgelist(
-        flowlines[["ID", "toID"]], source="ID", target="toID", create_using=nx.DiGraph,
+        flowlines[["ID", "toID"]],
+        source="ID",
+        target="toID",
+        create_using=nx.DiGraph,
     )
     topo_sorted = list(nx.topological_sort(G))
     return topo_sorted, upstream_nodes, G
