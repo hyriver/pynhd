@@ -14,20 +14,6 @@ UT = "upstreamTributaries"
 nldi = NLDI()
 
 
-def test_nldi_urlonly():
-    fsource = "comid"
-    fid = "1722317"
-    url_id = nldi.getfeature_byid(fsource, fid, url_only=True)
-    url_nav = nldi.navigate_byid(fsource, fid, UM, "flowlines", url_only=True)
-    url_char = nldi.getcharacteristic_byid("comid", "6710923", "tot", url_only=True)
-    assert (
-        url_id == "https://labs.waterdata.usgs.gov/api/nldi/linked-data/comid/1722317"
-        and url_nav
-        == "https://labs.waterdata.usgs.gov/api/nldi/linked-data/comid/1722317/navigation/UM/flowlines?distance=500"
-        and url_char == "https://labs.waterdata.usgs.gov/api/nldi/linked-data/comid/6710923/tot"
-    )
-
-
 @pytest.mark.flaky(max_runs=3)
 def test_nldi_navigate():
     stm = nldi.navigate_byid(site, station_id, UM, site)

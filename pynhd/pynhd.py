@@ -17,6 +17,9 @@ from requests import Response
 
 from .exceptions import InvalidInputType, InvalidInputValue, MissingItems, ZeroMatched
 
+DEF_CRS = "epsg:4326"
+ALT_CRS = "epsg:4269"
+
 
 class WaterData(WFS):
     """Access to `Water Data <https://labs.waterdata.usgs.gov/geoserver>`__ service.
@@ -43,7 +46,7 @@ class WaterData(WFS):
     def __init__(
         self,
         layer: str,
-        crs: str = "epsg:4326",
+        crs: str = DEF_CRS,
     ) -> None:
         layer = layer if ":" in layer else f"wmadata:{layer}"
         url = ServiceURL().wfs.waterdata
@@ -70,7 +73,7 @@ class WaterData(WFS):
         self.crs_df = crs
 
     def bybox(
-        self, bbox: Tuple[float, float, float, float], box_crs: str = "epsg:4326"
+        self, bbox: Tuple[float, float, float, float], box_crs: str = DEF_CRS
     ) -> gpd.GeoDataFrame:
         """Get features within a bounding box using ``WFS.getfeature_bybox``."""
         resp = self.getfeature_bybox(bbox, box_crs, always_xy=True)
@@ -100,7 +103,7 @@ class WaterData(WFS):
             The requested features in a dataframes.
         """
         if self.layer in ["wmadata:huc12", "wmadata:huc12all"]:
-            self.crs = "epsg:4269"
+            self.crs = ALT_CRS
 
         return geoutils.json2geodf(resp.json(), self.crs, self.crs_df)
 
@@ -118,9 +121,7 @@ class NLDI:
         resp = self.session.get("/".join([self.base_url, "lookups"])).json()
         self.valid_chartypes = {r["type"]: r["typeName"] for r in resp}
 
-    def getfeature_byid(
-        self, fsource: str, fid: str, basin: bool = False, url_only: bool = False
-    ) -> gpd.GeoDataFrame:
+    def getfeature_byid(self, fsource: str, fid: str, basin: bool = False) -> gpd.GeoDataFrame:
         """Get features of a single id.
 
         Parameters
@@ -132,27 +133,19 @@ class NLDI:
             The ID of the feature.
         basin : bool
             Whether to return the basin containing the feature.
-        url_only : bool
-            Whether to only return the generated url, defaults to False.
-            It's intended for preparing urls for batch download.
 
         Returns
         -------
         geopandas.GeoDataFrame
             NLDI indexed features in EPSG:4326.
         """
-        if fsource not in self.valid_fsources:
-            valids = [f'"{s}" for {d}' for s, d in self.valid_fsources.items()]
-            raise InvalidInputValue("feature source", valids)
+        self._validate_fsource(fsource)
 
         url = "/".join([self.base_url, "linked-data", fsource, fid])
         if basin:
             url += "/basin"
 
-        if url_only:
-            return url
-
-        return geoutils.json2geodf(self._geturl(url), "epsg:4269", "epsg:4326")
+        return geoutils.json2geodf(self._geturl(url), ALT_CRS, DEF_CRS)
 
     def getcharacteristic_byid(
         self,
@@ -160,7 +153,6 @@ class NLDI:
         fid: str,
         char_type: str,
         values_only: bool = True,
-        url_only: bool = False,
     ) -> Union[pd.DataFrame, pd.Series]:
         """Get features of a single id.
 
@@ -175,27 +167,19 @@ class NLDI:
             Type of the characteristic.
         values_only : bool, optional
             Whether to return only ``characteristic_value`` as a series, default to True.
-        url_only : bool, optional
-            Whether to only return the generated url, defaults to False.
-            It's intended for preparing urls for batch download.
 
         Returns
         -------
         pandas.DataFrame or pandas.Series
             Either only values as a series or all the available data as a dataframe.
         """
-        if fsource not in self.valid_fsources:
-            valids = [f'"{s}" for {d}' for s, d in self.valid_fsources.items()]
-            raise InvalidInputValue("feature source", valids)
+        self._validate_fsource(fsource)
 
         if char_type not in self.valid_chartypes:
             valids = [f'"{s}" for {d}' for s, d in self.valid_chartypes.items()]
             raise InvalidInputValue("char", valids)
 
         url = "/".join([self.base_url, "linked-data", fsource, fid, char_type])
-
-        if url_only:
-            return url
 
         rjson = self._geturl(url)
         char = pd.DataFrame.from_dict(rjson["characteristics"], orient="columns").T
@@ -206,8 +190,8 @@ class NLDI:
 
         if values_only:
             return char.loc["characteristic_value"]
-        else:
-            return char
+
+        return char
 
     def navigate_byid(
         self,
@@ -216,7 +200,6 @@ class NLDI:
         navigation: str,
         source: str,
         distance: int = 500,
-        url_only: bool = False,
     ) -> gpd.GeoDataFrame:
         """Navigate the NHDPlus databse from a single feature id up to a distance.
 
@@ -236,18 +219,13 @@ class NLDI:
             Limit the search for navigation up to a distance in km,
             defaults is 500 km. Note that this is an expensive request so you
             have be mindful of the value that you provide.
-        url_only : bool
-            Whether to only return the generated url, defaults to False.
-            It's intended for preparing urls for batch download.
 
         Returns
         -------
         geopandas.GeoDataFrame
             NLDI indexed features in EPSG:4326.
         """
-        if fsource not in self.valid_fsources:
-            valids = [f'"{s}" for {d}' for s, d in self.valid_fsources.items()]
-            raise InvalidInputValue("feature source", valids)
+        self._validate_fsource(fsource)
 
         url = "/".join([self.base_url, "linked-data", fsource, fid, "navigation"])
 
@@ -264,27 +242,23 @@ class NLDI:
 
         url = f"{valid_sources[source]}?distance={int(distance)}"
 
-        if url_only:
-            return url
-
-        return geoutils.json2geodf(self._geturl(url), "epsg:4269", "epsg:4326")
+        return geoutils.json2geodf(self._geturl(url), ALT_CRS, DEF_CRS)
 
     def navigate_byloc(
         self,
         coords: Tuple[float, float],
         navigation: Optional[str] = None,
         source: Optional[str] = None,
+        loc_crs: str = DEF_CRS,
         distance: int = 500,
-        loc_crs: str = "epsg:4326",
         comid_only: bool = False,
-        url_only: bool = False,
     ) -> gpd.GeoDataFrame:
         """Navigate the NHDPlus databse from a coordinate.
 
         Parameters
         ----------
         coordinate : tuple
-            A tuple of length two (x, y)
+            A tuple of length two (x, y).
         navigation : str, optional
             The navigation method, defaults to None which throws an exception
             if comid_only is False.
@@ -292,30 +266,28 @@ class NLDI:
             Return the data from another source after navigating
             the features using fsource, defaults to None which throws an exception
             if comid_only is False.
-        distance : int, optional
-            Limit the search for navigation up to a distance in km,
-            defaults is 500 km. Note that this is an expensive request so you
-            have be mindful of the value that you provide.
         loc_crs : str, optional
             The spatial reference of the input coordinate, defaults to EPSG:4326.
+        distance : int, optional
+            Limit the search for navigation up to a distance in km,
+            defaults to 500 km. Note that this is an expensive request so you
+            have be mindful of the value that you provide. If you want to get
+            all the available features you can pass a large distance like 9999999.
         comid_only : bool, optional
             Whether to return the nearest comid without navigation.
-        url_only : bool, optional
-            Whether to only return the generated url, defaults to False.
-            It's intended for  preparing urls for batch download.
 
         Returns
         -------
         geopandas.GeoDataFrame
             NLDI indexed features in EPSG:4326.
         """
-        _coords = MatchCRS().coords(((coords[0],), (coords[1],)), loc_crs, "epsg:4326")
+        _coords = MatchCRS().coords(((coords[0],), (coords[1],)), loc_crs, DEF_CRS)
         lon, lat = _coords[0][0], _coords[1][0]
 
         url = "/".join([self.base_url, "linked-data", "comid", "position"])
         payload = {"coords": f"POINT({lon} {lat})"}
         rjson = self._geturl(url, payload)
-        comid = geoutils.json2geodf(rjson, "epsg:4269", "epsg:4326").comid.iloc[0]
+        comid = geoutils.json2geodf(rjson, ALT_CRS, DEF_CRS).comid.iloc[0]
 
         if comid_only:
             return comid
@@ -323,7 +295,7 @@ class NLDI:
         if navigation is None or source is None:
             raise MissingItems(["navigation", "source"])
 
-        return self.navigate_byid("comid", comid, navigation, source, distance, url_only)
+        return self.navigate_byid("comid", comid, navigation, source, distance)
 
     def characteristics_dataframe(
         self,
@@ -377,6 +349,11 @@ class NLDI:
             raise InvalidInputValue("filename", list(flist.keys()))
 
         return pd.read_csv(flist[filename], compression="zip")
+
+    def _validate_fsource(self, fsource: str) -> None:
+        if fsource not in self.valid_fsources:
+            valids = [f'"{s}" for {d}' for s, d in self.valid_fsources.items()]
+            raise InvalidInputValue("feature source", valids)
 
     def _geturl(self, url: str, payload: Optional[Dict[str, str]] = None):
         if payload is None:
