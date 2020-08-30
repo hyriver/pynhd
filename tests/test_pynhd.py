@@ -17,26 +17,56 @@ nldi = NLDI()
 def test_nldi_urlonly():
     fsource = "comid"
     fid = "1722317"
-    url_box = nldi.getfeature_byid(fsource, fid, url_only=True)
-    url_nav = nldi.navigate_byid(fsource, fid, navigation="upstreamMain", url_only=True)
+    url_id = nldi.getfeature_byid(fsource, fid, url_only=True)
+    url_nav = nldi.navigate_byid(fsource, fid, UM, "flowlines", url_only=True)
+    url_char = nldi.getcharacteristic_byid("comid", "6710923", "tot", url_only=True)
     assert (
-        url_box == "https://labs.waterdata.usgs.gov/api/nldi/linked-data/comid/1722317"
+        url_id == "https://labs.waterdata.usgs.gov/api/nldi/linked-data/comid/1722317"
         and url_nav
-        == "https://labs.waterdata.usgs.gov/api/nldi/linked-data/comid/1722317/navigate/UM"
+        == "https://labs.waterdata.usgs.gov/api/nldi/linked-data/comid/1722317/navigation/UM/flowlines?distance=500"
+        and url_char == "https://labs.waterdata.usgs.gov/api/nldi/linked-data/comid/6710923/tot"
     )
 
 
 @pytest.mark.flaky(max_runs=3)
 def test_nldi_navigate():
-    stm = nldi.navigate_byid(site, station_id, navigation=UM, source=site)
-    st100 = nldi.navigate_byid(site, station_id, navigation=UM, source=site, distance=100)
-    pp = nldi.navigate_byid(site, station_id, navigation=UT, source="huc12pp")
-    assert st100.shape[0] == 2 and stm.shape[0] == 2 and pp.shape[0] == 12
+    stm = nldi.navigate_byid(site, station_id, UM, site)
+    st100 = nldi.navigate_byid(site, station_id, UM, site, distance=100)
+    pp = nldi.navigate_byid(site, station_id, UT, "huc12pp")
+    wqp = nldi.navigate_byloc((-70, 44), UT, "wqp")
+    assert (
+        st100.shape[0] == 2
+        and stm.shape[0] == 2
+        and pp.shape[0] == 12
+        and wqp.comid.iloc[0] == "6710923"
+    )
+
+
+@pytest.mark.flaky(max_runs=3)
+def test_nldi_feature():
+    basin = nldi.getfeature_byid(site, station_id, basin=True)
+    assert abs(basin.area.iloc[0] - 0.0887) < 1e-3
+
+
+@pytest.mark.flaky(max_runs=3)
+def test_nldi_char():
+    tot = nldi.getcharacteristic_byid("comid", "6710923", "tot")
+    assert abs(tot.TOT_BFI - 57) < 1e-3
+
+
+@pytest.mark.flaky(max_runs=3)
+def test_nldi_chardf():
+    bfi = nldi.characteristics_dataframe("tot", "TOT_BFI", "BFI_CONUS.zip")
+    meta = nldi.characteristics_dataframe("tot", "TOT_BFI", "BFI_CONUS.zip", metadata=True)
+    assert (
+        abs(bfi[bfi.ACC_BFI > 0].ACC_BFI.sum() - 116653087.67) < 1e-3
+        and meta["id"] == "5669a8e3e4b08895842a1d4f"
+    )
 
 
 @pytest.mark.flaky(max_runs=3)
 def test_waterdata_byid():
-    comids = nldi.navigate_byid(site, station_id, navigation=UT)
+    comids = nldi.navigate_byid(site, station_id, UT, "flowlines")
     comid_list = comids.nhdplus_comid.tolist()
 
     wd = WaterData("nhdflowline_network")
@@ -53,12 +83,6 @@ def test_waterdata_byid():
 
 
 @pytest.mark.flaky(max_runs=3)
-def test_nldi_feature():
-    basin = nldi.getfeature_byid(site, station_id, basin=True)
-    assert abs(basin.area.iloc[0] - 0.0887) < 1e-3
-
-
-@pytest.mark.flaky(max_runs=3)
 def test_waterdata_bybox():
     wd = WaterData("nhdwaterbody")
     print(wd)
@@ -67,9 +91,16 @@ def test_waterdata_bybox():
 
 
 @pytest.mark.flaky(max_runs=3)
+def test_waterdata_byfilter():
+    wd = nhd.WaterData("huc12", "epsg:3857")
+    wb = wd.byfilter(f"{wd.layer} LIKE '17030001%'")
+    assert wb.shape[0] == 52
+
+
+@pytest.mark.flaky(max_runs=3)
 def test_acc():
     wd = WaterData("nhdflowline_network")
-    comids = nldi.navigate_byid("nwissite", "USGS-11092450", UT)
+    comids = nldi.navigate_byid("nwissite", "USGS-11092450", UT, "flowlines")
     comid_list = comids.nhdplus_comid.tolist()
     trib = wd.byid("comid", comid_list)
 
@@ -80,7 +111,10 @@ def test_acc():
         return qin + q
 
     qsim = nhd.vector_accumulation(
-        flw[["comid", "tocomid", "lengthkm"]], routing, "lengthkm", ["lengthkm"],
+        flw[["comid", "tocomid", "lengthkm"]],
+        routing,
+        "lengthkm",
+        ["lengthkm"],
     )
     flw = flw.merge(qsim, on="comid")
     diff = flw.arbolatesu - flw.acc
