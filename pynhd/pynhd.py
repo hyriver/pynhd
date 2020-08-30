@@ -1,6 +1,7 @@
 """Access NLDI and WaterData databases."""
 import numbers
-from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
+from json import JSONDecodeError
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import geopandas as gpd
 import networkx as nx
@@ -8,8 +9,10 @@ import numpy as np
 import pandas as pd
 import pygeoogc as ogc
 import pygeoutils as geoutils
+from owslib.wfs import WebFeatureService
 from pandas._libs.missing import NAType
-from pygeoogc import WFS, RetrySession, ServiceURL
+from pygeoogc import WFS, MatchCRS, RetrySession, ServiceURL
+from pyproj import CRS
 from requests import Response
 
 from .exceptions import InvalidInputType, InvalidInputValue, MissingItems, ZeroMatched
@@ -22,8 +25,8 @@ class WaterData(WFS):
     -----
     ``pygeoogc.WFS`` is the base class for ``WaterData``. Therefore, all the low-level
     methods are available for ``WaterData`` with the addition of three high-level functions
-    that are intended to be used. For the most use cases, you only need ``bybox`` and ``byid``
-    methods.
+    that are intended to be used. For the most use cases, you only need ``bybox``, ``byid``,
+    and ``byfilter`` methods from this class.
 
     Parameters
     ----------
@@ -34,26 +37,53 @@ class WaterData(WFS):
         the layers' worksapce for the Water Data service is ``wmadata`` which will
         be added to the given ``layer`` argument if it is not provided.
     crs : str, optional
-        The spatial reference system for requesting the data. Each layer support
-        a limited number of CRSs, defaults to ``epsg:4269``.
+        The target spatial reference system, defaults to ``epsg:4326``.
     """
 
     def __init__(
         self,
         layer: str,
-        crs: str = "epsg:4269",
+        crs: str = "epsg:4326",
     ) -> None:
         layer = layer if ":" in layer else f"wmadata:{layer}"
-        super().__init__(ServiceURL().wfs.waterdata, layer, "application/json", "2.0.0", crs)
+        url = ServiceURL().wfs.waterdata
+        wfs = WebFeatureService(url, version="2.0.0")
 
-    def bybox(self, bbox: Tuple[float, float, float, float]) -> gpd.GeoDataFrame:
+        valid_layers = list(wfs.contents)
+        if layer not in valid_layers:
+            raise InvalidInputValue("layer", valid_layers)
+
+        payload = {
+            "service": "wfs",
+            "version": "2.0.0",
+            "outputFormat": "application/json",
+            "request": "GetFeature",
+            "typeName": layer,
+            "count": 1,
+        }
+
+        resp = ogc.RetrySession().get(url, payload)
+        ogc.utils.check_response(resp)
+        crs_req = CRS.from_string(resp.json()["crs"]["properties"]["name"]).to_string().lower()
+
+        super().__init__(url, layer, "application/json", "2.0.0", crs_req, validation=False)
+        self.crs_df = crs
+
+    def bybox(
+        self, bbox: Tuple[float, float, float, float], box_crs: str = "epsg:4326"
+    ) -> gpd.GeoDataFrame:
         """Get features within a bounding box using ``WFS.getfeature_bybox``."""
-        resp = self.getfeature_bybox(bbox, self.crs, always_xy=True)
+        resp = self.getfeature_bybox(bbox, box_crs, always_xy=True)
         return self.to_geodf(resp)
 
     def byid(self, featurename: str, featureids: Union[List[str], str]) -> gpd.GeoDataFrame:
         """Get features based on IDs using ``WFS.getfeature_byid``."""
         resp = self.getfeature_byid(featurename, featureids)
+        return self.to_geodf(resp)
+
+    def byfilter(self, cql_filter: str) -> gpd.GeoDataFrame:
+        """Get features based on a CQL filter using ``WFS.getfeature_byfilter``."""
+        resp = self.getfeature_byfilter(cql_filter)
         return self.to_geodf(resp)
 
     def to_geodf(self, resp: Response) -> gpd.GeoDataFrame:
@@ -69,17 +99,24 @@ class WaterData(WFS):
         geopandas.GeoDataFrame
             The requested features in a dataframes.
         """
-        return geoutils.json2geodf(resp.json(), self.crs, self.crs)
+        if self.layer in ["wmadata:huc12", "wmadata:huc12all"]:
+            self.crs = "epsg:4269"
+
+        return geoutils.json2geodf(resp.json(), self.crs, self.crs_df)
 
 
 class NLDI:
     """Access the Hydro Network-Linked Data Index (NLDI) service."""
 
     def __init__(self) -> None:
-        self.base_url = "/".join([ServiceURL().restful.nldi, "linked-data"])
+        self.base_url = ServiceURL().restful.nldi
         self.session = RetrySession()
-        r = self.session.get(self.base_url).json()
-        self.valid_sources = [el for sub in ogc.utils.traverse_json(r, ["source"]) for el in sub]
+
+        resp = self.session.get("/".join([self.base_url, "linked-data"])).json()
+        self.valid_fsources = {r["source"]: r["sourceName"] for r in resp}
+
+        resp = self.session.get("/".join([self.base_url, "lookups"])).json()
+        self.valid_chartypes = {r["type"]: r["typeName"] for r in resp}
 
     def getfeature_byid(
         self, fsource: str, fid: str, basin: bool = False, url_only: bool = False
@@ -90,7 +127,7 @@ class NLDI:
         ----------
         fsource : str
             The name of feature source. The valid sources are:
-            comid, huc12pp, nwissite, wade, WQP
+            comid, huc12pp, nwissite, wade, wqp
         fid : str
             The ID of the feature.
         basin : bool
@@ -104,28 +141,84 @@ class NLDI:
         geopandas.GeoDataFrame
             NLDI indexed features in EPSG:4326.
         """
-        if fsource not in self.valid_sources:
-            raise InvalidInputValue("feature source", self.valid_sources)
+        if fsource not in self.valid_fsources:
+            valids = [f'"{s}" for {d}' for s, d in self.valid_fsources.items()]
+            raise InvalidInputValue("feature source", valids)
 
-        url = "/".join([self.base_url, fsource, fid])
+        url = "/".join([self.base_url, "linked-data", fsource, fid])
         if basin:
             url += "/basin"
 
         if url_only:
             return url
 
-        return self._get_url(url)
+        return geoutils.json2geodf(self._geturl(url), "epsg:4269", "epsg:4326")
+
+    def getcharacteristic_byid(
+        self,
+        fsource: str,
+        fid: str,
+        char_type: str,
+        values_only: bool = True,
+        url_only: bool = False,
+    ) -> Union[pd.DataFrame, pd.Series]:
+        """Get features of a single id.
+
+        Parameters
+        ----------
+        fsource : str
+            The name of feature source. The valid sources are:
+            comid, huc12pp, nwissite, wade, WQP
+        fid : str
+            The ID of the feature.
+        char_type : str
+            Type of the characteristic.
+        values_only : bool, optional
+            Whether to return only ``characteristic_value`` as a series, default to True.
+        url_only : bool, optional
+            Whether to only return the generated url, defaults to False.
+            It's intended for preparing urls for batch download.
+
+        Returns
+        -------
+        pandas.DataFrame or pandas.Series
+            Either only values as a series or all the available data as a dataframe.
+        """
+        if fsource not in self.valid_fsources:
+            valids = [f'"{s}" for {d}' for s, d in self.valid_fsources.items()]
+            raise InvalidInputValue("feature source", valids)
+
+        if char_type not in self.valid_chartypes:
+            valids = [f'"{s}" for {d}' for s, d in self.valid_chartypes.items()]
+            raise InvalidInputValue("char", valids)
+
+        url = "/".join([self.base_url, "linked-data", fsource, fid, char_type])
+
+        if url_only:
+            return url
+
+        rjson = self._geturl(url)
+        char = pd.DataFrame.from_dict(rjson["characteristics"], orient="columns").T
+        char.columns = char.iloc[0]
+        char = char.drop(index="characteristic_id")
+        char[char == ""] = np.nan
+        char = char.astype("f4")
+
+        if values_only:
+            return char.loc["characteristic_value"]
+        else:
+            return char
 
     def navigate_byid(
         self,
         fsource: str,
         fid: str,
         navigation: str,
-        source: Optional[str] = None,
-        distance: Optional[int] = None,
+        source: str,
+        distance: int = 500,
         url_only: bool = False,
     ) -> gpd.GeoDataFrame:
-        """Navigate the NHDPlus databse from a single feature id.
+        """Navigate the NHDPlus databse from a single feature id up to a distance.
 
         Parameters
         ----------
@@ -140,8 +233,74 @@ class NLDI:
             Return the data from another source after navigating
             the features using fsource, defaults to None.
         distance : int, optional
-            Limit the search for navigation up to a distance, defaults to None.
+            Limit the search for navigation up to a distance in km,
+            defaults is 500 km. Note that this is an expensive request so you
+            have be mindful of the value that you provide.
         url_only : bool
+            Whether to only return the generated url, defaults to False.
+            It's intended for preparing urls for batch download.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            NLDI indexed features in EPSG:4326.
+        """
+        if fsource not in self.valid_fsources:
+            valids = [f'"{s}" for {d}' for s, d in self.valid_fsources.items()]
+            raise InvalidInputValue("feature source", valids)
+
+        url = "/".join([self.base_url, "linked-data", fsource, fid, "navigation"])
+
+        valid_navigations = self._geturl(url)
+        if navigation not in valid_navigations.keys():
+            raise InvalidInputValue("navigation", list(valid_navigations.keys()))
+
+        url = valid_navigations[navigation]
+
+        r_json = self._geturl(url)
+        valid_sources = {s["source"].lower(): s["features"] for s in r_json}
+        if source not in valid_sources:
+            raise InvalidInputValue("source", list(valid_sources.keys()))
+
+        url = f"{valid_sources[source]}?distance={int(distance)}"
+
+        if url_only:
+            return url
+
+        return geoutils.json2geodf(self._geturl(url), "epsg:4269", "epsg:4326")
+
+    def navigate_byloc(
+        self,
+        coords: Tuple[float, float],
+        navigation: Optional[str] = None,
+        source: Optional[str] = None,
+        distance: int = 500,
+        loc_crs: str = "epsg:4326",
+        comid_only: bool = False,
+        url_only: bool = False,
+    ) -> gpd.GeoDataFrame:
+        """Navigate the NHDPlus databse from a coordinate.
+
+        Parameters
+        ----------
+        coordinate : tuple
+            A tuple of length two (x, y)
+        navigation : str, optional
+            The navigation method, defaults to None which throws an exception
+            if comid_only is False.
+        source : str, optional
+            Return the data from another source after navigating
+            the features using fsource, defaults to None which throws an exception
+            if comid_only is False.
+        distance : int, optional
+            Limit the search for navigation up to a distance in km,
+            defaults is 500 km. Note that this is an expensive request so you
+            have be mindful of the value that you provide.
+        loc_crs : str, optional
+            The spatial reference of the input coordinate, defaults to EPSG:4326.
+        comid_only : bool, optional
+            Whether to return the nearest comid without navigation.
+        url_only : bool, optional
             Whether to only return the generated url, defaults to False.
             It's intended for  preparing urls for batch download.
 
@@ -150,31 +309,85 @@ class NLDI:
         geopandas.GeoDataFrame
             NLDI indexed features in EPSG:4326.
         """
-        if fsource not in self.valid_sources:
-            raise InvalidInputValue("feature source", self.valid_sources)
+        _coords = MatchCRS().coords(((coords[0],), (coords[1],)), loc_crs, "epsg:4326")
+        lon, lat = _coords[0][0], _coords[1][0]
 
-        url = "/".join([self.base_url, fsource, fid, "navigate"])
-        valid_navigations = self.session.get(url).json()
-        if navigation not in valid_navigations.keys():
-            raise InvalidInputValue("navigation", valid_navigations.keys())
+        url = "/".join([self.base_url, "linked-data", "comid", "position"])
+        payload = {"coords": f"POINT({lon} {lat})"}
+        rjson = self._geturl(url, payload)
+        comid = geoutils.json2geodf(rjson, "epsg:4269", "epsg:4326").comid.iloc[0]
 
-        url = valid_navigations[navigation]
+        if comid_only:
+            return comid
 
-        if source is not None:
-            if source not in self.valid_sources:
-                raise InvalidInputValue("source", self.valid_sources)
-            url += f"/{source}"
+        if navigation is None or source is None:
+            raise MissingItems(["navigation", "source"])
 
-        if distance is not None:
-            url += f"?distance={int(distance)}"
+        return self.navigate_byid("comid", comid, navigation, source, distance, url_only)
 
-        if url_only:
-            return url
+    def characteristics_dataframe(
+        self,
+        char_type: str,
+        char_id: str,
+        filename: Optional[str] = None,
+        metadata: bool = False,
+    ) -> Union[Dict[str, Any], pd.DataFrame]:
+        """Get a NHDPlus-based characteristic from sciencebase.gov as dataframe.
 
-        return self._get_url(url)
+        Parameters
+        ----------
+        char_type : str
+            Characteristic type.
+        char_id : str
+            Characteristic ID.
+        filename : str, optional
+            File name, defaults to None that throws an error and shows
+            a list of available files.
+        metadata : bool
+            Whether to only return the metadata for the selected characteristic,
+            defaults to False. Useful for getting information about the dataset
+            such as citation, units, column names, etc.
 
-    def _get_url(self, url):
-        return geoutils.json2geodf(self.session.get(url).json(), "epsg:4269", "epsg:4326")
+        Returns
+        -------
+        pandas.DataFrame or dict
+            The requested characteristic as a dataframe or if ``metadata`` is True
+            the metadata as a dictionary.
+        """
+        if char_type not in self.valid_chartypes:
+            valids = [f'"{s}" for {d}' for s, d in self.valid_chartypes.items()]
+            raise InvalidInputValue("char", valids)
+
+        resp = self.session.get("/".join([self.base_url, "lookups", char_type, "characteristics"]))
+        c_list = ogc.utils.traverse_json(resp.json(), ["characteristicMetadata", "characteristic"])
+        valid_ids = {c.pop("characteristic_id"): c for c in c_list}
+
+        if char_id not in valid_ids:
+            valids = [f"\"{s}\" for {d['dataset_label']}" for s, d in valid_ids.items()]
+            raise InvalidInputValue("char_id", valids)
+
+        meta = self.session.get(valid_ids[char_id]["dataset_url"], {"format": "json"}).json()
+        if metadata:
+            return meta
+
+        flist = {
+            f["name"]: f["downloadUri"] for f in meta["files"] if f["name"].split(".")[-1] == "zip"
+        }
+        if filename not in flist:
+            raise InvalidInputValue("filename", list(flist.keys()))
+
+        return pd.read_csv(flist[filename], compression="zip")
+
+    def _geturl(self, url: str, payload: Optional[Dict[str, str]] = None):
+        if payload is None:
+            payload = {"f": "json"}
+        else:
+            payload.update({"f": "json"})
+
+        try:
+            return self.session.get(url, payload).json()
+        except JSONDecodeError:
+            raise ZeroMatched("No feature was found with the provided inputs.")
 
 
 def prepare_nhdplus(
