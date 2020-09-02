@@ -36,8 +36,8 @@ def test_nldi_feature():
 
 @pytest.mark.flaky(max_runs=3)
 def test_nldi_char():
-    tot = nldi.getcharacteristic_byid("comid", "6710923", "tot")
-    assert abs(tot.TOT_BFI - 57) < 1e-3
+    tot, prc = nldi.getcharacteristic_byid("6710923", "tot", char_ids="TOT_BFI", values_only=False)
+    assert abs(tot.TOT_BFI.values[0] - 57) < 1e-3 and prc.TOT_BFI.values[0] == 0
 
 
 @pytest.mark.flaky(max_runs=3)
@@ -84,6 +84,15 @@ def test_waterdata_byfilter():
 
 
 @pytest.mark.flaky(max_runs=3)
+def test_nhdphr():
+    hr = nhd.NHDPlusHR("networknhdflowline")
+    flwb = hr.bygeom((-69.77, 45.07, -69.31, 45.45))
+    flwi = hr.byids("NHDPLUSID", ["5000500013223", "5000400039708", "5000500004825"])
+    flwf = hr.bysql("NHDPLUSID IN (5000500013223, 5000400039708, 5000500004825)")
+    assert flwb.shape[0] == 3887 and flwi.OBJECTID.tolist() == flwf.OBJECTID.tolist()
+
+
+@pytest.mark.flaky(max_runs=3)
 def test_acc():
     wd = WaterData("nhdflowline_network")
     comids = nldi.navigate_byid("nwissite", "USGS-11092450", UT, "flowlines")
@@ -103,7 +112,7 @@ def test_acc():
         ["lengthkm"],
     )
     flw = flw.merge(qsim, on="comid")
-    diff = flw.arbolatesu - flw.acc
+    diff = flw.arbolatesu - flw.acc_lengthkm
 
     assert diff.abs().sum() < 1e-5
 
