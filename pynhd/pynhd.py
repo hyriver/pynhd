@@ -11,9 +11,10 @@ import pygeoogc as ogc
 import pygeoutils as geoutils
 from owslib.wfs import WebFeatureService
 from pandas._libs.missing import NAType
-from pygeoogc import WFS, MatchCRS, RetrySession, ServiceURL
+from pygeoogc import WFS, ArcGISRESTful, MatchCRS, RetrySession, ServiceURL
 from pyproj import CRS
 from requests import Response
+from shapely.geometry import Polygon
 
 from .exceptions import InvalidInputType, InvalidInputValue, MissingItems, ZeroMatched
 
@@ -108,6 +109,126 @@ class WaterData(WFS):
         return geoutils.json2geodf(resp.json(), self.crs, self.crs_df)
 
 
+class NHDPlusHR:
+    """Access NHDPlus HR database through the National Map ArcGISRESTful.
+
+    Parameters
+    ----------
+    layer : str
+        A valid service layer. For a list of available layers pass an empty string to
+        the class.
+    outfields : str or list, optional
+        Target field name(s), default to "*" i.e., all the fileds.
+    crs : str, optional
+        Target spatial reference, default to EPSG:4326
+    """
+
+    def __init__(self, layer: str, outfields: Union[str, List[str]] = "*", crs: str = DEF_CRS):
+        self.service = ArcGISRESTful(
+            ServiceURL().restful.nhdplushr,
+            outformat="json",
+            outfields=outfields,
+            crs=crs,
+        )
+        valid_layers = self.service.get_validlayers()
+        self.valid_layers = {v.lower(): k for k, v in valid_layers.items()}
+        if layer not in self.valid_layers:
+            raise InvalidInputValue("layer", list(self.valid_layers))
+        self.service.layer = self.valid_layers[layer]
+
+        self.outfields = outfields
+        self.crs = crs
+
+    def bygeom(
+        self,
+        geom: Union[Polygon, Tuple[float, float, float, float]],
+        geo_crs: str = "epsg:4326",
+        sql_clause: str = "",
+        return_m: bool = False,
+    ) -> gpd.GeoDataFrame:
+        """Get feature within a geometry that can be combined with a SQL where clause.
+
+        Parameters
+        ----------
+        geom : Polygon or tuple
+            A geometry (Polgon) or bounding box (tuple of length 4).
+        geo_crs : str
+            The spatial reference of the input geometry.
+        sql_clause : str, optional
+            A valid SQL 92 WHERE clause, defaults to an empty string.
+        return_m : bool
+            Whether to activate the Return M (measure) in the request, defaults to False.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            The requested features as a GeoDataFrame.
+        """
+        self.service.oids_bygeom(geom, geo_crs=geo_crs, sql_clause=sql_clause)
+        return self._getfeatures(return_m)
+
+    def byids(
+        self, field: str, fids: Union[str, List[str]], return_m: bool = False
+    ) -> gpd.GeoDataFrame:
+        """Get features based on a list of field IDs.
+
+        Parameters
+        ----------
+        field : str
+            Name of the target field that IDs belong to.
+        fids : str or list
+            A list of target field ID(s).
+        return_m : bool
+            Whether to activate the Return M (measure) in the request, defaults to False.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            The requested features as a GeoDataFrame.
+        """
+        self.service.oids_byfield(field, fids)
+        return self._getfeatures(return_m)
+
+    def bysql(self, sql_clause: str, return_m: bool = False) -> gpd.GeoDataFrame:
+        """Get feature IDs using a valid SQL 92 WHERE clause.
+
+        Notes
+        -----
+        Not all web services support this type of query. For more details look
+        `here <https://developers.arcgis.com/rest/services-reference/query-feature-service-.htm#ESRI_SECTION2_07DD2C5127674F6A814CE6C07D39AD46>`__
+
+        Parameters
+        ----------
+        sql_clause : str
+            A valid SQL 92 WHERE clause.
+        return_m : bool
+            Whether to activate the Return M (measure) in the request, defaults to False.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            The requested features as a GeoDataFrame.
+        """
+        self.service.oids_bysql(sql_clause)
+        return self._getfeatures(return_m)
+
+    def _getfeatures(self, return_m: bool = False):
+        """Send a request for getting data based on object IDs.
+
+        Parameters
+        ----------
+        return_m : bool
+            Whether to activate the Return M (measure) in the request, defaults to False.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            The requested features as a GeoDataFrame.
+        """
+        resp = self.service.get_features(return_m)
+        return geoutils.json2geodf(resp)
+
+
 class NLDI:
     """Access the Hydro Network-Linked Data Index (NLDI) service."""
 
@@ -149,49 +270,79 @@ class NLDI:
 
     def getcharacteristic_byid(
         self,
-        fsource: str,
-        fid: str,
+        comids: Union[List[str], str],
         char_type: str,
+        char_ids: str = "all",
         values_only: bool = True,
-    ) -> Union[pd.DataFrame, pd.Series]:
-        """Get features of a single id.
+    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.DataFrame]]:
+        """Get characteristics using a list ComIDs.
 
         Parameters
         ----------
-        fsource : str
-            The name of feature source. The valid sources are:
-            comid, huc12pp, nwissite, wade, WQP
-        fid : str
+        comids : str or list
             The ID of the feature.
         char_type : str
             Type of the characteristic.
+        char_ids : str or list, optional
+            Name(s) of the target characteristics, default to all.
         values_only : bool, optional
             Whether to return only ``characteristic_value`` as a series, default to True.
+            If is set to False, ``percent_nodata`` is returned as well.
 
         Returns
         -------
-        pandas.DataFrame or pandas.Series
-            Either only values as a series or all the available data as a dataframe.
+        pandas.DataFrame or tuple of pandas.DataFrame
+            Either only ``characteristic_value`` as a dataframe or
+            or if ``values_only`` is Fale return ``percent_nodata`` is well.
         """
-        self._validate_fsource(fsource)
-
         if char_type not in self.valid_chartypes:
             valids = [f'"{s}" for {d}' for s, d in self.valid_chartypes.items()]
             raise InvalidInputValue("char", valids)
 
-        url = "/".join([self.base_url, "linked-data", fsource, fid, char_type])
+        comids = comids if isinstance(comids, list) else [comids]
+        v_dict, nd_dict = {}, {}
 
-        rjson = self._geturl(url)
-        char = pd.DataFrame.from_dict(rjson["characteristics"], orient="columns").T
-        char.columns = char.iloc[0]
-        char = char.drop(index="characteristic_id")
-        char[char == ""] = np.nan
-        char = char.astype("f4")
+        if char_ids == "all":
+            payload = None
+        else:
+            _char_ids = char_ids if isinstance(char_ids, list) else [char_ids]
+            valid_charids = self.get_validchars(char_type)
 
+            if any(c not in valid_charids for c in _char_ids):
+                valids = [f"\"{s}\" for {d['dataset_label']}" for s, d in valid_charids.items()]
+                raise InvalidInputValue("char_ids", valids)
+            payload = {"characteristicId": ",".join(_char_ids)}
+
+        for comid in comids:
+            url = "/".join([self.base_url, "linked-data", "comid", comid, char_type])
+            rjson = self._geturl(url, payload)
+            char = pd.DataFrame.from_dict(rjson["characteristics"], orient="columns").T
+            char.columns = char.iloc[0]
+            char = char.drop(index="characteristic_id")
+
+            v_dict[comid] = char.loc["characteristic_value"]
+            if values_only:
+                continue
+
+            nd_dict[comid] = char.loc["percent_nodata"]
+
+        def todf(df_dict: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+            df = pd.DataFrame.from_dict(df_dict, orient="index")
+            df[df == ""] = np.nan
+            df.index = df.index.astype("int64")
+            return df.astype("f4")
+
+        chars = todf(v_dict)
         if values_only:
-            return char.loc["characteristic_value"]
+            return chars
 
-        return char
+        return chars, todf(nd_dict)
+
+    def get_validchars(self, char_type: str) -> Dict[str, Dict[str, str]]:
+        """Get all the avialable characteristics IDs for a give characteristics type."""
+        resp = self.session.get("/".join([self.base_url, "lookups", char_type, "characteristics"]))
+        c_list = ogc.utils.traverse_json(resp.json(), ["characteristicMetadata", "characteristic"])
+        return {c.pop("characteristic_id"): c for c in c_list}
 
     def navigate_byid(
         self,
@@ -330,15 +481,13 @@ class NLDI:
             valids = [f'"{s}" for {d}' for s, d in self.valid_chartypes.items()]
             raise InvalidInputValue("char", valids)
 
-        resp = self.session.get("/".join([self.base_url, "lookups", char_type, "characteristics"]))
-        c_list = ogc.utils.traverse_json(resp.json(), ["characteristicMetadata", "characteristic"])
-        valid_ids = {c.pop("characteristic_id"): c for c in c_list}
+        valid_charids = self.get_validchars(char_type)
 
-        if char_id not in valid_ids:
-            valids = [f"\"{s}\" for {d['dataset_label']}" for s, d in valid_ids.items()]
+        if char_id not in valid_charids:
+            valids = [f"\"{s}\" for {d['dataset_label']}" for s, d in valid_charids.items()]
             raise InvalidInputValue("char_id", valids)
 
-        meta = self.session.get(valid_ids[char_id]["dataset_url"], {"format": "json"}).json()
+        meta = self.session.get(valid_charids[char_id]["dataset_url"], {"format": "json"}).json()
         if metadata:
             return meta
 
@@ -351,11 +500,13 @@ class NLDI:
         return pd.read_csv(flist[filename], compression="zip")
 
     def _validate_fsource(self, fsource: str) -> None:
+        """Check if the given feature source is valid."""
         if fsource not in self.valid_fsources:
             valids = [f'"{s}" for {d}' for s, d in self.valid_fsources.items()]
             raise InvalidInputValue("feature source", valids)
 
     def _geturl(self, url: str, payload: Optional[Dict[str, str]] = None):
+        """Send a request to the service using GET method."""
         if payload is None:
             payload = {"f": "json"}
         else:
@@ -644,7 +795,7 @@ def vector_accumulation(
 
     outflow.pop("0")
     acc = pd.Series(outflow).loc[sorted_nodes[:-1]]
-    acc = acc.rename_axis("comid").rename("acc")
+    acc = acc.rename_axis("comid").rename(f"acc_{attr_col}")
     return acc
 
 
