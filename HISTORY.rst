@@ -14,16 +14,20 @@ Breaking Changes
 
 New Features
 ~~~~~~~~~~~~
-The following functions are added to ``NLDI``:
+- Added support for NHDPlus High Resolution for getting features by geometry, IDs, or
+  SQL where clause.
+- The following functions are added to ``NLDI``:
 
-- ``getcharacteristic_byid``: For getting characteristics of NHDPlus catchments.
-- ``navigate_byloc``: For getting the nearest ComID to a coordinate and perform a navigation.
-- ``characteristics_dataframe``: For getting all the available catchment-scale characteristics
-  as a dataframe.
+    * ``getcharacteristic_byid``: For getting characteristics of NHDPlus catchments.
+    * ``navigate_byloc``: For getting the nearest ComID to a coordinate and perform a navigation.
+    * ``characteristics_dataframe``: For getting all the available catchment-scale characteristics
+      as a dataframe.
+    * ``get_validchars``: For getting a list of available characteristic IDs for a specified
+      characteristic type,.
 
-The following function is added to ``WaterData``:
+- The following function is added to ``WaterData``:
 
-- ``byfilter``: For getting data based on any valid CQL filter.
+    * ``byfilter``: For getting data based on any valid CQL filter.
 
 Bug Fixes
 ~~~~~~~~~
