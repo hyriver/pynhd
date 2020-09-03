@@ -9,10 +9,8 @@ import numpy as np
 import pandas as pd
 import pygeoogc as ogc
 import pygeoutils as geoutils
-from owslib.wfs import WebFeatureService
 from pandas._libs.missing import NAType
 from pygeoogc import WFS, ArcGISRESTful, MatchCRS, RetrySession, ServiceURL
-from pyproj import CRS
 from requests import Response
 from shapely.geometry import Polygon
 
@@ -22,15 +20,8 @@ DEF_CRS = "epsg:4326"
 ALT_CRS = "epsg:4269"
 
 
-class WaterData(WFS):
+class WaterData:
     """Access to `Water Data <https://labs.waterdata.usgs.gov/geoserver>`__ service.
-
-    Notes
-    -----
-    ``pygeoogc.WFS`` is the base class for ``WaterData``. Therefore, all the low-level
-    methods are available for ``WaterData`` with the addition of three high-level functions
-    that are intended to be used. For the most use cases, you only need ``bybox``, ``byid``,
-    and ``byfilter`` methods from this class.
 
     Parameters
     ----------
@@ -49,45 +40,31 @@ class WaterData(WFS):
         layer: str,
         crs: str = DEF_CRS,
     ) -> None:
-        layer = layer if ":" in layer else f"wmadata:{layer}"
-        url = ServiceURL().wfs.waterdata
-        wfs = WebFeatureService(url, version="2.0.0")
-
-        valid_layers = list(wfs.contents)
-        if layer not in valid_layers:
-            raise InvalidInputValue("layer", valid_layers)
-
-        payload = {
-            "service": "wfs",
-            "version": "2.0.0",
-            "outputFormat": "application/json",
-            "request": "GetFeature",
-            "typeName": layer,
-            "count": 1,
-        }
-
-        resp = ogc.RetrySession().get(url, payload)
-        ogc.utils.check_response(resp)
-        crs_req = CRS.from_string(resp.json()["crs"]["properties"]["name"]).to_string().lower()
-
-        super().__init__(url, layer, "application/json", "2.0.0", crs_req, validation=False)
-        self.crs_df = crs
+        self.layer = layer if ":" in layer else f"wmadata:{layer}"
+        self.crs = crs
+        self.wfs = WFS(
+            ServiceURL().wfs.waterdata,
+            layer=self.layer,
+            outformat="application/json",
+            version="2.0.0",
+            crs=ALT_CRS,
+        )
 
     def bybox(
         self, bbox: Tuple[float, float, float, float], box_crs: str = DEF_CRS
     ) -> gpd.GeoDataFrame:
-        """Get features within a bounding box using ``WFS.getfeature_bybox``."""
-        resp = self.getfeature_bybox(bbox, box_crs, always_xy=True)
+        """Get features within a bounding box."""
+        resp = self.wfs.getfeature_bybox(bbox, box_crs, always_xy=True)
         return self.to_geodf(resp)
 
     def byid(self, featurename: str, featureids: Union[List[str], str]) -> gpd.GeoDataFrame:
-        """Get features based on IDs using ``WFS.getfeature_byid``."""
-        resp = self.getfeature_byid(featurename, featureids)
+        """Get features based on IDs."""
+        resp = self.wfs.getfeature_byid(featurename, featureids)
         return self.to_geodf(resp)
 
     def byfilter(self, cql_filter: str) -> gpd.GeoDataFrame:
-        """Get features based on a CQL filter using ``WFS.getfeature_byfilter``."""
-        resp = self.getfeature_byfilter(cql_filter)
+        """Get features based on a CQL filter."""
+        resp = self.wfs.getfeature_byfilter(cql_filter)
         return self.to_geodf(resp)
 
     def to_geodf(self, resp: Response) -> gpd.GeoDataFrame:
@@ -103,10 +80,7 @@ class WaterData(WFS):
         geopandas.GeoDataFrame
             The requested features in a dataframes.
         """
-        if self.layer in ["wmadata:huc12", "wmadata:huc12all"]:
-            self.crs = ALT_CRS
-
-        return geoutils.json2geodf(resp.json(), self.crs, self.crs_df)
+        return geoutils.json2geodf(resp.json(), ALT_CRS, self.crs)
 
 
 class NHDPlusHR:
