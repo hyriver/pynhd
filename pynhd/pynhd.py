@@ -312,11 +312,13 @@ class NLDI:
 
         return chars, todf(nd_dict)
 
-    def get_validchars(self, char_type: str) -> Dict[str, Dict[str, str]]:
+    def get_validchars(self, char_type: str) -> pd.DataFrame:
         """Get all the avialable characteristics IDs for a give characteristics type."""
         resp = self.session.get("/".join([self.base_url, "lookups", char_type, "characteristics"]))
         c_list = ogc.utils.traverse_json(resp.json(), ["characteristicMetadata", "characteristic"])
-        return {c.pop("characteristic_id"): c for c in c_list}
+        return pd.DataFrame.from_dict(
+            {c.pop("characteristic_id"): c for c in c_list}, orient="index"
+        )
 
     def navigate_byid(
         self,
@@ -458,8 +460,8 @@ class NLDI:
         valid_charids = self.get_validchars(char_type)
 
         if char_id not in valid_charids:
-            valids = [f"\"{s}\" for {d['dataset_label']}" for s, d in valid_charids.items()]
-            raise InvalidInputValue("char_id", valids)
+            vids = valid_charids["characteristic_description"]
+            raise InvalidInputValue("char_id", [f'"{s}" for {d}' for s, d in vids.items()])
 
         meta = self.session.get(valid_charids[char_id]["dataset_url"], {"format": "json"}).json()
         if metadata:
