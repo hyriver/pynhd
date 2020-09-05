@@ -282,9 +282,10 @@ class NLDI:
             _char_ids = char_ids if isinstance(char_ids, list) else [char_ids]
             valid_charids = self.get_validchars(char_type)
 
-            if any(c not in valid_charids for c in _char_ids):
-                valids = [f"\"{s}\" for {d['dataset_label']}" for s, d in valid_charids.items()]
-                raise InvalidInputValue("char_ids", valids)
+            idx = valid_charids.index
+            if any(c not in idx for c in _char_ids):
+                vids = valid_charids["characteristic_description"]
+                raise InvalidInputValue("char_id", [f'"{s}" for {d}' for s, d in vids.items()])
             payload = {"characteristicId": ",".join(_char_ids)}
 
         for comid in comids:
@@ -459,11 +460,13 @@ class NLDI:
 
         valid_charids = self.get_validchars(char_type)
 
-        if char_id not in valid_charids:
+        if char_id not in valid_charids.index:
             vids = valid_charids["characteristic_description"]
             raise InvalidInputValue("char_id", [f'"{s}" for {d}' for s, d in vids.items()])
 
-        meta = self.session.get(valid_charids[char_id]["dataset_url"], {"format": "json"}).json()
+        meta = self.session.get(
+            valid_charids.loc[char_id, "dataset_url"], {"format": "json"}
+        ).json()
         if metadata:
             return meta
 
