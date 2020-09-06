@@ -4,16 +4,40 @@
 
 |
 
-=========== ===========================================================================
-Package     Description
-=========== ===========================================================================
-Hydrodata_  Access NWIS, HCDN 2009, NLCD, and SSEBop databases
-PyGeoOGC_   Query data from any ArcGIS RESTful-, WMS-, and WFS-based services
-PyGeoUtils_ Convert responses from pynhd's supported web services to datasets
-PyNHD_      Access NLDI and WaterData web services for navigating the NHDPlus database
-Py3DEP_     Access topographic data through the 3D Elevation Program (3DEP) web service
-PyDaymet_   Access the Daymet database for daily climate data
-=========== ===========================================================================
+.. |hydrodata| image:: https://github.com/cheginit/hydrodata/workflows/build/badge.svg
+    :target: https://github.com/cheginit/hydrodata/actions?query=workflow%3Abuild
+    :alt: Github Actions
+
+.. |pygeoogc| image:: https://github.com/cheginit/pygeoogc/workflows/build/badge.svg
+    :target: https://github.com/cheginit/pygeoogc/actions?query=workflow%3Abuild
+    :alt: Github Actions
+
+.. |pygeoutils| image:: https://github.com/cheginit/pygeoutils/workflows/build/badge.svg
+    :target: https://github.com/cheginit/pygeoutils/actions?query=workflow%3Abuild
+    :alt: Github Actions
+
+.. |pynhd| image:: https://github.com/cheginit/pynhd/workflows/build/badge.svg
+    :target: https://github.com/cheginit/pynhd/actions?query=workflow%3Abuild
+    :alt: Github Actions
+
+.. |py3dep| image:: https://github.com/cheginit/py3dep/workflows/build/badge.svg
+    :target: https://github.com/cheginit/py3dep/actions?query=workflow%3Abuild
+    :alt: Github Actions
+
+.. |pydaymet| image:: https://github.com/cheginit/pydaymet/workflows/build/badge.svg
+    :target: https://github.com/cheginit/pydaymet/actions?query=workflow%3Abuild
+    :alt: Github Actions
+
+=========== ==================================================================== ============
+Package     Description                                                          Status
+=========== ==================================================================== ============
+Hydrodata_  Access NWIS, HCDN 2009, NLCD, and SSEBop databases                   |hydrodata|
+PyGeoOGC_   Send queries to any ArcGIS RESTful-, WMS-, and WFS-based services    |pygeoogc|
+PyGeoUtils_ Convert responses from PyGeoOGC's supported web services to datasets |pygeoutils|
+PyNHD_      Navigate and subset NHDPlus (MR and HR) using web services           |pynhd|
+Py3DEP_     Access topographic data through National Map's 3DEP web service      |py3dep|
+PyDaymet_   Access Daymet for daily climate data both single pixel and gridded   |pydaymet|
+=========== ==================================================================== ============
 
 .. _Hydrodata: https://github.com/cheginit/hydrodata
 .. _PyGeoOGC: https://github.com/cheginit/pygeoogc
@@ -36,10 +60,6 @@ PyNHD: Navigate and extract NHDPlus database
 .. image:: https://codecov.io/gh/cheginit/pynhd/branch/master/graph/badge.svg
     :target: https://codecov.io/gh/cheginit/pynhd
     :alt: CodeCov
-
-.. image:: https://github.com/cheginit/pynhd/workflows/build/badge.svg
-    :target: https://github.com/cheginit/pynhd/workflows/build
-    :alt: Github Actions
 
 .. image:: https://mybinder.org/badge_logo.svg
     :target: https://mybinder.org/v2/gh/cheginit/hydrodata/master?filepath=docs%2Fexamples
@@ -113,112 +133,178 @@ Quick start
 
 Let's explore the capabilities of ``NLDI``. We need to instantiate the class first:
 
-.. code-block:: python
+.. code:: python
 
-    from pynhd import NLDI
+    from pynhd import NLDI, WaterData
+    import pynhd as nhd
+    import cmocean.cm as cmo
+    import matplotlib.pyplot as plt
+
+First, let’s get the watershed geometry of the contributing basin of a
+USGS station using ``NLDI``:
+
+.. code:: python
 
     nldi = NLDI()
     station_id = "USGS-01031500"
-    UT = "upstreamTributaries"
-    UM = "upstreamMain"
-
-We can get the basin geometry for the USGS station number 01031500:
-
-.. code-block:: python
+    ut = "upstreamTributaries"
+    um = "upstreamMain"
 
     basin = nldi.getfeature_byid("nwissite", station_id, basin=True)
 
-``NLDI`` offers navigating a river network from any point in the network in the
-upstream or downstream direction. We can also limit the navigation distance (in km). The
-navigation can be done for all the valid NLDI sources which are ``comid``, ``huc12pp``,
-``nwissite``, ``wade``, ``WQP``. For example, let's find all the USGS stations upstream
-of 01031500, through the tributaries, and then limit the navigation to only the main channel.
+The ``navigate_byid`` class method can be used to navigate NHDPlus in
+both upstream and downstream of any point in the database. Let’s get ComIDs and flowlines
+of the tributaries and the main river channel in the upstream of the station.
 
-.. code-block:: python
+.. code:: python
 
     args = {
         "fsource": "nwissite",
         "fid": station_id,
-        "navigation": UM,
-        "source": "nwissite",
-        "distance": None,
+        "navigation": um,
+        "source": "flowlines",
+        "distance": 1000,
     }
 
-    st_main = nldi.navigate_byid(**args)
+    flw_main = nldi.navigate_byid(**args)
 
-    args["distance"] = 20  # km
-    st_d150 = nldi.navigate_byid(**args)
+    args["navigation"] = ut
+    flw_trib = nldi.navigate_byid(**args)
 
-    args.update({"distance": None, "navigation": UT})
-    st_trib = nldi.navigate_byid(**args)
+We can get other USGS stations upstream (or downstream) of the station
+and even set a distance limit (in km):
 
-We can set the source to ``huc12pp`` to get HUC12 pour points.
+.. code:: python
 
-.. code-block:: python
+    args.update({
+        "source" : "nwissite",
+    })
+    st_all = nldi.navigate_byid(**args)
 
-    args["source"] = "huc12pp"
+    args.update({
+        "distance": 20,
+        "source" : "nwissite",
+    })
+    st_d20 = nldi.navigate_byid(**args)
+
+Now, let’s get the `HUC12 pour
+points <https://www.sciencebase.gov/catalog/item/5762b664e4b07657d19a71ea>`__:
+
+.. code:: python
+
+    args.update({
+        "distance": 1000,
+        "source" : "huc12pp",
+    })
     pp = nldi.navigate_byid(**args)
 
-``NLDI`` provides only ``comid`` and geometry of the flowlines which can further
-be used to get the other available columns in the NHDPlus database. Let's see how
-we can combine ``NLDI`` and ``WaterData`` to get the NHDPlus data for our station.
+Let’s plot the vector data:
 
-.. code-block:: python
+.. code:: python
+
+    ax = basin.plot(facecolor="none", edgecolor="k", figsize=(8,8))
+    st_all.plot(ax=ax, label="USGS stations", marker="*", markersize=300, zorder=4, color="b")
+    st_d20.plot(ax=ax, label="USGS stations up to 20 km", marker="v", markersize=100, zorder=5, color="darkorange")
+    pp.plot(ax=ax, label="HUC12 pour points", marker="o", markersize=50, color="k", zorder=3)
+    flw_main.plot(ax=ax, lw=3, color="r", zorder=2, label="Main")
+    flw_trib.plot(ax=ax, lw=1, zorder=1, label="Tributaries")
+    ax.legend(loc="best")
+    ax.set_aspect("auto")
+    ax.figure.set_dpi(100)
+
+.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_12_0.png
+    :target: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_12_0.png
+    :width: 400
+    :align: center
+
+Based on a topological sorted river network
+``pynhd.vector_accumulation`` computes flow accumulation in the network.
+It returns a dataframe which is sorted from upstream to downstream that
+shows the accumulated flow in each node.
+
+PyNHD has a utility called ``prepare_nhdplus`` that identifies such
+relationship among other things such as fixing some common issues with
+NHDPlus flowlines. But first we need to get all the NHDPlus attributes
+for each ComID since ``NLDI`` only provides the flowlines’ geometries
+and ComIDs which is useful for navigating the vector river network data.
+For getting the NHDPlus database we use ``WaterData``. Let’s use the
+``nhdflowline_network`` layer to get required info.
+
+.. code:: python
 
     wd = WaterData("nhdflowline_network")
 
-    args.update({"source" : None, "navigation": UM})
-    comids = nldi.navigate_byid(**args).nhdplus_comid.tolist()
-    flw_main = wd.byid("comid", comids)
+    comids = flw_trib.nhdplus_comid.to_list()
+    nhdp_trib = wd.byid("comid", comids)
+    flw = nhd.prepare_nhdplus(nhdp_trib, 0, 0, purge_non_dendritic=False)
 
-    args["navigation"] = UT
-    comids = nldi.navigate_byid(**args).nhdplus_comid.tolist()
-    flw_trib = wd.byid("comid", comids)
+The NLDI service offers about 140 NHDPlus catchment-scale attributes
+that are associated with ComIDs. Let’s get Mean Annual Groundwater
+Recharge using ``getcharacteristic_byid`` class method and carry out
+with the flow accumulation.
 
-.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/example_plots_pynhd.png
-    :target: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/example_plots_pynhd.png
-    :width: 600
-    :align: center
+.. code:: python
 
-Other feature sources in the WaterData database are ``nhdarea``, ``nhdwaterbody``,
-``catchmentsp``, ``gagesii``, ``huc08``, ``huc12``, ``huc12agg``, and ``huc12all``.
-For example, we can get the contributing catchments of the flowlines using ``catchmentsp``.
+    char = "CAT_RECHG"
+    area = "areasqkm"
 
-.. code-block:: python
+    local = nldi.getcharacteristic_byid(comids, "local", char_ids=char)
+    flw = flw.merge(local[char], left_on="comid", right_index=True)
+
+    def runoff_acc(qin, q, a):
+        return qin + q * a
+
+    flw_r = flw[["comid", "tocomid", char, area]]
+    runoff = nhd.vector_accumulation(flw_r, runoff_acc, char, [char, area])
+
+    def area_acc(ain, a):
+        return ain + a
+
+    flw_a = flw[["comid", "tocomid", area]]
+    areasqkm = nhd.vector_accumulation(flw_a, area_acc, area, [area])
+
+    runoff /= areasqkm
+
+Since these are catchment-scale characteristic, let’s get the catchments
+then add the accumulated characteristic as a new column and plot the
+results.
+
+.. code:: python
 
     wd = WaterData("catchmentsp")
     catchments = wd.byid("featureid", comids)
 
-The ``WaterData`` class also has a method called ``bybox`` to get data from the feature
-sources within a bounding box.
+    c_local = catchments.merge(local, left_on="featureid", right_index=True)
+    c_acc = catchments.merge(runoff, left_on="featureid", right_index=True)
 
-.. code-block:: python
+.. code:: python
 
-    wd = WaterData("nhdwaterbody")
-    wb = wd.bybox((-69.7718, 45.0742, -69.3141, 45.4534))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 8), dpi=100)
 
-Next, lets clean up the flowlines and use it to compute flow accumulation. For simplicity,
-we assume that the flow in each river segment is equal to the length of the segment. Therefore,
-the accumulated flow at each point should be equal to the sum of the lengths of all its upstream
-river segments i.e., ``arbolatesu`` column in the NHDPlus database. We can use this to validate
-the flow accumulation result.
+    cmap = cmo.deep
+    norm = plt.Normalize(vmin=c_local.CAT_RECHG.min(), vmax=c_acc.acc_CAT_RECHG.max())
 
-.. code-block:: python
+    c_local.plot(ax=ax1, column=char, cmap=cmap, norm=norm)
+    flw.plot(ax=ax1, column="streamorde", cmap="Blues", scheme='fisher_jenks')
+    ax1.set_title("Groundwater Recharge (mm/yr)");
 
-    import pynhd as nhd
+    c_acc.plot(ax=ax2, column=f"acc_{char}", cmap=cmap, norm=norm)
+    flw.plot(ax=ax2, column="streamorde", cmap="Blues", scheme='fisher_jenks')
+    ax2.set_title("Accumulated Groundwater Recharge (mm/yr)")
 
-    flw = nhd.prepare_nhdplus(flw_trib, 1, 1, 1, True, True)
+    cax = fig.add_axes([
+        ax2.get_position().x1 + 0.01,
+        ax2.get_position().y0,
+        0.02,
+        ax2.get_position().height
+    ])
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    fig.colorbar(sm, cax=cax);
 
-    def routing(qin, q):
-        return qin + q
-
-    qsim = nhd.vector_accumulation(
-        flw[["comid", "tocomid", "lengthkm"]], routing, "lengthkm", ["lengthkm"],
-    )
-    flw = flw.merge(qsim, on="comid")
-    diff = flw.arbolatesu - flw.acc
-
-    print(diff.abs().sum() < 1e-5)
+.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_19_0.png
+    :target: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_19_0.png
+    :width: 600
+    :align: center
 
 Contributing
 ------------
