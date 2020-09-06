@@ -135,7 +135,7 @@ Let's explore the capabilities of ``NLDI``. We need to instantiate the class fir
 
 .. code:: python
 
-    from pynhd import NLDI, WaterData
+    from pynhd import NLDI, WaterData, NHDPlusHR
     import pynhd as nhd
 
 First, let’s get the watershed geometry of the contributing basin of a
