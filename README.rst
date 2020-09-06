@@ -137,8 +137,6 @@ Let's explore the capabilities of ``NLDI``. We need to instantiate the class fir
 
     from pynhd import NLDI, WaterData
     import pynhd as nhd
-    import cmocean.cm as cmo
-    import matplotlib.pyplot as plt
 
 First, let’s get the watershed geometry of the contributing basin of a
 USGS station using ``NLDI``:
@@ -198,25 +196,29 @@ points <https://www.sciencebase.gov/catalog/item/5762b664e4b07657d19a71ea>`__:
     })
     pp = nldi.navigate_byid(**args)
 
-Let’s plot the vector data:
-
-.. code:: python
-
-    ax = basin.plot(facecolor="none", edgecolor="k", figsize=(8,8))
-    st_all.plot(ax=ax, label="USGS stations", marker="*", markersize=300, zorder=4, color="b")
-    st_d20.plot(ax=ax, label="USGS stations up to 20 km", marker="v", markersize=100, zorder=5, color="darkorange")
-    pp.plot(ax=ax, label="HUC12 pour points", marker="o", markersize=50, color="k", zorder=3)
-    flw_main.plot(ax=ax, lw=3, color="r", zorder=2, label="Main")
-    flw_trib.plot(ax=ax, lw=1, zorder=1, label="Tributaries")
-    ax.legend(loc="best")
-    ax.set_aspect("auto")
-    ax.figure.set_dpi(100)
-
 .. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_12_0.png
     :target: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_12_0.png
     :width: 400
     :align: center
 
+Now, let's get the medium- and high-resolution flowlines within the bounding box of this watershed
+and compare them.
+
+.. code:: python
+
+    mr = WaterData("nhdflowline_network")
+    nhdp_mr = mr.bybox(basin.geometry[0].bounds)
+
+    hr = NHDPlusHR("networknhdflowline")
+    nhdp_hr = hr.bygeom(basin.geometry[0].bounds)
+
+.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/hr_mr.png
+    :target: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/hr_mr.png
+    :width: 400
+    :align: center
+
+Since NHDPlus HR is still at the pre-release stage let's use the MR flowlines to
+demonstrate the vector-based accumulation.
 Based on a topological sorted river network
 ``pynhd.vector_accumulation`` computes flow accumulation in the network.
 It returns a dataframe which is sorted from upstream to downstream that
@@ -277,34 +279,12 @@ results.
     c_local = catchments.merge(local, left_on="featureid", right_index=True)
     c_acc = catchments.merge(runoff, left_on="featureid", right_index=True)
 
-.. code:: python
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 8), dpi=100)
-
-    cmap = cmo.deep
-    norm = plt.Normalize(vmin=c_local.CAT_RECHG.min(), vmax=c_acc.acc_CAT_RECHG.max())
-
-    c_local.plot(ax=ax1, column=char, cmap=cmap, norm=norm)
-    flw.plot(ax=ax1, column="streamorde", cmap="Blues", scheme='fisher_jenks')
-    ax1.set_title("Groundwater Recharge (mm/yr)");
-
-    c_acc.plot(ax=ax2, column=f"acc_{char}", cmap=cmap, norm=norm)
-    flw.plot(ax=ax2, column="streamorde", cmap="Blues", scheme='fisher_jenks')
-    ax2.set_title("Accumulated Groundwater Recharge (mm/yr)")
-
-    cax = fig.add_axes([
-        ax2.get_position().x1 + 0.01,
-        ax2.get_position().y0,
-        0.02,
-        ax2.get_position().height
-    ])
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    fig.colorbar(sm, cax=cax);
-
 .. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_19_0.png
     :target: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_19_0.png
     :width: 600
     :align: center
+
+More examples can be found `here <https://hydrodata.readthedocs.io/en/latest/examples.html>`__.
 
 Contributing
 ------------
