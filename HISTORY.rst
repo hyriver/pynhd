@@ -9,7 +9,7 @@ Breaking Changes
 ~~~~~~~~~~~~~~~~
 - Re-wrote the ``NLDI`` function to use API v3 of the NLDI service.
 - The ``crs`` argument of ``WaterData`` now is the target CRS of the output dataframe.
-  The service CRS is taken care of under-the-hood so there's no need for a user input.
+  The service CRS is now EPSG:4269 for all the layers.
 - Remove the ``url_only`` argument of ``NLDI`` since it's not applicable anymore.
 
 New Features
