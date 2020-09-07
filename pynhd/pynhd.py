@@ -256,7 +256,10 @@ class NLDI:
         comids : str or list
             The ID of the feature.
         char_type : str
-            Type of the characteristic.
+            Type of the characteristic. Valid values are ``local`` for
+            individual reach catchments, ``tot`` for network-accumulated values
+            using total cumulative drainage area and ``div`` for network-accumulated values
+            using divergence-routed.
         char_ids : str or list, optional
             Name(s) of the target characteristics, default to all.
         values_only : bool, optional
@@ -437,7 +440,10 @@ class NLDI:
         Parameters
         ----------
         char_type : str
-            Characteristic type.
+            Characteristic type. Valid values are ``local`` for
+            individual reach catchments, ``tot`` for network-accumulated values
+            using total cumulative drainage area and ``div`` for network-accumulated values
+            using divergence-routed.
         char_id : str
             Characteristic ID.
         filename : str, optional
@@ -694,14 +700,14 @@ def topoogical_sort(
     upstream_nodes = {i: flowlines[flowlines.toID == i].ID.tolist() for i in flowlines.ID.tolist()}
     upstream_nodes[pd.NA] = flowlines[flowlines.toID.isna()].ID.tolist()
 
-    G = nx.from_pandas_edgelist(
+    netwrok = nx.from_pandas_edgelist(
         flowlines[["ID", "toID"]],
         source="ID",
         target="toID",
         create_using=nx.DiGraph,
     )
-    topo_sorted = list(nx.topological_sort(G))
-    return topo_sorted, upstream_nodes, G
+    topo_sorted = list(nx.topological_sort(netwrok))
+    return topo_sorted, upstream_nodes, netwrok
 
 
 def vector_accumulation(
@@ -762,7 +768,7 @@ def vector_accumulation(
     elif isinstance(init, (np.ndarray, list)):
         outflow["0"] = np.zeros_like(init)
     else:
-        raise ValueError("The elements in the attribute column can be either scalars or arrays")
+        raise InvalidInputType("values of attr_col", "a scalar or an array")
 
     upstream_nodes.update({k: ["0"] for k, v in upstream_nodes.items() if len(v) == 0})
 
