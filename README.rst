@@ -90,7 +90,16 @@ PyNHD is a part of Hydrodata software stack and provides access to
 `WaterData <https://labs.waterdata.usgs.gov/geoserver/web/wicket/bookmarkable/org.geoserver.web.demo.MapPreviewPage?1>`__
 and `NLDI <https://labs.waterdata.usgs.gov/about-nldi/>`_ web services. These two web services
 can be used to navigate and extract vector data from NHDPlus V2 database such as
-catchments, HUC8, HUC12, GagesII, flowlines, and water bodies.
+catchments, HUC8, HUC12, GagesII, flowlines, and water bodies. Moreover, the NLDI service
+includes more than 30 NHDPlus catchment-scale attributes that are associated with NHDPlus
+ComIDs. Values of these attributes are provided in three characteristic types:
+
+1. ``local``: For individual reach catchments,
+2. ``tot``: For network-accumulated values using total cumulative drainage area,
+3. ``div``: For network-accumulated values using divergence-routed.
+
+A list of these attributes for each characteristic type can be accessed using
+``NLDI().get_validchars`` class method.
 
 Additionally, PyNHD offers some extra utilities for processing the flowlines:
 
@@ -240,10 +249,8 @@ For getting the NHDPlus database we use ``WaterData``. Let’s use the
     nhdp_trib = wd.byid("comid", comids)
     flw = nhd.prepare_nhdplus(nhdp_trib, 0, 0, purge_non_dendritic=False)
 
-The NLDI service offers about 140 NHDPlus catchment-scale attributes
-that are associated with ComIDs. Let’s get Mean Annual Groundwater
-Recharge using ``getcharacteristic_byid`` class method and carry out
-with the flow accumulation.
+Now, let’s get Mean Annual Groundwater Recharge using ``getcharacteristic_byid``
+class method and carry out the accumulation.
 
 .. code:: python
 
