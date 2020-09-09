@@ -46,8 +46,8 @@ PyDaymet_   Access Daymet for daily climate data both single pixel and gridded  
 .. _Py3DEP: https://github.com/cheginit/py3dep
 .. _PyDaymet: https://github.com/cheginit/pydaymet
 
-PyNHD: Navigate and extract NHDPlus database
---------------------------------------------
+PyNHD: Navigate and subset NHDPlus database
+-------------------------------------------
 
 .. image:: https://img.shields.io/pypi/v/pynhd.svg
     :target: https://pypi.python.org/pypi/pynhd
