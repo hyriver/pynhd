@@ -58,10 +58,14 @@ class WaterData:
         resp = self.wfs.getfeature_bybox(bbox, box_crs, always_xy=True)
         return self.to_geodf(resp)
 
-    def bygeom(self, geometry: Union[Polygon, MultiPolygon]) -> gpd.GeoDataFrame:
+    def bygeom(self, geometry: Union[Polygon, MultiPolygon], xy: bool = True) -> gpd.GeoDataFrame:
         """Get features within a bounding box."""
-        g_wkt = ops.transform(lambda x, y: (y, x), geometry).wkt
-        return self.byfilter(f"WITHIN(the_geom, {g_wkt})", method="POST")
+        if not isinstance(geometry, (Polygon, MultiPolygon)):
+            raise InvalidInputType("geometry", "Polygon or Multipolygon")
+
+        g_wkt = ops.transform(lambda x, y: (y, x), geometry).wkt if xy else geometry.wkt
+
+        return self.byfilter(f"INTERSECTS(the_geom, {g_wkt})", method="POST")
 
     def byid(self, featurename: str, featureids: Union[List[str], str]) -> gpd.GeoDataFrame:
         """Get features based on IDs."""
