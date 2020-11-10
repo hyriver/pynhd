@@ -9,10 +9,11 @@ import numpy as np
 import pandas as pd
 import pygeoogc as ogc
 import pygeoutils as geoutils
+import shapely.ops as ops
 from pandas._libs.missing import NAType
 from pygeoogc import WFS, ArcGISRESTful, MatchCRS, RetrySession, ServiceURL
 from requests import Response
-from shapely.geometry import Polygon
+from shapely.geometry import MultiPolygon, Polygon
 
 from .exceptions import InvalidInputType, InvalidInputValue, MissingItems, ZeroMatched
 
@@ -57,14 +58,19 @@ class WaterData:
         resp = self.wfs.getfeature_bybox(bbox, box_crs, always_xy=True)
         return self.to_geodf(resp)
 
+    def bygeom(self, geometry: Union[Polygon, MultiPolygon]) -> gpd.GeoDataFrame:
+        """Get features within a bounding box."""
+        g_wkt = ops.transform(lambda x, y: (y, x), geometry).wkt
+        return self.byfilter(f"WITHIN(the_geom, {g_wkt})", method="POST")
+
     def byid(self, featurename: str, featureids: Union[List[str], str]) -> gpd.GeoDataFrame:
         """Get features based on IDs."""
         resp = self.wfs.getfeature_byid(featurename, featureids)
         return self.to_geodf(resp)
 
-    def byfilter(self, cql_filter: str) -> gpd.GeoDataFrame:
+    def byfilter(self, cql_filter: str, method: str = "GET") -> gpd.GeoDataFrame:
         """Get features based on a CQL filter."""
-        resp = self.wfs.getfeature_byfilter(cql_filter)
+        resp = self.wfs.getfeature_byfilter(cql_filter, method)
         return self.to_geodf(resp)
 
     def to_geodf(self, resp: Response) -> gpd.GeoDataFrame:
