@@ -69,7 +69,7 @@ class WaterData:
 
         Parameters
         ----------
-        geometry : Polygon or MultiPolygon
+        geometry : shapely.geometry
             The input geometry
         geom_crs : str, optional
             The CRS of the input geometry, default to epsg:4326.
@@ -87,9 +87,6 @@ class WaterData:
         geopandas.GeoDataFrame
             The requested features in a GeoDataFrames.
         """
-        if not isinstance(geometry, (Polygon, MultiPolygon)):
-            raise InvalidInputType("geometry", "Polygon or Multipolygon")
-
         geom = MatchCRS().geometry(geometry, geo_crs, ALT_CRS)
         g_wkt = ops.transform(lambda x, y: (y, x), geom).wkt if xy else geom.wkt
 
