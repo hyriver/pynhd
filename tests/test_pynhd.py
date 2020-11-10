@@ -73,7 +73,7 @@ def test_waterdata_byid():
 def test_waterdata_bybox():
     wd = WaterData("nhdwaterbody")
     print(wd)
-    wb_g = wd.bygeom(box(-69.7718, 45.0742, -69.3141, 45.4534))
+    wb_g = wd.bygeom(box(-69.7718, 45.0742, -69.3141, 45.4534), predicate="INTERSECTS", xy=True)
     wb_b = wd.bybox((-69.7718, 45.0742, -69.3141, 45.4534))
     assert abs(wb_b.areasqkm.sum() - wb_g.areasqkm.sum()) < 1e-3
 
