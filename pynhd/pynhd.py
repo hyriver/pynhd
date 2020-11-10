@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 import pygeoogc as ogc
 import pygeoutils as geoutils
-import shapely.ops as ops
 from pandas._libs.missing import NAType
 from pygeoogc import WFS, ArcGISRESTful, MatchCRS, RetrySession, ServiceURL
 from requests import Response
@@ -74,8 +73,7 @@ class WaterData:
         geom_crs : str, optional
             The CRS of the input geometry, default to epsg:4326.
         xy : bool, optional
-            Whether the coordinate order of input geometry is xy or yx.
-            Defaults to True.
+            Whether axis order of the input geometry is xy or yx.
         predicate : str, optional
             The geometric prediacte to use for requesting the data, defaults to
             INTERSECTS. Valid predicates are:
@@ -85,28 +83,10 @@ class WaterData:
         Returns
         -------
         geopandas.GeoDataFrame
-            The requested features in a GeoDataFrames.
+            The requested features in the given geometry.
         """
-        geom = MatchCRS().geometry(geometry, geo_crs, ALT_CRS)
-        g_wkt = ops.transform(lambda x, y: (y, x), geom).wkt if xy else geom.wkt
-
-        valid_predicates = [
-            "EQUALS",
-            "DISJOINT",
-            "INTERSECTS",
-            "TOUCHES",
-            "CROSSES",
-            "WITHIN",
-            "CONTAINS",
-            "OVERLAPS",
-            "RELATE",
-            "DWITHIN",
-            "BEYOND",
-        ]
-        if predicate not in valid_predicates:
-            raise InvalidInputValue("predicate", valid_predicates)
-
-        return self.byfilter(f"{predicate}(the_geom, {g_wkt})", method="POST")
+        resp = self.wfs.getfeature_bygeom(geometry, geo_crs, always_xy=not xy, predicate=predicate)
+        return self.to_geodf(resp)
 
     def byid(self, featurename: str, featureids: Union[List[str], str]) -> gpd.GeoDataFrame:
         """Get features based on IDs."""
