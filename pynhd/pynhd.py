@@ -58,14 +58,58 @@ class WaterData:
         resp = self.wfs.getfeature_bybox(bbox, box_crs, always_xy=True)
         return self.to_geodf(resp)
 
-    def bygeom(self, geometry: Union[Polygon, MultiPolygon], xy: bool = True) -> gpd.GeoDataFrame:
-        """Get features within a bounding box."""
+    def bygeom(
+        self,
+        geometry: Union[Polygon, MultiPolygon],
+        geo_crs: str = DEF_CRS,
+        xy: bool = True,
+        predicate: str = "INTERSECTS",
+    ) -> gpd.GeoDataFrame:
+        """Get features within a geometry.
+
+        Parameters
+        ----------
+        geometry : Polygon or MultiPolygon
+            The input geometry
+        geom_crs : str, optional
+            The CRS of the input geometry, default to epsg:4326.
+        xy : bool, optional
+            Whether the coordinate order of input geometry is xy or yx.
+            Defaults to True.
+        predicate : str, optional
+            The geometric prediacte to use for requesting the data, defaults to
+            INTERSECTS. Valid predicates are:
+            EQUALS, DISJOINT, INTERSECTS, TOUCHES, CROSSES, WITHIN, CONTAINS,
+            OVERLAPS, RELATE, DWITHIN, BEYOND
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            The requested features in a GeoDataFrames.
+        """
         if not isinstance(geometry, (Polygon, MultiPolygon)):
             raise InvalidInputType("geometry", "Polygon or Multipolygon")
 
-        g_wkt = ops.transform(lambda x, y: (y, x), geometry).wkt if xy else geometry.wkt
+        geom = MatchCRS().geometry(geometry, geo_crs, ALT_CRS)
+        g_wkt = ops.transform(lambda x, y: (y, x), geom).wkt if xy else geom.wkt
 
-        return self.byfilter(f"INTERSECTS(the_geom, {g_wkt})", method="POST")
+        valid_predicates = [
+            "EQUALS",
+            "DISJOINT",
+            "INTERSECTS",
+            "TOUCHES",
+            "CROSSES",
+            "WITHIN",
+            "CONTAINS",
+            "OVERLAPS",
+            "RELATE",
+            "DWITHIN",
+            "BEYOND",
+        ]
+        if predicate not in valid_predicates:
+            raise InvalidInputValue("predicate", valid_predicates)
+
+        return self.byfilter(f"{predicate}(the_geom, {g_wkt})", method="POST")
 
     def byid(self, featurename: str, featureids: Union[List[str], str]) -> gpd.GeoDataFrame:
         """Get features based on IDs."""
@@ -88,7 +132,7 @@ class WaterData:
         Returns
         -------
         geopandas.GeoDataFrame
-            The requested features in a dataframes.
+            The requested features in a GeoDataFrames.
         """
         return geoutils.json2geodf(resp.json(), ALT_CRS, self.crs)
 
