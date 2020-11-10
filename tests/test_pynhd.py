@@ -2,6 +2,7 @@
 import io
 
 import pytest
+from shapely.geometry import box
 
 import pynhd as nhd
 from pynhd import NLDI, WaterData
@@ -72,13 +73,14 @@ def test_waterdata_byid():
 def test_waterdata_bybox():
     wd = WaterData("nhdwaterbody")
     print(wd)
-    wb = wd.bybox((-69.7718, 45.0742, -69.3141, 45.4534))
-    assert abs(wb.areasqkm.sum() - 87.181) < 1e-3
+    wb_g = wd.bygeom(box(-69.7718, 45.0742, -69.3141, 45.4534))
+    wb_b = wd.bybox((-69.7718, 45.0742, -69.3141, 45.4534))
+    assert abs(wb_b.areasqkm.sum() - wb_g.areasqkm.sum()) < 1e-3
 
 
 @pytest.mark.flaky(max_runs=3)
 def test_waterdata_byfilter():
-    wd = nhd.WaterData("huc12", "epsg:3857")
+    wd = WaterData("huc12", "epsg:3857")
     wb = wd.byfilter(f"{wd.layer} LIKE '17030001%'")
     assert wb.shape[0] == 52
 
