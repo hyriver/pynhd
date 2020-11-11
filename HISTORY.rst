@@ -28,7 +28,7 @@ New Features
 - The following function is added to ``WaterData``:
 
     * ``byfilter``: For getting data based on any valid CQL filter.
-    * ``bygeom``: For getting data within a geometry.
+    * ``bygeom``: For getting data within a geometry (polygon and multipolygon).
 
 Bug Fixes
 ~~~~~~~~~
