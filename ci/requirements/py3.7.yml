@@ -3,9 +3,26 @@ channels:
   - conda-forge
 dependencies:
   - python=3.7
-  - setuptools
-  - networkx
   - pip
+  - setuptools
+  - owslib
+  - pyproj
+  - shapely
+  - orjson
+  - defusedxml
+  - requests
+  - aiohttp
+  - chardet
+  - aiodns
+  - brotlipy
+  - nest-asyncio
+  - xarray
+  - netCDF4
+  - geopandas
+  - rasterio
+  - shapely
+  - orjson
+  - networkx
   - pip:
     - git+https://github.com/cheginit/pygeoogc.git
     - git+https://github.com/cheginit/pygeoutils.git
