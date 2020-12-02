@@ -1,0 +1,11 @@
+name: pynhd
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9
+  - setuptools
+  - networkx
+  - pip:
+    - git+https://github.com/cheginit/pygeoogc.git
+    - git+https://github.com/cheginit/pygeoutils.git
+
