@@ -24,6 +24,7 @@ dependencies:
   - orjson
   - networkx
   - pip:
+    - git+https://github.com/Toblerity/Fiona.git
     - git+https://github.com/cheginit/pygeoogc.git
     - git+https://github.com/cheginit/pygeoutils.git
 
