@@ -29,6 +29,7 @@ New Features
 
     * ``byfilter``: For getting data based on any valid CQL filter.
     * ``bygeom``: For getting data within a geometry (polygon and multipolygon).
+- Add support for Python 3.9 and tests for Windows.
 
 Bug Fixes
 ~~~~~~~~~
