@@ -4,6 +4,21 @@ channels:
 dependencies:
   - python>=3.8
   - setuptools
+  - owslib
+  - pyproj
+  - defusedxml
+  - requests
+  - aiohttp
+  - chardet
+  - aiodns
+  - brotlipy
+  - nest-asyncio
+  - xarray
+  - netCDF4
+  - geopandas
+  - rasterio
+  - shapely
+  - orjson
   - networkx
 
   - setuptools_scm
