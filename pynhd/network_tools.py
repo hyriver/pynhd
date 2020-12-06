@@ -1,21 +1,15 @@
 """Access NLDI and WaterData databases."""
 import numbers
-from json import JSONDecodeError
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Tuple, Union
 
 import geopandas as gpd
 import networkx as nx
 import numpy as np
 import pandas as pd
-import pygeoogc as ogc
-import pygeoutils as geoutils
 from pandas._libs.missing import NAType
-from pygeoogc import WFS, ArcGISRESTful, MatchCRS, RetrySession, ServiceURL
-from requests import Response
-from shapely.geometry import MultiPolygon, Polygon
 
-from .exceptions import InvalidInputType, InvalidInputValue, MissingItems, ZeroMatched
- 
+from .exceptions import InvalidInputType, MissingItems, ZeroMatched
+
 
 def prepare_nhdplus(
     flw: gpd.GeoDataFrame,

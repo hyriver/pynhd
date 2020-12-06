@@ -1,20 +1,17 @@
 """Access NLDI and WaterData databases."""
-import numbers
 from json import JSONDecodeError
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import geopandas as gpd
-import networkx as nx
 import numpy as np
 import pandas as pd
 import pygeoogc as ogc
 import pygeoutils as geoutils
-from pandas._libs.missing import NAType
 from pygeoogc import WFS, ArcGISRESTful, MatchCRS, RetrySession, ServiceURL
 from requests import Response
 from shapely.geometry import MultiPolygon, Polygon
 
-from .exceptions import InvalidInputType, InvalidInputValue, MissingItems, ZeroMatched
+from .exceptions import InvalidInputValue, MissingItems, ZeroMatched
 
 DEF_CRS = "epsg:4326"
 ALT_CRS = "epsg:4269"

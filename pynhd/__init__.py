@@ -2,9 +2,9 @@
 from pkg_resources import DistributionNotFound, get_distribution
 
 from .exceptions import InvalidInputType, InvalidInputValue, MissingItems, ZeroMatched
+from .network_tools import prepare_nhdplus, topoogical_sort, vector_accumulation
 from .print_versions import show_versions
 from .pynhd import NLDI, NHDPlusHR, WaterData
-from .network_tools import prepare_nhdplus, topoogical_sort, vector_accumulation
 
 try:
     __version__ = get_distribution(__name__).version
