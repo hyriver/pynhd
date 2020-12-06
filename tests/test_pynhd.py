@@ -31,8 +31,9 @@ def test_nldi_navigate():
 
 @pytest.mark.flaky(max_runs=3)
 def test_nldi_feature():
-    basin = nldi.getfeature_byid(site, station_id, basin=True)
-    assert abs(basin.area.iloc[0] - 0.0887) < 1e-3
+    eck4 = "+proj=eck4 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=km"
+    basin = nldi.getfeature_byid(site, station_id, basin=True).to_crs(eck4)
+    assert abs(basin.area.iloc[0] - 774.170) < 1e-3
 
 
 @pytest.mark.flaky(max_runs=3)
