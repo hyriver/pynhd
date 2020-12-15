@@ -285,7 +285,10 @@ class NLDI:
             {s: geoutils.json2geodf(self._geturl(u), ALT_CRS, DEF_CRS) for s, u in urls.items()}
         )
 
-        return gpd.GeoDataFrame(basins_df.reset_index(level=1, drop=True))
+        basins = gpd.GeoDataFrame(basins_df.reset_index(level=1, drop=True))
+        basins.index.rename("identifier", inplace=True)
+
+        return basins
 
     def getcharacteristic_byid(
         self,
