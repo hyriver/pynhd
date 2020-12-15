@@ -2,6 +2,16 @@
 History
 =======
 
+0.3.0 (unreleased)
+------------------
+
+Breaking Changes
+~~~~~~~~~~~~~~~~
+- Add a new function for getting basins geometries for a list of USGS station IDs.
+  The function is a method of ``NLDI`` class called ``get_basins``. So, now
+  ``NLDI.getfeature_byid`` function does not have a basin flag. This change
+  makes getting geometries easier and faster.
+
 0.2.0 (2020-12-06)
 ------------------
 

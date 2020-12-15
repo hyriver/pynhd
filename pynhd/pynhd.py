@@ -244,7 +244,7 @@ class NLDI:
         resp = self.session.get("/".join([self.base_url, "lookups"])).json()
         self.valid_chartypes = {r["type"]: r["typeName"] for r in resp}
 
-    def getfeature_byid(self, fsource: str, fid: str, basin: bool = False) -> gpd.GeoDataFrame:
+    def getfeature_byid(self, fsource: str, fid: str) -> gpd.GeoDataFrame:
         """Get features of a single id.
 
         Parameters
@@ -254,8 +254,6 @@ class NLDI:
             comid, huc12pp, nwissite, wade, wqp
         fid : str
             The ID of the feature.
-        basin : bool
-            Whether to return the basin containing the feature.
 
         Returns
         -------
@@ -265,10 +263,29 @@ class NLDI:
         self._validate_fsource(fsource)
 
         url = "/".join([self.base_url, "linked-data", fsource, fid])
-        if basin:
-            url += "/basin"
 
         return geoutils.json2geodf(self._geturl(url), ALT_CRS, DEF_CRS)
+
+    def get_basins(self, station_ids: Union[str, List[str]]) -> gpd.GeoDataFrame:
+        """Get basins for a list of station IDs.
+
+        Parameters
+        ----------
+        station_ids : str or list
+            USGS station ID(s).
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            NLDI indexed features in EPSG:4326.
+        """
+        station_ids = station_ids if isinstance(station_ids, list) else [station_ids]
+        urls = {s: f"{self.base_url}/linked-data/nwissite/USGS-{s}/basin" for s in station_ids}
+        basins_df = pd.concat(
+            {s: geoutils.json2geodf(self._geturl(u), ALT_CRS, DEF_CRS) for s, u in urls.items()}
+        )
+
+        return gpd.GeoDataFrame(basins_df.reset_index(level=1, drop=True))
 
     def getcharacteristic_byid(
         self,
