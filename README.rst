@@ -153,11 +153,9 @@ USGS station using ``NLDI``:
 .. code:: python
 
     nldi = NLDI()
-    station_id = "USGS-01031500"
-    ut = "upstreamTributaries"
-    um = "upstreamMain"
+    station_id = "01031500"
 
-    basin = nldi.getfeature_byid("nwissite", station_id, basin=True)
+    basin = nldi.get_basins(station_id)
 
 The ``navigate_byid`` class method can be used to navigate NHDPlus in
 both upstream and downstream of any point in the database. Let’s get ComIDs and flowlines
@@ -165,45 +163,55 @@ of the tributaries and the main river channel in the upstream of the station.
 
 .. code:: python
 
-    args = {
-        "fsource": "nwissite",
-        "fid": station_id,
-        "navigation": um,
-        "source": "flowlines",
-        "distance": 1000,
-    }
+    flw_main = nldi.navigate_byid(
+        fsource="nwissite",
+        fid=f"USGS-{station_id}",
+        navigation="upstreamMain",
+        source="flowlines",
+        distance=1000,
+    )
 
-    flw_main = nldi.navigate_byid(**args)
-
-    args["navigation"] = ut
-    flw_trib = nldi.navigate_byid(**args)
+    flw_trib = nldi.navigate_byid(
+        fsource="nwissite",
+        fid=f"USGS-{station_id}",
+        navigation="upstreamTributaries",
+        source="flowlines",
+        distance=1000,
+    )
 
 We can get other USGS stations upstream (or downstream) of the station
 and even set a distance limit (in km):
 
 .. code:: python
 
-    args.update({
-        "source" : "nwissite",
-    })
-    st_all = nldi.navigate_byid(**args)
+    st_all = nldi.navigate_byid(
+        fsource="nwissite",
+        fid=f"USGS-{station_id}",
+        navigation="upstreamTributaries",
+        source="nwissite",
+        distance=1000,
+    )
 
-    args.update({
-        "distance": 20,
-        "source" : "nwissite",
-    })
-    st_d20 = nldi.navigate_byid(**args)
+    st_d20 = nldi.navigate_byid(
+        fsource="nwissite",
+        fid=f"USGS-{station_id}",
+        navigation="upstreamTributaries",
+        source="nwissite",
+        distance=20,
+    )
 
 Now, let’s get the `HUC12 pour
 points <https://www.sciencebase.gov/catalog/item/5762b664e4b07657d19a71ea>`__:
 
 .. code:: python
 
-    args.update({
-        "distance": 1000,
-        "source" : "huc12pp",
-    })
-    pp = nldi.navigate_byid(**args)
+    pp = nldi.navigate_byid(
+        fsource="nwissite",
+        fid=f"USGS-{station_id}",
+        navigation="upstreamTributaries",
+        source="huc12pp",
+        distance=1000,
+    )
 
 .. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_12_0.png
     :target: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_12_0.png
