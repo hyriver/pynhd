@@ -49,7 +49,7 @@ repos:
         additional_dependencies: [flake8-comprehensions, flake8-builtins, flake8-blind-except, flake8-bugbear, flake8-use-fstring, flake8-docstrings, flake8-simplify]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v0.790
+    rev: v0.800
     hooks:
       - id: mypy
         name: Static type checking with mypy
@@ -69,4 +69,3 @@ repos:
         name: Check for security issues with bandit
         args: [-lll, --recursive, mosart_urban]
         files: .py$
-
