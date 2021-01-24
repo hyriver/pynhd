@@ -22,8 +22,8 @@ def test_nldi_navigate():
     pp = nldi.navigate_byid(site, station_id, UT, "huc12pp")
     wqp = nldi.navigate_byloc((-70, 44), UT, "wqp")
     assert (
-        st100.shape[0] == 2
-        and stm.shape[0] == 2
+        st100.shape[0] == 3
+        and stm.shape[0] == 3
         and pp.shape[0] == 12
         and wqp.comid.iloc[0] == "6710923"
     )
@@ -44,14 +44,14 @@ def test_nldi_basin():
 
 @pytest.mark.flaky(max_runs=3)
 def test_nldi_char():
-    tot, prc = nldi.getcharacteristic_byid("6710923", "tot", char_ids="TOT_BFI", values_only=False)
-    assert abs(tot.TOT_BFI.values[0] - 57) < 1e-3 and prc.TOT_BFI.values[0] == 0
+    tot, prc = nldi.getcharacteristic_byid("6710923", "div", char_ids="ACC_BFI", values_only=False)
+    assert abs(tot.ACC_BFI.values[0] - 57) < 1e-3 and prc.ACC_BFI.values[0] == 0
 
 
 @pytest.mark.flaky(max_runs=3)
 def test_nldi_chardf():
-    bfi = nldi.characteristics_dataframe("tot", "TOT_BFI", "BFI_CONUS.zip")
-    meta = nldi.characteristics_dataframe("tot", "TOT_BFI", "BFI_CONUS.zip", metadata=True)
+    bfi = nldi.characteristics_dataframe("div", "TOT_BFI", "BFI_CONUS.zip")
+    meta = nldi.characteristics_dataframe("div", "TOT_BFI", "BFI_CONUS.zip", metadata=True)
     assert (
         abs(bfi[bfi.ACC_BFI > 0].ACC_BFI.sum() - 116653087.67) < 1e-3
         and meta["id"] == "5669a8e3e4b08895842a1d4f"
