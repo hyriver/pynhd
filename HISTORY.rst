@@ -12,6 +12,11 @@ Breaking Changes
   ``NLDI.getfeature_byid`` function does not have a basin flag. This change
   makes getting geometries easier and faster.
 
+New Features
+~~~~~~~~~~~~
+- Add a new argument to ``topoogical_sort`` called ``edge_attr`` that allows to
+  add attribute(s) to the returned Networkx Graph. By default it is ``None``.
+
 0.2.0 (2020-12-06)
 ------------------
 
@@ -28,17 +33,18 @@ New Features
   SQL where clause.
 - The following functions are added to ``NLDI``:
 
-    * ``getcharacteristic_byid``: For getting characteristics of NHDPlus catchments.
-    * ``navigate_byloc``: For getting the nearest ComID to a coordinate and perform a navigation.
-    * ``characteristics_dataframe``: For getting all the available catchment-scale characteristics
-      as a dataframe.
-    * ``get_validchars``: For getting a list of available characteristic IDs for a specified
-      characteristic type,.
+* ``getcharacteristic_byid``: For getting characteristics of NHDPlus catchments.
+* ``navigate_byloc``: For getting the nearest ComID to a coordinate and perform a navigation.
+* ``characteristics_dataframe``: For getting all the available catchment-scale characteristics
+  as a dataframe.
+* ``get_validchars``: For getting a list of available characteristic IDs for a specified
+  characteristic type,.
 
 - The following function is added to ``WaterData``:
 
-    * ``byfilter``: For getting data based on any valid CQL filter.
-    * ``bygeom``: For getting data within a geometry (polygon and multipolygon).
+* ``byfilter``: For getting data based on any valid CQL filter.
+* ``bygeom``: For getting data within a geometry (polygon and multipolygon).
+
 - Add support for Python 3.9 and tests for Windows.
 
 Bug Fixes
