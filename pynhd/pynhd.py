@@ -318,7 +318,7 @@ class NLDI:
         -------
         pandas.DataFrame or tuple of pandas.DataFrame
             Either only ``characteristic_value`` as a dataframe or
-            or if ``values_only`` is Fale return ``percent_nodata`` is well.
+            or if ``values_only`` is Fale return ``percent_nodata`` as well.
         """
         if char_type not in self.valid_chartypes:
             valids = [f'"{s}" for {d}' for s, d in self.valid_chartypes.items()]

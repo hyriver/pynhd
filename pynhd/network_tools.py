@@ -1,6 +1,6 @@
 """Access NLDI and WaterData databases."""
 import numbers
-from typing import Callable, Dict, Iterable, List, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import geopandas as gpd
 import networkx as nx
@@ -67,10 +67,10 @@ def prepare_nhdplus(
     flw[req_cols[:-1]] = flw[req_cols[:-1]].astype("Int64")
 
     if not any(flw.terminalfl == 1):
-        if all(flw.terminalpa == flw.terminalpa.iloc[0]):
-            flw.loc[flw.hydroseq == flw.hydroseq.min(), "terminalfl"] = 1
-        else:
+        if not all(flw.terminalpa == flw.terminalpa.iloc[0]):
             raise ZeroMatched("No terminal flag were found in the dataframe.")
+
+        flw.loc[flw.hydroseq == flw.hydroseq.min(), "terminalfl"] = 1
 
     if purge_non_dendritic:
         flw = flw[
@@ -188,7 +188,7 @@ def _add_tocomid(flw: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
 
 def topoogical_sort(
-    flowlines: pd.DataFrame,
+    flowlines: pd.DataFrame, edge_attr: Optional[Union[str, List[str]]] = None
 ) -> Tuple[List[Union[str, NAType]], Dict[Union[str, NAType], List[str]], nx.DiGraph]:
     """Topological sorting of a river network.
 
@@ -196,6 +196,8 @@ def topoogical_sort(
     ----------
     flowlines : pandas.DataFrame
         A dataframe with columns ID and toID
+    edge_attr : str or list, optional
+        Names of the columns in the dataframe to be used as edge attributes, defaults to None.
 
     Returns
     -------
@@ -209,10 +211,11 @@ def topoogical_sort(
     upstream_nodes[pd.NA] = flowlines[flowlines.toID.isna()].ID.tolist()
 
     netwrok = nx.from_pandas_edgelist(
-        flowlines[["ID", "toID"]],
+        flowlines,
         source="ID",
         target="toID",
         create_using=nx.DiGraph,
+        edge_attr=edge_attr,
     )
     topo_sorted = list(nx.topological_sort(netwrok))
     return topo_sorted, upstream_nodes, netwrok
@@ -271,12 +274,13 @@ def vector_accumulation(
     outflow = flowlines.set_index(id_col)[attr_col].to_dict()
 
     init = flowlines.iloc[0][attr_col]
+    if not isinstance(init, (np.ndarray, list, numbers.Number)):
+        raise InvalidInputType("values of attr_col", "a scalar or an array")
+
     if isinstance(init, numbers.Number):
         outflow["0"] = 0.0
-    elif isinstance(init, (np.ndarray, list)):
-        outflow["0"] = np.zeros_like(init)
     else:
-        raise InvalidInputType("values of attr_col", "a scalar or an array")
+        outflow["0"] = np.zeros_like(init)
 
     upstream_nodes.update({k: ["0"] for k, v in upstream_nodes.items() if len(v) == 0})
 
