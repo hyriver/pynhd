@@ -174,8 +174,8 @@ def _add_tocomid(flw: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
     flw[req_cols] = flw[req_cols].astype("Int64")
 
-    def tocomid(group):
-        def toid(row):
+    def tocomid(group: pd.core.groupby.generic.DataFrameGroupBy) -> pd.DataFrame:
+        def toid(row: pd.DataFrame) -> pd.Int64Dtype:
             try:
                 return group[group.fromnode == row.tonode].comid.to_numpy()[0]
             except IndexError:

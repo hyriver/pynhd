@@ -214,7 +214,7 @@ class NHDPlusHR:
         self.service.oids_bysql(sql_clause)
         return self._getfeatures(return_m)
 
-    def _getfeatures(self, return_m: bool = False):
+    def _getfeatures(self, return_m: bool = False) -> gpd.GeoDataFrame:
         """Send a request for getting data based on object IDs.
 
         Parameters
@@ -415,7 +415,7 @@ class NLDI:
         url = valid_navigations[navigation]
 
         r_json = self._geturl(url)
-        valid_sources = {s["source"].lower(): s["features"] for s in r_json}
+        valid_sources = {s["source"].lower(): s["features"] for s in r_json}  # type: ignore
         if source not in valid_sources:
             raise InvalidInputValue("source", list(valid_sources.keys()))
 
@@ -538,7 +538,7 @@ class NLDI:
             valids = [f'"{s}" for {d}' for s, d in self.valid_fsources.items()]
             raise InvalidInputValue("feature source", valids)
 
-    def _geturl(self, url: str, payload: Optional[Dict[str, str]] = None):
+    def _geturl(self, url: str, payload: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Send a request to the service using GET method."""
         if payload is None:
             payload = {"f": "json"}
@@ -546,6 +546,6 @@ class NLDI:
             payload.update({"f": "json"})
 
         try:
-            return self.session.get(url, payload).json()
+            return self.session.get(url, payload).json()  # type: ignore
         except JSONDecodeError:
             raise ZeroMatched("No feature was found with the provided inputs.")
