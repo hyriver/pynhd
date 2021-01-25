@@ -53,7 +53,8 @@ repos:
     hooks:
       - id: mypy
         name: Static type checking with mypy
-        files: mosart_urban
+        exclude: tests
+        files: pynhd
 
   - repo: https://github.com/asottile/pyupgrade
     rev: v2.7.4
@@ -67,5 +68,5 @@ repos:
     hooks:
       - id: bandit
         name: Check for security issues with bandit
-        args: [-lll, --recursive, mosart_urban]
+        args: [-lll, --recursive, pynhd]
         files: .py$
