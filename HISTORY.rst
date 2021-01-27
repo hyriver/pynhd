@@ -16,6 +16,9 @@ New Features
 ~~~~~~~~~~~~
 - Add a new argument to ``topoogical_sort`` called ``edge_attr`` that allows to
   add attribute(s) to the returned Networkx Graph. By default it is ``None``.
+- A new base class, ``AGRBase`` for connecting to ArcGISRESTful-based services such as National Map
+  and EPA's WaterGEOS.
+- Add support for setting the buffer distance for the input geometries to ``AGRBase.bygeom``.
 
 0.2.0 (2020-12-06)
 ------------------
