@@ -5,7 +5,7 @@ import pytest
 from shapely.geometry import box
 
 import pynhd as nhd
-from pynhd import NLDI, WaterData
+from pynhd import NLDI, AGRBase, WaterData
 
 STA_ID = "01031500"
 station_id = f"USGS-{STA_ID}"
@@ -13,6 +13,31 @@ site = "nwissite"
 UM = "upstreamMain"
 UT = "upstreamTributaries"
 nldi = NLDI()
+
+
+class NHDPlusEPA(AGRBase):
+    def __init__(self, layer):
+        super().__init__(layer, "*", "epsg:4326")
+        self._init_service(
+            "https://watersgeo.epa.gov/arcgis/rest/services/NHDPlus/NHDPlus/MapServer"
+        )
+
+
+@pytest.mark.flaky(max_runs=3)
+def test_agr():
+    layer = "network flowline"
+    sql_clause = "FTYPE NOT IN (420,428,566)"
+    geom = [
+        (-97.06138, 32.837),
+        (-97.06133, 32.836),
+        (-97.06124, 32.834),
+        (-97.06127, 32.832),
+    ]
+    geo_crs = "epsg:4269"
+    distance = 1500
+    epa = NHDPlusEPA(layer=layer)
+    df = epa.bygeom(geom, geo_crs=geo_crs, sql_clause=sql_clause, distance=distance)
+    assert (df.LENGTHKM.sum() - 8.917) < 1e-3
 
 
 @pytest.mark.flaky(max_runs=3)

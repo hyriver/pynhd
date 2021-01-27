@@ -1,4 +1,5 @@
 """Access NLDI and WaterData databases."""
+from dataclasses import dataclass
 from json import JSONDecodeError
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -52,7 +53,7 @@ class WaterData:
     ) -> gpd.GeoDataFrame:
         """Get features within a bounding box."""
         resp = self.wfs.getfeature_bybox(bbox, box_crs, always_xy=True)
-        return self.to_geodf(resp)
+        return self._to_geodf(resp)
 
     def bygeom(
         self,
@@ -75,7 +76,7 @@ class WaterData:
             The geometric prediacte to use for requesting the data, defaults to
             INTERSECTS. Valid predicates are:
             EQUALS, DISJOINT, INTERSECTS, TOUCHES, CROSSES, WITHIN, CONTAINS,
-            OVERLAPS, RELATE, DWITHIN, BEYOND
+            OVERLAPS, RELATE, BEYOND
 
         Returns
         -------
@@ -83,19 +84,19 @@ class WaterData:
             The requested features in the given geometry.
         """
         resp = self.wfs.getfeature_bygeom(geometry, geo_crs, always_xy=not xy, predicate=predicate)
-        return self.to_geodf(resp)
+        return self._to_geodf(resp)
 
     def byid(self, featurename: str, featureids: Union[List[str], str]) -> gpd.GeoDataFrame:
         """Get features based on IDs."""
         resp = self.wfs.getfeature_byid(featurename, featureids)
-        return self.to_geodf(resp)
+        return self._to_geodf(resp)
 
     def byfilter(self, cql_filter: str, method: str = "GET") -> gpd.GeoDataFrame:
         """Get features based on a CQL filter."""
         resp = self.wfs.getfeature_byfilter(cql_filter, method)
-        return self.to_geodf(resp)
+        return self._to_geodf(resp)
 
-    def to_geodf(self, resp: Response) -> gpd.GeoDataFrame:
+    def _to_geodf(self, resp: Response) -> gpd.GeoDataFrame:
         """Convert a response from WaterData to a GeoDataFrame.
 
         Parameters
@@ -111,8 +112,9 @@ class WaterData:
         return geoutils.json2geodf(resp.json(), ALT_CRS, self.crs)
 
 
-class NHDPlusHR:
-    """Access NHDPlus HR database through the National Map ArcGISRESTful.
+@dataclass
+class AGRBase:
+    """Base class for accessing NHD(Plus) HR database through the National Map ArcGISRESTful.
 
     Parameters
     ----------
@@ -120,32 +122,34 @@ class NHDPlusHR:
         A valid service layer. For a list of available layers pass an empty string to
         the class.
     outfields : str or list, optional
-        Target field name(s), default to "*" i.e., all the fileds.
+        Target field name(s), default to "*" i.e., all the fields.
     crs : str, optional
         Target spatial reference, default to EPSG:4326
     """
 
-    def __init__(self, layer: str, outfields: Union[str, List[str]] = "*", crs: str = DEF_CRS):
+    layer: str
+    outfields: Union[str, List[str]] = "*"
+    crs: str = DEF_CRS
+
+    def _init_service(self, url: str) -> None:
         self.service = ArcGISRESTful(
-            ServiceURL().restful.nhdplushr,
+            url,
             outformat="json",
-            outfields=outfields,
-            crs=crs,
+            outfields=self.outfields,
+            crs=self.crs,
         )
         valid_layers = self.service.get_validlayers()
         self.valid_layers = {v.lower(): k for k, v in valid_layers.items()}
-        if layer not in self.valid_layers:
+        if self.layer not in self.valid_layers:
             raise InvalidInputValue("layer", list(self.valid_layers))
-        self.service.layer = self.valid_layers[layer]
-
-        self.outfields = outfields
-        self.crs = crs
+        self.service.layer = self.valid_layers[self.layer]
 
     def bygeom(
         self,
-        geom: Union[Polygon, Tuple[float, float, float, float]],
+        geom: Union[Polygon, List[Tuple[float, float]], Tuple[float, float, float, float]],
         geo_crs: str = "epsg:4326",
         sql_clause: str = "",
+        distance: Optional[int] = None,
         return_m: bool = False,
     ) -> gpd.GeoDataFrame:
         """Get feature within a geometry that can be combined with a SQL where clause.
@@ -153,12 +157,14 @@ class NHDPlusHR:
         Parameters
         ----------
         geom : Polygon or tuple
-            A geometry (Polgon) or bounding box (tuple of length 4).
+            A geometry (Polygon) or bounding box (tuple of length 4).
         geo_crs : str
             The spatial reference of the input geometry.
         sql_clause : str, optional
             A valid SQL 92 WHERE clause, defaults to an empty string.
-        return_m : bool
+        distance : int, optional
+            The buffer distance for the input geometries in meters, default to None.
+        return_m : bool, optional
             Whether to activate the Return M (measure) in the request, defaults to False.
 
         Returns
@@ -166,7 +172,7 @@ class NHDPlusHR:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        self.service.oids_bygeom(geom, geo_crs=geo_crs, sql_clause=sql_clause)
+        self.service.oids_bygeom(geom, geo_crs=geo_crs, sql_clause=sql_clause, distance=distance)
         return self._getfeatures(return_m)
 
     def byids(
@@ -229,6 +235,25 @@ class NHDPlusHR:
         """
         resp = self.service.get_features(return_m)
         return geoutils.json2geodf(resp)
+
+
+class NHDPlusHR(AGRBase):
+    """Access NHDPlus HR database through the National Map ArcGISRESTful.
+
+    Parameters
+    ----------
+    layer : str
+        A valid service layer. For a list of available layers pass an empty string to
+        the class.
+    outfields : str or list, optional
+        Target field name(s), default to "*" i.e., all the fields.
+    crs : str, optional
+        Target spatial reference, default to EPSG:4326
+    """
+
+    def __init__(self, layer: str, outfields: Union[str, List[str]] = "*", crs: str = DEF_CRS):
+        super().__init__(layer, outfields, crs)
+        self._init_service(ServiceURL().restful.nhdplushr)
 
 
 class NLDI:
