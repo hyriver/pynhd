@@ -37,7 +37,7 @@ def test_agr():
     distance = 1500
     epa = NHDPlusEPA(layer=layer)
     df = epa.bygeom(geom, geo_crs=geo_crs, sql_clause=sql_clause, distance=distance)
-    assert (df.LENGTHKM.sum() - 8.917) < 1e-3
+    assert abs(df.LENGTHKM.sum() - 8.917) < 1e-3
 
 
 @pytest.mark.flaky(max_runs=3)
