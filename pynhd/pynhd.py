@@ -130,19 +130,21 @@ class AGRBase:
     layer: str
     outfields: Union[str, List[str]] = "*"
     crs: str = DEF_CRS
+    service: Optional[ArcGISRESTful] = None
 
-    def _init_service(self, url: str) -> None:
-        self.service = ArcGISRESTful(
+    def _init_service(self, url: str) -> ArcGISRESTful:
+        service = ArcGISRESTful(
             url,
             outformat="json",
             outfields=self.outfields,
             crs=self.crs,
         )
-        valid_layers = self.service.get_validlayers()
-        self.valid_layers = {v.lower(): k for k, v in valid_layers.items()}
-        if self.layer not in self.valid_layers:
-            raise InvalidInputValue("layer", list(self.valid_layers))
-        self.service.layer = self.valid_layers[self.layer]
+        valid_layers = service.get_validlayers()
+        valid_layers = {v.lower(): k for k, v in valid_layers.items()}
+        if self.layer not in valid_layers:
+            raise InvalidInputValue("layer", list(valid_layers))
+        service.layer = valid_layers[self.layer]
+        return service
 
     def bygeom(
         self,
@@ -172,6 +174,9 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
+        if self.service is None:
+            raise ValueError("First you should use _init_service(url) to initialize the service.")
+
         self.service.oids_bygeom(geom, geo_crs=geo_crs, sql_clause=sql_clause, distance=distance)
         return self._getfeatures(return_m)
 
@@ -194,6 +199,9 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
+        if self.service is None:
+            raise ValueError("First you should use _init_service(url) to initialize the service.")
+
         self.service.oids_byfield(field, fids)
         return self._getfeatures(return_m)
 
@@ -217,6 +225,9 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
+        if self.service is None:
+            raise ValueError("First you should use _init_service(url) to initialize the service.")
+
         self.service.oids_bysql(sql_clause)
         return self._getfeatures(return_m)
 
@@ -233,6 +244,9 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
+        if self.service is None:
+            raise ValueError("First you should use _init_service(url) to initialize the service.")
+
         resp = self.service.get_features(return_m)
         return geoutils.json2geodf(resp)
 
@@ -253,7 +267,7 @@ class NHDPlusHR(AGRBase):
 
     def __init__(self, layer: str, outfields: Union[str, List[str]] = "*", crs: str = DEF_CRS):
         super().__init__(layer, outfields, crs)
-        self._init_service(ServiceURL().restful.nhdplushr)
+        self.service = self._init_service(ServiceURL().restful.nhdplushr)
 
 
 class NLDI:

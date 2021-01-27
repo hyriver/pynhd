@@ -18,7 +18,7 @@ nldi = NLDI()
 class NHDPlusEPA(AGRBase):
     def __init__(self, layer):
         super().__init__(layer, "*", "epsg:4326")
-        self._init_service(
+        self.service = self._init_service(
             "https://watersgeo.epa.gov/arcgis/rest/services/NHDPlus/NHDPlus/MapServer"
         )
 
