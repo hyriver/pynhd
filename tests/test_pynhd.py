@@ -57,14 +57,22 @@ def test_nldi_navigate():
 @pytest.mark.flaky(max_runs=3)
 def test_nldi_feature():
     station = nldi.getfeature_byid(site, station_id)
-    assert station.comid.values[0] == "1722317"
+    lon = round(station.geometry[0].centroid.x, 1)
+    lat = round(station.geometry[0].centroid.y, 1)
+    comid, missing = nldi.comid_byloc([(lon, lat), (lat, lon)])
+    assert (
+        station.comid.values[0] == "1722317"
+        and comid.comid.values[0] == "1722211"
+        and len(missing) == 1
+    )
 
 
 @pytest.mark.flaky(max_runs=3)
 def test_nldi_basin():
     eck4 = "+proj=eck4 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=km"
-    basin = nldi.get_basins(STA_ID).to_crs(eck4)
-    assert abs(basin.area.values[0] - 774.170) < 1e-3
+    basin, missing = nldi.get_basins([STA_ID, "00000000"])
+    basin = basin.to_crs(eck4)
+    assert abs(basin.area.values[0] - 774.170) < 1e-3 and len(missing) == 1
 
 
 @pytest.mark.flaky(max_runs=3)

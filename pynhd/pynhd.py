@@ -1,4 +1,5 @@
 """Access NLDI and WaterData databases."""
+import logging
 from dataclasses import dataclass
 from json import JSONDecodeError
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -14,6 +15,8 @@ from shapely.geometry import MultiPolygon, Polygon
 
 from .exceptions import InvalidInputValue, MissingItems, ZeroMatched
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 DEF_CRS = "epsg:4326"
 ALT_CRS = "epsg:4269"
 
@@ -283,29 +286,88 @@ class NLDI:
         resp = self.session.get("/".join([self.base_url, "lookups"])).json()
         self.valid_chartypes = {r["type"]: r["typeName"] for r in resp}
 
-    def getfeature_byid(self, fsource: str, fid: str) -> gpd.GeoDataFrame:
-        """Get features of a single id.
+    def getfeature_byid(
+        self, fsource: str, fid: Union[str, List[str]]
+    ) -> Union[gpd.GeoDataFrame, Tuple[gpd.GeoDataFrame, List[str]]]:
+        """Get feature(s) based ID(s).
 
         Parameters
         ----------
         fsource : str
-            The name of feature source. The valid sources are:
+            The name of feature(s) source. The valid sources are:
             comid, huc12pp, nwissite, wade, wqp
-        fid : str
-            The ID of the feature.
+        fid : str or list
+            Feature ID(s).
 
         Returns
         -------
-        geopandas.GeoDataFrame
-            NLDI indexed features in EPSG:4326.
+        geopandas.GeoDataFrame or (geopandas.GeoDataFrame, list)
+            NLDI indexed features in EPSG:4326. If some IDs don't return any features
+            a list of missing ID(s) are returnd as well.
         """
         self._validate_fsource(fsource)
+        fid = fid if isinstance(fid, list) else [fid]
+        urls = {f: "/".join([self.base_url, "linked-data", fsource, f]) for f in fid}
+        features, not_found = self._get_urls(urls)
 
-        url = "/".join([self.base_url, "linked-data", fsource, fid])
+        if len(not_found) > 0:
+            msg = " ".join(
+                [
+                    f"{len(not_found)} of {len(fid)} inputs didn't return any features.",
+                    "They are returned as a list.",
+                ]
+            )
+            logger.warning(msg)
+            return features, not_found
 
-        return geoutils.json2geodf(self._geturl(url), ALT_CRS, DEF_CRS)
+        return features
 
-    def get_basins(self, station_ids: Union[str, List[str]]) -> gpd.GeoDataFrame:
+    def comid_byloc(
+        self,
+        coords: Union[Tuple[float, float], List[Tuple[float, float]]],
+        loc_crs: str = "epsg:4326",
+    ) -> Union[gpd.GeoDataFrame, Tuple[gpd.GeoDataFrame, List[Tuple[float, float]]]]:
+        """Get the closest ComID(s) based on coordinates.
+
+        Parameters
+        ----------
+        coords : tuple or list
+            A tuple of length two (x, y) or a list of them.
+        loc_crs : str, optional
+            The spatial reference of the input coordinate, defaults to EPSG:4326.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame or (geopandas.GeoDataFrame, list)
+            NLDI indexed ComID(s) in EPSG:4326. If some coords don't return any ComID
+            a list of missing coords are returnd as well.
+        """
+        coords = coords if isinstance(coords, list) else [coords]
+        coords_4326 = list(zip(*MatchCRS.coords(tuple(zip(*coords)), loc_crs, DEF_CRS)))
+
+        base_url = "/".join([self.base_url, "linked-data", "comid", "position"])
+        urls = {
+            (coords[i][0], coords[i][1]): f"{base_url}?coords=POINT({lon} {lat})"
+            for i, (lon, lat) in enumerate(coords_4326)
+        }
+        comids, not_found = self._get_urls(urls)
+        comids = comids.reset_index(level=2, drop=True)
+
+        if len(not_found) > 0:
+            msg = " ".join(
+                [
+                    f"{len(not_found)} of {len(coords)} inputs didn't return any features.",
+                    "They are returned as a list.",
+                ]
+            )
+            logger.warning(msg)
+            return comids, not_found
+
+        return comids
+
+    def get_basins(
+        self, station_ids: Union[str, List[str]]
+    ) -> Union[gpd.GeoDataFrame, Tuple[gpd.GeoDataFrame, List[str]]]:
         """Get basins for a list of station IDs.
 
         Parameters
@@ -315,17 +377,25 @@ class NLDI:
 
         Returns
         -------
-        geopandas.GeoDataFrame
-            NLDI indexed features in EPSG:4326.
+        geopandas.GeoDataFrame or (geopandas.GeoDataFrame, list)
+            NLDI indexed basins in EPSG:4326. If some IDs don't return any features
+            a list of missing ID(s) are returnd as well.
         """
         station_ids = station_ids if isinstance(station_ids, list) else [station_ids]
         urls = {s: f"{self.base_url}/linked-data/nwissite/USGS-{s}/basin" for s in station_ids}
-        basins_df = pd.concat(
-            {s: geoutils.json2geodf(self._geturl(u), ALT_CRS, DEF_CRS) for s, u in urls.items()}
-        )
-
-        basins = gpd.GeoDataFrame(basins_df.reset_index(level=1, drop=True))
+        basins, not_found = self._get_urls(urls)
+        basins = basins.reset_index(level=1, drop=True)
         basins.index.rename("identifier", inplace=True)
+
+        if len(not_found) > 0:
+            msg = " ".join(
+                [
+                    f"{len(not_found)} of {len(station_ids)} inputs didn't return any features.",
+                    "They are returned as a list.",
+                ]
+            )
+            logger.warning(msg)
+            return basins, not_found
 
         return basins
 
@@ -380,7 +450,7 @@ class NLDI:
 
         for comid in comids:
             url = "/".join([self.base_url, "linked-data", "comid", comid, char_type])
-            rjson = self._geturl(url, payload)
+            rjson = self._get_url(url, payload)
             char = pd.DataFrame.from_dict(rjson["characteristics"], orient="columns").T
             char.columns = char.iloc[0]
             char = char.drop(index="characteristic_id")
@@ -447,20 +517,20 @@ class NLDI:
 
         url = "/".join([self.base_url, "linked-data", fsource, fid, "navigation"])
 
-        valid_navigations = self._geturl(url)
+        valid_navigations = self._get_url(url)
         if navigation not in valid_navigations.keys():
             raise InvalidInputValue("navigation", list(valid_navigations.keys()))
 
         url = valid_navigations[navigation]
 
-        r_json = self._geturl(url)
+        r_json = self._get_url(url)
         valid_sources = {s["source"].lower(): s["features"] for s in r_json}  # type: ignore
         if source not in valid_sources:
             raise InvalidInputValue("source", list(valid_sources.keys()))
 
         url = f"{valid_sources[source]}?distance={int(distance)}"
 
-        return geoutils.json2geodf(self._geturl(url), ALT_CRS, DEF_CRS)
+        return geoutils.json2geodf(self._get_url(url), ALT_CRS, DEF_CRS)
 
     def navigate_byloc(
         self,
@@ -469,13 +539,12 @@ class NLDI:
         source: Optional[str] = None,
         loc_crs: str = DEF_CRS,
         distance: int = 500,
-        comid_only: bool = False,
     ) -> gpd.GeoDataFrame:
         """Navigate the NHDPlus databse from a coordinate.
 
         Parameters
         ----------
-        coordinate : tuple
+        coords : tuple
             A tuple of length two (x, y).
         navigation : str, optional
             The navigation method, defaults to None which throws an exception
@@ -491,8 +560,6 @@ class NLDI:
             defaults to 500 km. Note that this is an expensive request so you
             have be mindful of the value that you provide. If you want to get
             all the available features you can pass a large distance like 9999999.
-        comid_only : bool, optional
-            Whether to return the nearest comid without navigation.
 
         Returns
         -------
@@ -504,11 +571,8 @@ class NLDI:
 
         url = "/".join([self.base_url, "linked-data", "comid", "position"])
         payload = {"coords": f"POINT({lon} {lat})"}
-        rjson = self._geturl(url, payload)
+        rjson = self._get_url(url, payload)
         comid = geoutils.json2geodf(rjson, ALT_CRS, DEF_CRS).comid.iloc[0]
-
-        if comid_only:
-            return comid
 
         if navigation is None or source is None:
             raise MissingItems(["navigation", "source"])
@@ -577,7 +641,36 @@ class NLDI:
             valids = [f'"{s}" for {d}' for s, d in self.valid_fsources.items()]
             raise InvalidInputValue("feature source", valids)
 
-    def _geturl(self, url: str, payload: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    def _get_urls(self, urls: Dict[Any, str]) -> Tuple[gpd.GeoDataFrame, List[str]]:
+        """Get basins for a list of station IDs.
+
+        Parameters
+        ----------
+        urls_dict : dict
+            A dict with keys as feature ids and values as corresponsing url.
+
+        Returns
+        -------
+        (geopandas.GeoDataFrame, list)
+            NLDI indexed features in EPSG:4326 and list of ID(s) that no feature was found.
+        """
+        not_found = []
+        resp = []
+        for f, u in urls.items():
+            try:
+                rjson = self._get_url(u)
+                resp.append((f, geoutils.json2geodf(rjson, ALT_CRS, DEF_CRS)))
+            except (ZeroMatched, JSONDecodeError, ConnectionError):
+                not_found.append(f)
+
+        if len(resp) == 0:
+            raise ZeroMatched("No feature was found with the provided inputs.")
+
+        resp_df = gpd.GeoDataFrame(pd.concat(dict(resp)))
+
+        return resp_df, not_found
+
+    def _get_url(self, url: str, payload: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Send a request to the service using GET method."""
         if payload is None:
             payload = {"f": "json"}

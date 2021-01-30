@@ -19,6 +19,8 @@ New Features
 - A new base class, ``AGRBase`` for connecting to ArcGISRESTful-based services such as National Map
   and EPA's WaterGEOS.
 - Add support for setting the buffer distance for the input geometries to ``AGRBase.bygeom``.
+- Add ``comid_byloc`` to ``NLDI`` class for getting ComIDs of the closest flowlines from a list of
+  lon/lat coordinates.
 
 0.2.0 (2020-12-06)
 ------------------
