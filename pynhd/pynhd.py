@@ -1,7 +1,6 @@
 """Access NLDI and WaterData databases."""
 import logging
 from dataclasses import dataclass
-from json import JSONDecodeError
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import geopandas as gpd
@@ -12,8 +11,9 @@ import pygeoutils as geoutils
 from pygeoogc import WFS, ArcGISRESTful, MatchCRS, RetrySession, ServiceURL
 from requests import Response
 from shapely.geometry import MultiPolygon, Polygon
+from simplejson import JSONDecodeError
 
-from .exceptions import InvalidInputValue, MissingItems, ZeroMatched
+from .exceptions import InvalidInputType, InvalidInputValue, MissingItems, ZeroMatched
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -87,6 +87,20 @@ class WaterData:
             The requested features in the given geometry.
         """
         resp = self.wfs.getfeature_bygeom(geometry, geo_crs, always_xy=not xy, predicate=predicate)
+        return self._to_geodf(resp)
+
+    def bydistance(
+        self, coords: Tuple[float, float], distance: int, loc_crs: str = DEF_CRS
+    ) -> gpd.GeoDataFrame:
+        """Get features within a radius (in meters) of a point."""
+        if isinstance(coords, (list, tuple)) and len(coords) != 2:
+            raise InvalidInputType("coords", "tuple or list of length 2.")
+
+        _coords = MatchCRS.coords(((coords[0],), (coords[1],)), loc_crs, ALT_CRS)
+        cql_filter = (
+            f"DWITHIN(the_geom,POINT({_coords[1][0]:.6f} {_coords[0][0]:.6f}),{distance},meters)"
+        )
+        resp = self.wfs.getfeature_byfilter(cql_filter, "GET")
         return self._to_geodf(resp)
 
     def byid(self, featurename: str, featureids: Union[List[str], str]) -> gpd.GeoDataFrame:
@@ -672,12 +686,14 @@ class NLDI:
 
     def _get_url(self, url: str, payload: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Send a request to the service using GET method."""
-        if payload is None:
-            payload = {"f": "json"}
-        else:
+        if payload:
             payload.update({"f": "json"})
+        else:
+            payload = {"f": "json"}
 
         try:
             return self.session.get(url, payload).json()  # type: ignore
         except JSONDecodeError:
             raise ZeroMatched("No feature was found with the provided inputs.")
+        except ConnectionError:
+            raise ConnectionError("NLDI server cannot be reached at the moment.")

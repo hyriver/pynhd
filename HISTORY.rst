@@ -21,6 +21,7 @@ New Features
 - Add support for setting the buffer distance for the input geometries to ``AGRBase.bygeom``.
 - Add ``comid_byloc`` to ``NLDI`` class for getting ComIDs of the closest flowlines from a list of
   lon/lat coordinates.
+- Add ``bydistance`` to ``WaterData`` for getting features within a given radius of a point.
 
 0.2.0 (2020-12-06)
 ------------------

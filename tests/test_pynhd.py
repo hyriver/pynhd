@@ -120,9 +120,12 @@ def test_waterdata_bybox():
 
 @pytest.mark.flaky(max_runs=3)
 def test_waterdata_byfilter():
-    wd = WaterData("huc12", "epsg:3857")
+    crs = "epsg:3857"
+    wd = WaterData("huc12", crs)
     wb = wd.byfilter(f"{wd.layer} LIKE '17030001%'")
-    assert wb.shape[0] == 52
+    coords = (wb.iloc[0].geometry.centroid.x, wb.iloc[0].geometry.centroid.y)
+    hucs = wd.bydistance(coords, 100, crs)
+    assert wb.shape[0] == 52 and hucs.huc12.values[0] == "170300010602"
 
 
 @pytest.mark.flaky(max_runs=3)
