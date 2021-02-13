@@ -12,6 +12,7 @@ netCDF4
 networkx
 orjson
 owslib
+pyarrow
 pygeoogc
 pygeoutils
 pyproj
