@@ -1,8 +1,13 @@
 """Access NLDI and WaterData databases."""
 import logging
+import os
+import re
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import cytoolz as tlz
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -593,62 +598,6 @@ class NLDI:
 
         return self.navigate_byid("comid", comid, navigation, source, distance)
 
-    def characteristics_dataframe(
-        self,
-        char_type: str,
-        char_id: str,
-        filename: Optional[str] = None,
-        metadata: bool = False,
-    ) -> Union[Dict[str, Any], pd.DataFrame]:
-        """Get a NHDPlus-based characteristic from sciencebase.gov as dataframe.
-
-        Parameters
-        ----------
-        char_type : str
-            Characteristic type. Valid values are ``local`` for
-            individual reach catchments, ``tot`` for network-accumulated values
-            using total cumulative drainage area and ``div`` for network-accumulated values
-            using divergence-routed.
-        char_id : str
-            Characteristic ID.
-        filename : str, optional
-            File name, defaults to None that throws an error and shows
-            a list of available files.
-        metadata : bool
-            Whether to only return the metadata for the selected characteristic,
-            defaults to False. Useful for getting information about the dataset
-            such as citation, units, column names, etc.
-
-        Returns
-        -------
-        pandas.DataFrame or dict
-            The requested characteristic as a dataframe or if ``metadata`` is True
-            the metadata as a dictionary.
-        """
-        if char_type not in self.valid_chartypes:
-            valids = [f'"{s}" for {d}' for s, d in self.valid_chartypes.items()]
-            raise InvalidInputValue("char", valids)
-
-        valid_charids = self.get_validchars(char_type)
-
-        if char_id not in valid_charids.index:
-            vids = valid_charids["characteristic_description"]
-            raise InvalidInputValue("char_id", [f'"{s}" for {d}' for s, d in vids.items()])
-
-        meta = self.session.get(
-            valid_charids.loc[char_id, "dataset_url"], {"format": "json"}
-        ).json()
-        if metadata:
-            return meta
-
-        flist = {
-            f["name"]: f["downloadUri"] for f in meta["files"] if f["name"].split(".")[-1] == "zip"
-        }
-        if filename not in flist:
-            raise InvalidInputValue("filename", list(flist.keys()))
-
-        return pd.read_csv(flist[filename], compression="zip")
-
     def _validate_fsource(self, fsource: str) -> None:
         """Check if the given feature source is valid."""
         if fsource not in self.valid_fsources:
@@ -697,3 +646,143 @@ class NLDI:
             raise ZeroMatched("No feature was found with the provided inputs.")
         except ConnectionError:
             raise ConnectionError("NLDI server cannot be reached at the moment.")
+
+
+class ScienceBase:
+    """Access NHDPlus V2.1 Attributes from ScienceBase over CONUS.
+
+    More info can be found `here <https://www.sciencebase.gov/catalog/item/5669a79ee4b08895842a1d47>`_.
+
+    Parameters
+    ----------
+    save_dir : str
+        Directory to save the staged data frame containing metadata for the database,
+        defaults to system's temp directory. The metadata dataframe is saved as a feather
+        file, nhdplus_attrs.feather, in save_dir that can be loaded with Pandas.
+    """
+
+    def __init__(self, save_dir: Optional[str] = None) -> None:
+        self.save_dir = Path(save_dir) if save_dir else Path(tempfile.gettempdir())
+        if not self.save_dir.exists():
+            os.makedirs(self.save_dir)
+        self.session = RetrySession()
+        self.nhd_attr_item = "5669a79ee4b08895842a1d47"
+        self.char_feather = Path(self.save_dir, "nhdplus_attrs.feather")
+
+    def get_children(self, item: str) -> Dict[str, Any]:
+        """Get childern items of an item."""
+        url = "https://www.sciencebase.gov/catalog/items"
+        payload = {
+            "filter": f"parentIdExcludingLinks={item}",
+            "fields": "title,id",
+            "format": "json",
+        }
+        return self.session.get(url, payload=payload).json()  # type: ignore
+
+    def get_files(self, item: str) -> Dict[str, Tuple[str, str]]:
+        """Get all the available zip files in an item."""
+        url = "https://www.sciencebase.gov/catalog/item"
+        payload = {"fields": "files,downloadUri", "format": "json"}
+        r = self.session.get(f"{url}/{item}", payload=payload).json()
+        files_url = zip(tlz.pluck("name", r["files"]), tlz.pluck("url", r["files"]))
+        # TODO: Add units
+        meta = "".join(tlz.pluck("metadataHtmlViewUri", r["files"], default=""))
+        return {f.replace("_CONUS.zip", ""): (u, meta) for f, u in files_url if ".zip" in f}
+
+    def stage_data(self) -> pd.DataFrame:
+        """Stage the NHDPlus Attributes database and save to nhdplus_attrs.feather."""
+        r = self.get_children(self.nhd_attr_item)
+
+        titles = tlz.pluck("title", r["items"])
+        titles = tlz.concat(tlz.map(tlz.partial(re.findall, "Select(.*?)Attributes"), titles))
+        titles = tlz.map(str.strip, titles)
+
+        main_items = dict(zip(titles, tlz.pluck("id", r["items"])))
+
+        files = {}
+        soil = main_items.pop("Soil")
+        for i, item in main_items.items():
+            r = self.get_children(item)
+
+            titles = tlz.pluck("title", r["items"])
+            titles = tlz.map(lambda s: s.split(":")[1].strip() if ":" in s else s, titles)
+
+            child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
+            files[i] = {t: self.get_files(c) for t, c in child_items.items()}
+
+        r = self.get_children(soil)
+        titles = tlz.pluck("title", r["items"])
+        titles = tlz.map(lambda s: s.split(":")[1].strip() if ":" in s else s, titles)
+
+        child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
+        stat = child_items.pop("STATSGO Soil Characteristics")
+        ssur = child_items.pop("SSURGO Soil Characteristics")
+        files["Soil"] = {t: self.get_files(c) for t, c in child_items.items()}
+
+        r = self.get_children(stat)
+        titles = tlz.pluck("title", r["items"])
+        titles = tlz.map(lambda s: s.split(":")[1].split(",")[1].strip(), titles)
+        child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
+        files["STATSGO"] = {t: self.get_files(c) for t, c in child_items.items()}
+
+        r = self.get_children(ssur)
+        titles = tlz.pluck("title", r["items"])
+        titles = tlz.map(lambda s: s.split(":")[1].strip(), titles)
+        child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
+        files["SSURGO"] = {t: self.get_files(c) for t, c in child_items.items()}
+
+        chars = []
+        types = {"CAT": "local", "TOT": "upstream_acc", "ACC": "div_routing"}
+        for t, dd in files.items():
+            for d, fd in dd.items():
+                for f, u in fd.items():
+                    chars.append(
+                        {
+                            "name": f,
+                            "type": types.get(f[-3:], "other"),
+                            "theme": t,
+                            "description": d,
+                            "url": u[0],
+                            "meta": u[1],
+                        }
+                    )
+        char_df = pd.DataFrame(chars, dtype="category")
+        char_df.to_feather(self.char_feather)
+        return char_df
+
+
+def nhdplus_attrs(name: Optional[str] = None, save_dir: Optional[str] = None) -> pd.DataFrame:
+    """Access NHDPlus V2.1 Attributes from ScienceBase over CONUS.
+
+    More info can be found `here <https://www.sciencebase.gov/catalog/item/5669a79ee4b08895842a1d47>`_.
+
+    Parameters
+    ----------
+    name : str, optional
+        Name of the NHDPlus attribute, defaults to None which returns a dataframe containing
+        all the available attributes in the database with their metadata.
+    save_dir : str, optional
+        Directory to save the staged data frame containing metadata for the database,
+        defaults to system's temp directory. The metadata dataframe is saved as a feather
+        file, nhdplus_attrs.feather, in save_dir that can be loaded with Pandas.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Either a dataframe containing the database metadata or the requested attribute over CONUS.
+    """
+    sb = ScienceBase(save_dir)
+    if sb.char_feather.exists():
+        char_df = pd.read_feather(sb.char_feather)
+    else:
+        char_df = sb.stage_data()
+
+    if name is None:
+        return char_df
+
+    try:
+        url = char_df[char_df.name == name].url.values[0]
+    except IndexError:
+        raise ValueError("The given characteristic name is not in the database.")
+
+    return pd.read_csv(url, compression="zip")

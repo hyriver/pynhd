@@ -11,6 +11,8 @@ Breaking Changes
   The function is a method of ``NLDI`` class called ``get_basins``. So, now
   ``NLDI.getfeature_byid`` function does not have a basin flag. This change
   makes getting geometries easier and faster.
+- Remove ``characteristics_dataframe`` method from ``NLDI`` and made a standalone function
+  called ``nhdplus_attrs`` for accessing NHDPlus attributes directly from ScienceBase.
 
 New Features
 ~~~~~~~~~~~~

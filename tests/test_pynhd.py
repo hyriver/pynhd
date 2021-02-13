@@ -1,5 +1,6 @@
 """Tests for PyNHD package."""
 import io
+from pathlib import Path
 
 import pytest
 from shapely.geometry import box
@@ -82,13 +83,11 @@ def test_nldi_char():
 
 
 @pytest.mark.flaky(max_runs=3)
-def test_nldi_chardf():
-    bfi = nldi.characteristics_dataframe("div", "TOT_BFI", "BFI_CONUS.zip")
-    meta = nldi.characteristics_dataframe("div", "TOT_BFI", "BFI_CONUS.zip", metadata=True)
-    assert (
-        abs(bfi[bfi.ACC_BFI > 0].ACC_BFI.sum() - 116653087.67) < 1e-3
-        and meta["id"] == "5669a8e3e4b08895842a1d4f"
-    )
+def test_nhd_attrs():
+    meta = nhd.nhdplus_attrs(save_dir=".")
+    cat = nhd.nhdplus_attrs("RECHG", ".")
+    Path("nhdplus_attrs.feather").unlink()
+    assert abs(cat[cat.COMID > 0].CAT_RECHG.sum() - 143215331.64) < 1e-3 and len(meta) == 609
 
 
 @pytest.mark.flaky(max_runs=3)

@@ -90,16 +90,18 @@ PyNHD is a part of Hydrodata software stack and provides access to
 `WaterData <https://labs.waterdata.usgs.gov/geoserver/web/wicket/bookmarkable/org.geoserver.web.demo.MapPreviewPage?1>`__
 and `NLDI <https://labs.waterdata.usgs.gov/about-nldi/>`_ web services. These two web services
 can be used to navigate and extract vector data from NHDPlus V2 database such as
-catchments, HUC8, HUC12, GagesII, flowlines, and water bodies. Moreover, the NLDI service
-includes more than 30 NHDPlus catchment-scale attributes that are associated with NHDPlus
-ComIDs. Values of these attributes are provided in three characteristic types:
+catchments, HUC8, HUC12, GagesII, flowlines, and water bodies. Moreover, PyNHD gives access to
+an item on `ScienceBase <https://sciencebase.usgs.gov>`_ called
+`Select Attributes for NHDPlus Version 2.1 Reach Catchments and Modified Network Routed Upstream Watersheds for the Conterminous United States <https://www.sciencebase.gov/catalog/item/5669a79ee4b08895842a1d47>`_.
+This item prvoides over 30 attributes at catchment-scale based on NHDPlus ComIDs.
+These attributes are avilable in three categories:
 
-1. ``local``: For individual reach catchments,
-2. ``tot``: For network-accumulated values using total cumulative drainage area,
-3. ``div``: For network-accumulated values using divergence-routed.
+1. Local (`local`): For individual reach catchments,
+2. Total (`upstream_acc`): For network-accumulated values using total cumulative drainage area,
+3. Divergence (`div_routing`): For network-accumulated values using divergence-routed.
 
-A list of these attributes for each characteristic type can be accessed using
-``NLDI().get_validchars`` class method.
+A list of these attributes for each characteristic type can be accessed using ``nhdplus_attrs``
+function.
 
 Additionally, PyNHD offers some extra utilities for processing the flowlines:
 
@@ -218,8 +220,8 @@ points <https://www.sciencebase.gov/catalog/item/5762b664e4b07657d19a71ea>`__:
     :width: 400
     :align: center
 
-Now, let's get the medium- and high-resolution flowlines within the bounding box of this watershed
-and compare them.
+Next, we retrieve the medium- and high-resolution flowlines within the bounding box of our
+watershed and compare them.
 
 .. code:: python
 
@@ -231,6 +233,21 @@ and compare them.
 
 .. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/hr_mr.png
     :target: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/hr_mr.png
+    :width: 400
+    :align: center
+
+Additionally, ``WaterData`` can find features within a given radius (in meters) of a point:
+
+.. code:: python
+
+    eck4 = "+proj=eck4 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
+    coords = (-5727797.427596455, 5584066.49330473)
+    rad = 5e3
+    flw_rad = mr.bydistance(coords, rad, loc_crs=eck4)
+    flw_rad = flw_rad.to_crs(eck4)
+
+.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_radius.png
+    :target: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_radius.png
     :width: 400
     :align: center
 
@@ -257,8 +274,8 @@ For getting the NHDPlus database we use ``WaterData``. Let’s use the
     nhdp_trib = wd.byid("comid", comids)
     flw = nhd.prepare_nhdplus(nhdp_trib, 0, 0, purge_non_dendritic=False)
 
-Now, let’s get Mean Annual Groundwater Recharge using ``getcharacteristic_byid``
-class method and carry out the accumulation.
+To demostrate the use of routing, let's use ``nhdplus_attrs`` function to get list of available
+NHDPlus attributes
 
 .. code:: python
 
