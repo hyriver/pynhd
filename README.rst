@@ -248,7 +248,7 @@ Additionally, ``WaterData`` can find features within a given radius (in meters) 
 
 .. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_radius.png
     :target: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_radius.png
-    :width: 400
+    :width: 250
     :align: center
 
 Since NHDPlus HR is still at the pre-release stage let's use the MR flowlines to
