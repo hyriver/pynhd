@@ -81,8 +81,6 @@ PyNHD: Navigate and subset NHDPlus database
 
 |
 
-🚨 **This package is under heavy development and breaking changes are likely to happen.** 🚨
-
 Features
 --------
 
@@ -118,6 +116,10 @@ These utilities are developed based on an ``R`` package called
 You can try using PyNHD without installing it on you system by clicking on the binder badge
 below the PyNHD banner. A Jupyter notebook instance with the Hydrodata software stack
 pre-installed will be launched in your web browser and you can start coding!
+
+Please note that since Hydrodata is in early development stages, while the provided
+functionaities should be stable, changes in APIs are possible in new releases. But we
+appreciate it if you give this project a try and provide feedback. Contributions are most welcome.
 
 Moreover, requests for additional functionalities can be submitted via
 `issue tracker <https://github.com/cheginit/pynhd/issues>`__.
