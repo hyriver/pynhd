@@ -2,8 +2,10 @@
 History
 =======
 
-0.3.0 (unreleased)
+0.9.0 (2021-02-14)
 ------------------
+
+- Bump version to the same version as Hydrodata.
 
 Breaking Changes
 ~~~~~~~~~~~~~~~~
