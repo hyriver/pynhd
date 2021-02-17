@@ -129,11 +129,14 @@ def test_waterdata_byfilter():
 
 @pytest.mark.flaky(max_runs=3)
 def test_nhdphr():
-    hr = nhd.NHDPlusHR("networknhdflowline")
+    hr = nhd.NHDPlusHR("networknhdflowline", service="edits", auto_switch=True)
     flwb = hr.bygeom((-69.77, 45.07, -69.31, 45.45))
-    flwi = hr.byids("NHDPLUSID", ["5000500013223", "5000400039708", "5000500004825"])
-    flwf = hr.bysql("NHDPLUSID IN (5000500013223, 5000400039708, 5000500004825)")
-    assert flwb.shape[0] == 3887 and flwi.OBJECTID.tolist() == flwf.OBJECTID.tolist()
+    flwi = hr.byids("NHDFlowline.PERMANENT_IDENTIFIER", ["103455178", "103454362", "103453218"])
+    flwf = hr.bysql("NHDFlowline.PERMANENT_IDENTIFIER IN ('103455178', '103454362', '103453218')")
+    assert (
+        flwb.shape[0] == 3892
+        and flwi["NHDFlowline.OBJECTID"].tolist() == flwf["NHDFlowline.OBJECTID"].tolist()
+    )
 
 
 @pytest.mark.flaky(max_runs=3)
