@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import pygeoogc as ogc
 import pygeoutils as geoutils
-from pygeoogc import WFS, ArcGISRESTful, MatchCRS, RetrySession, ServiceURL
+from pygeoogc import WFS, ArcGISRESTful, MatchCRS, RetrySession, ServerError, ServiceURL
 from requests import Response
 from shapely.geometry import MultiPolygon, Polygon
 from simplejson import JSONDecodeError
@@ -161,12 +161,46 @@ class AGRBase:
             outfields=self.outfields,
             crs=self.crs,
         )
-        valid_layers = service.get_validlayers()
-        valid_layers = {v.lower(): k for k, v in valid_layers.items()}
+        valid_layers = {v.lower(): k for k, v in service.valid_layers.items()}
         if self.layer not in valid_layers:
             raise InvalidInputValue("layer", list(valid_layers))
         service.layer = valid_layers[self.layer]
         return service
+
+    def connect_to(self, service: str, service_list: Dict[str, str], auto_switch: bool) -> None:
+        """Connect to a web service.
+
+        Parameters
+        ----------
+        service : str, optional
+            Name of the preferred web service to connect to from the list provided in service_list.
+        service_list: dict
+            A dict where keys are names of the web services and values are their URLs.
+        auto_switch : bool, optional
+            Automatically switch to other services' URL if the first one doesn't work, default to False.
+        """
+        if service not in service_list:
+            raise InvalidInputValue("service", list(service_list.keys()))
+
+        url = service_list.pop(service)
+        try:
+            self.service = self._init_service(url)
+        except (ServerError, ConnectionError):
+            if not auto_switch:
+                raise ServerError(url)
+
+            while len(service_list) > 0:
+                next_service = next(iter(service_list.keys()))
+                logger.warning(f"Connection to {url} failed. Will try {next_service} next ...")
+                try:
+                    url = service_list.pop(next_service)
+                    self.service = self._init_service(url)
+                    logger.info(f"Connected to {url}.")
+                except (ServerError, ConnectionError):
+                    continue
+
+        if self.service is None:
+            raise ServerError(url)
 
     def bygeom(
         self,
@@ -285,11 +319,28 @@ class NHDPlusHR(AGRBase):
         Target field name(s), default to "*" i.e., all the fields.
     crs : str, optional
         Target spatial reference, default to EPSG:4326
+    service : str, optional
+        Name of the web service to use, defaults to hydro. Supported web services are:
+        * hydro: https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer
+        * edits: https://edits.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/NHDPlus_HR/MapServer
+    auto_switch : bool, optional
+        Automatically switch to other services' URL if the first one doesn't work, default to False.
     """
 
-    def __init__(self, layer: str, outfields: Union[str, List[str]] = "*", crs: str = DEF_CRS):
+    def __init__(
+        self,
+        layer: str,
+        outfields: Union[str, List[str]] = "*",
+        crs: str = DEF_CRS,
+        service: str = "hydro",
+        auto_switch: bool = False,
+    ):
         super().__init__(layer, outfields, crs)
-        self.service = self._init_service(ServiceURL().restful.nhdplushr)
+        service_list = {
+            "hydro": ServiceURL().restful.nhdplushr,
+            "edits": ServiceURL().restful.nhdplushr_edits,
+        }
+        self.connect_to(service, service_list, auto_switch)
 
 
 class NLDI:
