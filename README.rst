@@ -223,14 +223,16 @@ points <https://www.sciencebase.gov/catalog/item/5762b664e4b07657d19a71ea>`__:
     :align: center
 
 Next, we retrieve the medium- and high-resolution flowlines within the bounding box of our
-watershed and compare them.
+watershed and compare them. Moreover, Since serveral web services offer access to NHDPlus database,
+``NHDPlusHR`` has an argument for selecting a service and also an argument for automatically
+switching between services.
 
 .. code:: python
 
     mr = WaterData("nhdflowline_network")
     nhdp_mr = mr.bybox(basin.geometry[0].bounds)
 
-    hr = NHDPlusHR("networknhdflowline")
+    hr = NHDPlusHR("networknhdflowline", service="hydro", auto_switch=True)
     nhdp_hr = hr.bygeom(basin.geometry[0].bounds)
 
 .. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/hr_mr.png
@@ -238,7 +240,7 @@ watershed and compare them.
     :width: 400
     :align: center
 
-Additionally, ``WaterData`` can find features within a given radius (in meters) of a point:
+Moreover, ``WaterData`` can find features within a given radius (in meters) of a point:
 
 .. code:: python
 

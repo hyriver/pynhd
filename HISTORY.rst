@@ -15,6 +15,11 @@ Breaking Changes
   makes getting geometries easier and faster.
 - Remove ``characteristics_dataframe`` method from ``NLDI`` and made a standalone function
   called ``nhdplus_attrs`` for accessing NHDPlus attributes directly from ScienceBase.
+- Add support for using `hydro <https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer>`_
+  or `edits <https://edits.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/NHDPlus_HR/MapServer>`_
+  webs services for getting NHDPlus High-Resolution using ``NHDPlusHR`` function. The new arguments
+  are ``service`` which accepts ``hydro`` or ``edits``, and ``autos_switch`` flag for automatically
+  switching to the other service if the ones passed by ``service`` fails.
 
 New Features
 ~~~~~~~~~~~~
