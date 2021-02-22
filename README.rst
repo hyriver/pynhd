@@ -250,6 +250,15 @@ Moreover, ``WaterData`` can find features within a given radius (in meters) of a
     flw_rad = mr.bydistance(coords, rad, loc_crs=eck4)
     flw_rad = flw_rad.to_crs(eck4)
 
+Instead of getting all features withing a radius of the coordinate, we can snap to the closest
+flowline using NLDI:
+
+.. code:: python
+
+    comid_closest = nldi.comid_byloc((x, y), eck4)
+    flw_closest = nhdp_mr.byid("comid", comid_closest.comid.values[0])
+
+
 .. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_radius.png
     :target: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_radius.png
     :width: 400
