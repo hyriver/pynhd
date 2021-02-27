@@ -78,8 +78,10 @@ def test_nldi_basin():
 
 @pytest.mark.flaky(max_runs=3)
 def test_nldi_char():
-    tot, prc = nldi.getcharacteristic_byid("6710923", "div", char_ids="ACC_BFI", values_only=False)
-    assert abs(tot.ACC_BFI.values[0] - 57) < 1e-3 and prc.ACC_BFI.values[0] == 0
+    tot, prc = nldi.getcharacteristic_byid(
+        "6710923", "local", char_ids="CAT_BFI", values_only=False
+    )
+    assert abs(tot.CAT_BFI.values[0] - 57) < 1e-3 and prc.CAT_BFI.values[0] == 0
 
 
 @pytest.mark.flaky(max_runs=3)
