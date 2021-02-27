@@ -3,7 +3,6 @@ import logging
 import os
 import re
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -134,7 +133,6 @@ class WaterData:
         return geoutils.json2geodf(resp.json(), ALT_CRS, self.crs)
 
 
-@dataclass
 class AGRBase:
     """Base class for accessing NHD(Plus) HR database through the National Map ArcGISRESTful.
 
@@ -149,10 +147,18 @@ class AGRBase:
         Target spatial reference, default to EPSG:4326
     """
 
-    layer: str
-    outfields: Union[str, List[str]] = "*"
-    crs: str = DEF_CRS
-    service: Optional[ArcGISRESTful] = None
+    def __init__(
+        self,
+        layer: str,
+        outfields: Union[str, List[str]] = "*",
+        crs: str = DEF_CRS,
+        service: Optional[ArcGISRESTful] = None,
+    ) -> None:
+        pass
+        self.layer = layer
+        self.outfields = outfields
+        self.crs = crs
+        self.service = service
 
     def _init_service(self, url: str) -> ArcGISRESTful:
         service = ArcGISRESTful(
