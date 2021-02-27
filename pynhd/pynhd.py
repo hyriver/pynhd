@@ -154,11 +154,15 @@ class AGRBase:
         crs: str = DEF_CRS,
         service: Optional[ArcGISRESTful] = None,
     ) -> None:
-        pass
         self.layer = layer
         self.outfields = outfields
         self.crs = crs
         self.service = service
+
+    def _check_service(self) -> None:
+        """Check if service is set."""
+        if self.service is None:
+            raise ValueError("First you should use _init_service(url) to initialize the service.")
 
     def _init_service(self, url: str) -> ArcGISRESTful:
         service = ArcGISRESTful(
@@ -211,7 +215,7 @@ class AGRBase:
     def bygeom(
         self,
         geom: Union[Polygon, List[Tuple[float, float]], Tuple[float, float, float, float]],
-        geo_crs: str = "epsg:4326",
+        geo_crs: str = DEF_CRS,
         sql_clause: str = "",
         distance: Optional[int] = None,
         return_m: bool = False,
@@ -236,10 +240,11 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        if self.service is None:
-            raise ValueError("First you should use _init_service(url) to initialize the service.")
+        self._check_service()
 
-        self.service.oids_bygeom(geom, geo_crs=geo_crs, sql_clause=sql_clause, distance=distance)
+        self.service.oids_bygeom(  # type: ignore
+            geom, geo_crs=geo_crs, sql_clause=sql_clause, distance=distance
+        )
         return self._getfeatures(return_m)
 
     def byids(
@@ -261,10 +266,9 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        if self.service is None:
-            raise ValueError("First you should use _init_service(url) to initialize the service.")
+        self._check_service()
 
-        self.service.oids_byfield(field, fids)
+        self.service.oids_byfield(field, fids)  # type: ignore
         return self._getfeatures(return_m)
 
     def bysql(self, sql_clause: str, return_m: bool = False) -> gpd.GeoDataFrame:
@@ -287,10 +291,9 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        if self.service is None:
-            raise ValueError("First you should use _init_service(url) to initialize the service.")
+        self._check_service()
 
-        self.service.oids_bysql(sql_clause)
+        self.service.oids_bysql(sql_clause)  # type: ignore
         return self._getfeatures(return_m)
 
     def _getfeatures(self, return_m: bool = False) -> gpd.GeoDataFrame:
@@ -306,10 +309,9 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        if self.service is None:
-            raise ValueError("First you should use _init_service(url) to initialize the service.")
+        self._check_service()
 
-        resp = self.service.get_features(return_m)
+        resp = self.service.get_features(return_m)  # type: ignore
         return geoutils.json2geodf(resp)
 
 
@@ -362,6 +364,18 @@ class NLDI:
         resp = self.session.get("/".join([self.base_url, "lookups"])).json()
         self.valid_chartypes = {r["type"]: r["typeName"] for r in resp}
 
+    @staticmethod
+    def _missing_warning(n_miss: int, n_tot: int) -> None:
+        """Show a warning if there are misssing features."""
+        logger.warning(
+            " ".join(
+                [
+                    f"{n_miss} of {n_tot} inputs didn't return any features.",
+                    "They are returned as a list.",
+                ]
+            )
+        )
+
     def getfeature_byid(
         self, fsource: str, fid: Union[str, List[str]]
     ) -> Union[gpd.GeoDataFrame, Tuple[gpd.GeoDataFrame, List[str]]]:
@@ -387,13 +401,7 @@ class NLDI:
         features, not_found = self._get_urls(urls)
 
         if len(not_found) > 0:
-            msg = " ".join(
-                [
-                    f"{len(not_found)} of {len(fid)} inputs didn't return any features.",
-                    "They are returned as a list.",
-                ]
-            )
-            logger.warning(msg)
+            self._missing_warning(len(not_found), len(fid))
             return features, not_found
 
         return features
@@ -401,7 +409,7 @@ class NLDI:
     def comid_byloc(
         self,
         coords: Union[Tuple[float, float], List[Tuple[float, float]]],
-        loc_crs: str = "epsg:4326",
+        loc_crs: str = DEF_CRS,
     ) -> Union[gpd.GeoDataFrame, Tuple[gpd.GeoDataFrame, List[Tuple[float, float]]]]:
         """Get the closest ComID(s) based on coordinates.
 
@@ -430,13 +438,7 @@ class NLDI:
         comids = comids.reset_index(level=2, drop=True)
 
         if len(not_found) > 0:
-            msg = " ".join(
-                [
-                    f"{len(not_found)} of {len(coords)} inputs didn't return any features.",
-                    "They are returned as a list.",
-                ]
-            )
-            logger.warning(msg)
+            self._missing_warning(len(not_found), len(coords))
             return comids, not_found
 
         return comids
@@ -464,13 +466,7 @@ class NLDI:
         basins.index.rename("identifier", inplace=True)
 
         if len(not_found) > 0:
-            msg = " ".join(
-                [
-                    f"{len(not_found)} of {len(station_ids)} inputs didn't return any features.",
-                    "They are returned as a list.",
-                ]
-            )
-            logger.warning(msg)
+            self._missing_warning(len(not_found), len(station_ids))
             return basins, not_found
 
         return basins
