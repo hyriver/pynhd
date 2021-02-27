@@ -475,7 +475,7 @@ class NLDI:
         self,
         comids: Union[List[str], str],
         char_type: str,
-        char_ids: str = "all",
+        char_ids: Union[str, List[str]] = "all",
         values_only: bool = True,
     ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.DataFrame]]:
         """Get characteristics using a list ComIDs.
@@ -694,7 +694,7 @@ class NLDI:
             payload = {"f": "json"}
 
         try:
-            return self.session.get(url, payload).json()  # type: ignore
+            return self.session.get(url, payload).json()
         except JSONDecodeError:
             raise ZeroMatched("No feature was found with the provided inputs.")
         except ConnectionError:
@@ -730,7 +730,7 @@ class ScienceBase:
             "fields": "title,id",
             "format": "json",
         }
-        return self.session.get(url, payload=payload).json()  # type: ignore
+        return self.session.get(url, payload=payload).json()
 
     def get_files(self, item: str) -> Dict[str, Tuple[str, str]]:
         """Get all the available zip files in an item."""
