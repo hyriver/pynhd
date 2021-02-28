@@ -738,8 +738,7 @@ class ScienceBase:
         payload = {"fields": "files,downloadUri", "format": "json"}
         r = self.session.get(f"{url}/{item}", payload=payload).json()
         files_url = zip(tlz.pluck("name", r["files"]), tlz.pluck("url", r["files"]))
-        # TODO: Add units
-        meta = "".join(tlz.pluck("metadataHtmlViewUri", r["files"], default=""))
+        meta = list(tlz.pluck("metadataHtmlViewUri", r["files"], default=""))[-1]
         return {f.replace("_CONUS.zip", ""): (u, meta) for f, u in files_url if ".zip" in f}
 
     def stage_data(self) -> pd.DataFrame:
@@ -813,7 +812,7 @@ def nhdplus_attrs(name: Optional[str] = None, save_dir: Optional[str] = None) ->
     ----------
     name : str, optional
         Name of the NHDPlus attribute, defaults to None which returns a dataframe containing
-        all the available attributes in the database with their metadata.
+        metadata of all the available attributes in the database.
     save_dir : str, optional
         Directory to save the staged data frame containing metadata for the database,
         defaults to system's temp directory. The metadata dataframe is saved as a feather
