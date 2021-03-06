@@ -1,11 +1,11 @@
-.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/pynhd_logo.png
-    :target: https://github.com/cheginit/pynhd
-    :align: center
+.. .. image:: https://raw.githubusercontent.com/cheginit/geohydrohub-examples/main/notbooks/_static/pynhd_logo.png
+..     :target: https://github.com/cheginit/pynhd
+..     :align: center
 
-|
+.. |
 
-.. |hydrodata| image:: https://github.com/cheginit/hydrodata/actions/workflows/test.yml/badge.svg
-    :target: https://github.com/cheginit/hydrodata/actions?query=workflow%3Apytest
+.. |pygeohydro| image:: https://github.com/cheginit/pygeohydro/actions/workflows/test.yml/badge.svg
+    :target: https://github.com/cheginit/pygeohydro/actions?query=workflow%3Apytest
     :alt: Github Actions
 
 .. |pygeoogc| image:: https://github.com/cheginit/pygeoogc/actions/workflows/test.yml/badge.svg
@@ -31,7 +31,7 @@
 =========== ==================================================================== ============
 Package     Description                                                          Status
 =========== ==================================================================== ============
-Hydrodata_  Access NWIS, NID, HCDN 2009, NLCD, and SSEBop databases              |hydrodata|
+PyGeoHydro_ Access NWIS, NID, HCDN 2009, NLCD, and SSEBop databases              |pygeohydro|
 PyGeoOGC_   Send queries to any ArcGIS RESTful-, WMS-, and WFS-based services    |pygeoogc|
 PyGeoUtils_ Convert responses from PyGeoOGC's supported web services to datasets |pygeoutils|
 PyNHD_      Navigate and subset NHDPlus (MR and HR) using web services           |pynhd|
@@ -39,7 +39,7 @@ Py3DEP_     Access topographic data through National Map's 3DEP web service     
 PyDaymet_   Access Daymet for daily climate data both single pixel and gridded   |pydaymet|
 =========== ==================================================================== ============
 
-.. _Hydrodata: https://github.com/cheginit/hydrodata
+.. _PyGeoHydro: https://github.com/cheginit/pygeohydro
 .. _PyGeoOGC: https://github.com/cheginit/pygeoogc
 .. _PyGeoUtils: https://github.com/cheginit/pygeoutils
 .. _PyNHD: https://github.com/cheginit/pynhd
@@ -62,7 +62,7 @@ PyNHD: Navigate and subset NHDPlus database
     :alt: CodeCov
 
 .. image:: https://mybinder.org/badge_logo.svg
-    :target: https://mybinder.org/v2/gh/cheginit/hydrodata/master?filepath=docs%2Fexamples
+    :target: https://mybinder.org/v2/gh/cheginit/pygeohydro/master?filepath=docs%2Fexamples
     :alt: Binder
 
 |
@@ -84,15 +84,18 @@ PyNHD: Navigate and subset NHDPlus database
 Features
 --------
 
-PyNHD is a part of Hydrodata software stack and provides access to
-`WaterData <https://labs.waterdata.usgs.gov/geoserver/web/wicket/bookmarkable/org.geoserver.web.demo.MapPreviewPage?1>`__
-and `NLDI <https://labs.waterdata.usgs.gov/about-nldi/>`_ web services. These two web services
-can be used to navigate and extract vector data from NHDPlus V2 database such as
-catchments, HUC8, HUC12, GagesII, flowlines, and water bodies. Moreover, PyNHD gives access to
+PyNHD is part of a software stack for retrieving and processing hydrology and climatology
+datasets. This package provides access to
+`WaterData <https://labs.waterdata.usgs.gov/geoserver/web/wicket/bookmarkable/org.geoserver.web.demo.MapPreviewPage?1>`__,
+the National Map's `NHDPlus HR <https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer>`__,
+and `NLDI <https://labs.waterdata.usgs.gov/about-nldi/>`_ web services. These web services
+can be used to navigate and extract vector data from NHDPlus V2 (both medium- and
+hight-resolution) database such as catchments, HUC8, HUC12, GagesII, flowlines, and water bodies.
+Moreover, PyNHD gives access to
 an item on `ScienceBase <https://sciencebase.usgs.gov>`_ called
 `Select Attributes for NHDPlus Version 2.1 Reach Catchments and Modified Network Routed Upstream Watersheds for the Conterminous United States <https://www.sciencebase.gov/catalog/item/5669a79ee4b08895842a1d47>`_.
-This item prvoides over 30 attributes at catchment-scale based on NHDPlus ComIDs.
-These attributes are avilable in three categories:
+This item provides over 30 attributes at catchment-scale based on NHDPlus ComIDs.
+These attributes are available in three categories:
 
 1. Local (`local`): For individual reach catchments,
 2. Total (`upstream_acc`): For network-accumulated values using total cumulative drainage area,
@@ -113,12 +116,10 @@ Additionally, PyNHD offers some extra utilities for processing the flowlines:
 These utilities are developed based on an ``R`` package called
 `nhdplusTools <https://github.com/USGS-R/nhdplusTools>`__.
 
-You can try using PyNHD without installing it on you system by clicking on the binder badge
-below the PyNHD banner. A Jupyter notebook instance with the Hydrodata software stack
-pre-installed will be launched in your web browser and you can start coding!
+You can find some example notebooks `here <https://github.com/cheginit/geohydrohub-examples>`__.
 
-Please note that since Hydrodata is in early development stages, while the provided
-functionaities should be stable, changes in APIs are possible in new releases. But we
+Please note that since this project is in early development stages, while the provided
+functionalities should be stable, changes in APIs are possible in new releases. But we
 appreciate it if you give this project a try and provide feedback. Contributions are most welcome.
 
 Moreover, requests for additional functionalities can be submitted via
@@ -217,8 +218,8 @@ points <https://www.sciencebase.gov/catalog/item/5762b664e4b07657d19a71ea>`__:
         distance=1000,
     )
 
-.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_12_0.png
-    :target: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_12_0.png
+.. image:: https://raw.githubusercontent.com/cheginit/geohydrohub-examples/main/notebooks/_static/nhdplus_navigation.png
+    :target: https://github.com/cheginit/geohydrohub-examples/blob/main/notebooks/nhdplus.ipynb
     :width: 400
     :align: center
 
@@ -235,8 +236,8 @@ switching between services.
     hr = NHDPlusHR("networknhdflowline", service="hydro", auto_switch=True)
     nhdp_hr = hr.bygeom(basin.geometry[0].bounds)
 
-.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/hr_mr.png
-    :target: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/hr_mr.png
+.. image:: https://raw.githubusercontent.com/cheginit/geohydrohub-examples/main/notebooks/_static/hr_mr.png
+    :target: https://github.com/cheginit/geohydrohub-examples/blob/main/notebooks/nhdplus.ipynb
     :width: 400
     :align: center
 
@@ -259,8 +260,8 @@ flowline using NLDI:
     flw_closest = nhdp_mr.byid("comid", comid_closest.comid.values[0])
 
 
-.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_radius.png
-    :target: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_radius.png
+.. image:: https://raw.githubusercontent.com/cheginit/geohydrohub-examples/main/notebooks/_static/nhdplus_radius.png
+    :target: https://github.com/cheginit/geohydrohub-examples/blob/main/notebooks/nhdplus.ipynb
     :width: 400
     :align: center
 
@@ -287,7 +288,7 @@ For getting the NHDPlus database we use ``WaterData``. Let’s use the
     nhdp_trib = wd.byid("comid", comids)
     flw = nhd.prepare_nhdplus(nhdp_trib, 0, 0, purge_non_dendritic=False)
 
-To demostrate the use of routing, let's use ``nhdplus_attrs`` function to get list of available
+To demonstrate the use of routing, let's use ``nhdplus_attrs`` function to get list of available
 NHDPlus attributes
 
 .. code:: python
@@ -324,12 +325,12 @@ results.
     c_local = catchments.merge(local, left_on="featureid", right_index=True)
     c_acc = catchments.merge(runoff, left_on="featureid", right_index=True)
 
-.. image:: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_19_0.png
-    :target: https://raw.githubusercontent.com/cheginit/hydrodata/master/docs/_static/nhdplus_19_0.png
+.. image:: https://raw.githubusercontent.com/cheginit/geohydrohub-examples/main/notebooks/_static/flow_accumulation.png
+    :target: https://github.com/cheginit/geohydrohub-examples/blob/main/notebooks/nhdplus.ipynb
     :width: 600
     :align: center
 
-More examples can be found `here <https://hydrodata.readthedocs.io/en/latest/examples.html>`__.
+More examples can be found `here <https://pygeohydro.readthedocs.io/en/latest/examples.html>`__.
 
 Contributing
 ------------
