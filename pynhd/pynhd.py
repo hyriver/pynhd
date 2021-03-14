@@ -2,6 +2,7 @@
 import logging
 import os
 import re
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -21,6 +22,10 @@ from .exceptions import InvalidInputType, InvalidInputValue, MissingItems, ZeroM
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(logging.Formatter(""))
+logger.handlers = [handler]
+logger.propagate = False
 DEF_CRS = "epsg:4326"
 ALT_CRS = "epsg:4269"
 
