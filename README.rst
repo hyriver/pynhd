@@ -1,5 +1,5 @@
-.. image:: https://raw.githubusercontent.com/cheginit/HydRiver-examples/main/notebooks/_static/pynhd_logo.png
-    :target: https://github.com/cheginit/HydRiver
+.. image:: https://raw.githubusercontent.com/cheginit/HyRiver-examples/main/notebooks/_static/pynhd_logo.png
+    :target: https://github.com/cheginit/HyRiver
 
 |
 
@@ -83,7 +83,7 @@ PyNHD: Navigate and subset NHDPlus database
 Features
 --------
 
-PyNHD is a part of `HydRiver <https://github.com/cheginit/HydRiver>`__ software stack that
+PyNHD is a part of `HyRiver <https://github.com/cheginit/HyRiver>`__ software stack that
 is designed to aid in watershed analysis through web services. This package provides
 access to
 `WaterData <https://labs.waterdata.usgs.gov/geoserver/web/wicket/bookmarkable/org.geoserver.web.demo.MapPreviewPage?1>`__,
@@ -116,7 +116,7 @@ Additionally, PyNHD offers some extra utilities for processing the flowlines:
 These utilities are developed based on an ``R`` package called
 `nhdplusTools <https://github.com/USGS-R/nhdplusTools>`__.
 
-You can find some example notebooks `here <https://github.com/cheginit/HydRiver-examples>`__.
+You can find some example notebooks `here <https://github.com/cheginit/HyRiver-examples>`__.
 
 Please note that since this project is in early development stages, while the provided
 functionalities should be stable, changes in APIs are possible in new releases. But we
@@ -218,8 +218,8 @@ points <https://www.sciencebase.gov/catalog/item/5762b664e4b07657d19a71ea>`__:
         distance=1000,
     )
 
-.. image:: https://raw.githubusercontent.com/cheginit/HydRiver-examples/main/notebooks/_static/nhdplus_navigation.png
-    :target: https://github.com/cheginit/HydRiver-examples/blob/main/notebooks/nhdplus.ipynb
+.. image:: https://raw.githubusercontent.com/cheginit/HyRiver-examples/main/notebooks/_static/nhdplus_navigation.png
+    :target: https://github.com/cheginit/HyRiver-examples/blob/main/notebooks/nhdplus.ipynb
     :width: 400
     :align: center
 
@@ -236,8 +236,8 @@ switching between services.
     hr = NHDPlusHR("networknhdflowline", service="hydro", auto_switch=True)
     nhdp_hr = hr.bygeom(basin.geometry[0].bounds)
 
-.. image:: https://raw.githubusercontent.com/cheginit/HydRiver-examples/main/notebooks/_static/hr_mr.png
-    :target: https://github.com/cheginit/HydRiver-examples/blob/main/notebooks/nhdplus.ipynb
+.. image:: https://raw.githubusercontent.com/cheginit/HyRiver-examples/main/notebooks/_static/hr_mr.png
+    :target: https://github.com/cheginit/HyRiver-examples/blob/main/notebooks/nhdplus.ipynb
     :width: 400
     :align: center
 
@@ -260,8 +260,8 @@ flowline using NLDI:
     flw_closest = nhdp_mr.byid("comid", comid_closest.comid.values[0])
 
 
-.. image:: https://raw.githubusercontent.com/cheginit/HydRiver-examples/main/notebooks/_static/nhdplus_radius.png
-    :target: https://github.com/cheginit/HydRiver-examples/blob/main/notebooks/nhdplus.ipynb
+.. image:: https://raw.githubusercontent.com/cheginit/HyRiver-examples/main/notebooks/_static/nhdplus_radius.png
+    :target: https://github.com/cheginit/HyRiver-examples/blob/main/notebooks/nhdplus.ipynb
     :width: 400
     :align: center
 
@@ -325,8 +325,8 @@ results.
     c_local = catchments.merge(local, left_on="featureid", right_index=True)
     c_acc = catchments.merge(runoff, left_on="featureid", right_index=True)
 
-.. image:: https://raw.githubusercontent.com/cheginit/HydRiver-examples/main/notebooks/_static/flow_accumulation.png
-    :target: https://github.com/cheginit/HydRiver-examples/blob/main/notebooks/nhdplus.ipynb
+.. image:: https://raw.githubusercontent.com/cheginit/HyRiver-examples/main/notebooks/_static/flow_accumulation.png
+    :target: https://github.com/cheginit/HyRiver-examples/blob/main/notebooks/nhdplus.ipynb
     :width: 600
     :align: center
 
