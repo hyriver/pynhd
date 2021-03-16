@@ -56,12 +56,12 @@ PyNHD: Navigate and subset NHDPlus database
     :target: https://anaconda.org/conda-forge/pynhd
     :alt: Conda Version
 
-.. image:: https://codecov.io/gh/cheginit/pynhd/branch/master/graph/badge.svg
+.. image:: https://codecov.io/gh/cheginit/pynhd/branch/main/graph/badge.svg
     :target: https://codecov.io/gh/cheginit/pynhd
     :alt: CodeCov
 
 .. image:: https://mybinder.org/badge_logo.svg
-    :target: https://mybinder.org/v2/gh/cheginit/pygeohydro/master?filepath=docs%2Fexamples
+    :target: https://mybinder.org/v2/gh/cheginit/HyRiver-examples/main?urlpath=lab/tree/notebooks
     :alt: Binder
 
 |
@@ -336,5 +336,5 @@ Contributing
 ------------
 
 Contributions are very welcomed. Please read
-`CONTRIBUTING.rst <https://github.com/cheginit/pynhd/blob/master/CONTRIBUTING.rst>`__
+`CONTRIBUTING.rst <https://github.com/cheginit/pynhd/blob/main/CONTRIBUTING.rst>`__
 file for instructions.
