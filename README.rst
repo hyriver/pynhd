@@ -299,14 +299,18 @@ NHDPlus attributes
     local = nldi.getcharacteristic_byid(comids, "local", char_ids=char)
     flw = flw.merge(local[char], left_on="comid", right_index=True)
 
+
     def runoff_acc(qin, q, a):
         return qin + q * a
+
 
     flw_r = flw[["comid", "tocomid", char, area]]
     runoff = nhd.vector_accumulation(flw_r, runoff_acc, char, [char, area])
 
+
     def area_acc(ain, a):
         return ain + a
+
 
     flw_a = flw[["comid", "tocomid", area]]
     areasqkm = nhd.vector_accumulation(flw_a, area_acc, area, [area])
