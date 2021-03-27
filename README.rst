@@ -64,6 +64,10 @@ PyNHD: Navigate and subset NHDPlus database
     :target: https://pypi.python.org/pypi/pynhd
     :alt: Python Versions
 
+.. image:: https://pepy.tech/badge/pynhd
+    :target: https://pepy.tech/project/pynhd
+    :alt: Downloads
+
 |
 
 .. image:: https://www.codefactor.io/repository/github/cheginit/pynhd/badge
