@@ -29,6 +29,16 @@ dependencies:
   - networkx
   - pyarrow
 
+  # deps to speed up xarray and geopandas
+  - pygeos
+  - bottleneck
+
+  # test deps
+  - pytest
+  - pytest-cov
+  - pytest-xdist
+  - flaky
+
   - pip
   - pip:
     - git+https://github.com/cheginit/pygeoogc.git
