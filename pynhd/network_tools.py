@@ -253,9 +253,9 @@ def vector_accumulation(
         List of the flowlines columns that contain all the required
         data for a routing a single river segment such as slope, length,
         lateral flow, etc.
-    id_name : str, optional
+    id_col : str, optional
         Name of the flowlines column containing IDs, defaults to ``comid``
-    toid_name : str, optional
+    toid_col : str, optional
         Name of the flowlines column containing ``toIDs``, defaults to ``tocomid``
 
     Returns

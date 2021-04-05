@@ -80,7 +80,7 @@ class WaterData:
         ----------
         geometry : shapely.geometry
             The input geometry
-        geom_crs : str, optional
+        geo_crs : str, optional
             The CRS of the input geometry, default to epsg:4326.
         xy : bool, optional
             Whether axis order of the input geometry is xy or yx.
@@ -667,7 +667,7 @@ class NLDI:
 
         Parameters
         ----------
-        urls_dict : dict
+        urls : dict
             A dict with keys as feature ids and values as corresponsing url.
 
         Returns
