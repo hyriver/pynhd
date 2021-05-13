@@ -50,6 +50,7 @@ dependencies:
   # dev deps
   - setuptools_scm
   - pytest-xdist
+  - flaky
   - pre-commit
 
   - pip
