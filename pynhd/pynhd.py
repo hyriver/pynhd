@@ -31,7 +31,7 @@ DEF_CRS = "epsg:4326"
 ALT_CRS = "epsg:4269"
 
 
-def nhdplus_vaa(parquet_name: Optional[str] = None) -> pd.DataFrame:
+def nhdplus_vaa(parquet_name: Optional[Union[Path, str]] = None) -> pd.DataFrame:
     """Get NHDPlus Value Added Attributes with ComID-level roughness and slope values.
 
     Notes
@@ -61,7 +61,7 @@ def nhdplus_vaa(parquet_name: Optional[str] = None) -> pd.DataFrame:
     if parquet_name is None:
         output = Path(tempfile.gettempdir(), "nhdplus_vaa.parquet")
     else:
-        if ".parquet" not in parquet_name:
+        if ".parquet" not in str(parquet_name):
             raise InvalidInputValue("parquet_name", ["Filenames with .parquet extension."])
 
         output = Path(parquet_name)
