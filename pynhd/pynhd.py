@@ -62,7 +62,7 @@ def nhdplus_vaa(parquet_name: Optional[Union[Path, str]] = None) -> pd.DataFrame
         output = Path(tempfile.gettempdir(), "nhdplus_vaa.parquet")
     else:
         if ".parquet" not in str(parquet_name):
-            raise InvalidInputValue("parquet_name", ["Filenames with .parquet extension."])
+            raise InvalidInputValue("parquet_name", ["a filename with `.parquet` extension."])
 
         output = Path(parquet_name)
         os.makedirs(output.parent, exist_ok=True)
