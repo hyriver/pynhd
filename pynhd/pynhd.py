@@ -122,11 +122,8 @@ def nhdplus_vaa(parquet_name: Optional[Union[Path, str]] = None) -> pd.DataFrame
     fpath = "data/contents/nhdplusVAA.parquet"
     url = f"https://www.hydroshare.org/hsapi/resource/{rid}/files/{fpath}"
 
-    if sys.platform.startswith("win"):
-        cache_name = Path(tempfile.gettempdir(), "hydroshare")
-    else:
-        cache_name = Path(Path.home(), ".cache", "hydroshare")
-    resp = ogc.RetrySession(cache_name).get(url)
+    cache_name = ogc.utils.create_cachefile()
+    resp = RetrySession(cache_name=cache_name).get(url)
 
     vaa = pd.read_parquet(io.BytesIO(resp.content))
     vaa = vaa.astype(dtypes, errors="ignore")
@@ -465,7 +462,9 @@ class NLDI:
 
     def __init__(self) -> None:
         self.base_url = ServiceURL().restful.nldi
-        self.session = RetrySession()
+
+        cache_name = ogc.utils.create_cachefile()
+        self.session = RetrySession(cache_name=cache_name)
 
         resp = self.session.get("/".join([self.base_url, "linked-data"])).json()
         self.valid_fsources = {r["source"]: r["sourceName"] for r in resp}
@@ -827,7 +826,9 @@ class ScienceBase:
         self.save_dir = Path(save_dir) if save_dir else Path(tempfile.gettempdir())
         if not self.save_dir.exists():
             os.makedirs(self.save_dir)
-        self.session = RetrySession()
+
+        cache_name = ogc.utils.create_cachefile()
+        self.session = RetrySession(cache_name=cache_name)
         self.nhd_attr_item = "5669a79ee4b08895842a1d47"
         self.char_feather = Path(self.save_dir, "nhdplus_attrs.feather")
 
