@@ -1,4 +1,5 @@
 """Access NLDI and WaterData databases."""
+import io
 import logging
 import os
 import re
@@ -28,6 +29,109 @@ logger.handlers = [handler]
 logger.propagate = False
 DEF_CRS = "epsg:4326"
 ALT_CRS = "epsg:4269"
+
+
+def nhdplus_vaa(parquet_name: Optional[str] = None) -> pd.DataFrame:
+    """Get NHDPlus Value Added Attributes with ComID-level roughness and slope values.
+
+    Notes
+    -----
+    This downloads a 200 MB `parquet` file from
+    `here <https://www.hydroshare.org/resource/6092c8a62fac45be97a09bfd0b0bf726>`__ .
+    Although this dataframe does not include geometry, it can be linked to other geospatial
+    NHDPlus dataframes through ComIDs.
+
+    Parameters
+    ----------
+    parquet_name : str or Path
+        Path to a file with `.parquet` extension for saving the processed to disk for
+        later use.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A dataframe that includes ComID-level attributes for 2.7 million NHDPlus flowlines.
+
+    Examples
+    --------
+    >>> vaa = nhdplus_vaa("nhdlus_vaa.parquet")
+    >>> print(vaa.slope.max())
+    4.6
+    """
+    if parquet_name is None:
+        output = Path(tempfile.gettempdir(), "nhdplus_vaa.parquet")
+    else:
+        if ".parquet" not in parquet_name:
+            raise InvalidInputValue("parquet_name", ["Filenames with .parquet extension."])
+
+        output = Path(parquet_name)
+        os.makedirs(output.parent, exist_ok=True)
+
+    if output.exists():
+        return pd.read_parquet(output)
+
+    dtypes = {
+        "comid": "Int64",
+        "streamleve": "Int8",
+        "streamorde": "Int8",
+        "streamcalc": "Int8",
+        "fromnode": "Int64",
+        "tonode": "Int64",
+        "hydroseq": "Int64",
+        "levelpathi": "Int64",
+        "pathlength": "Int64",
+        "terminalpa": "Int64",
+        "arbolatesu": "Int64",
+        "divergence": "Int8",
+        "startflag": "Int8",
+        "terminalfl": "Int8",
+        "dnlevel": "Int16",
+        "thinnercod": "Int8",
+        "uplevelpat": "Int64",
+        "uphydroseq": "Int64",
+        "dnlevelpat": "Int64",
+        "dnminorhyd": "Int64",
+        "dndraincou": "Int64",
+        "dnhydroseq": "Int64",
+        "frommeas": "Int32",
+        "tomeas": "Int32",
+        "reachcode": "Int64",
+        "lengthkm": "f8",
+        "fcode": "Int32",
+        "vpuin": "Int8",
+        "vpuout": "Int8",
+        "areasqkm": "f8",
+        "totdasqkm": "f8",
+        "divdasqkm": "f8",
+        "totma": "f8",
+        "wbareatype": str,
+        "pathtimema": "f8",
+        "slope": "f8",
+        "slopelenkm": "f8",
+        "ftype": str,
+        "gnis_name": str,
+        "gnis_id": str,
+        "wbareacomi": "Int64",
+        "hwnodesqkm": "f8",
+        "rpuid": str,
+        "vpuid": str,
+        "roughness": "f8",
+    }
+
+    rid = "6092c8a62fac45be97a09bfd0b0bf726"
+    fpath = "data/contents/nhdplusVAA.parquet"
+    url = f"https://www.hydroshare.org/hsapi/resource/{rid}/files/{fpath}"
+
+    if sys.platform.startswith("win"):
+        cache_name = Path(tempfile.gettempdir(), "hydroshare")
+    else:
+        cache_name = Path(Path.home(), ".cache", "hydroshare")
+    resp = ogc.RetrySession(cache_name).get(url)
+
+    vaa = pd.read_parquet(io.BytesIO(resp.content))
+    vaa = vaa.astype(dtypes, errors="ignore")
+    vaa.to_parquet(output)
+    return vaa
 
 
 class WaterData:

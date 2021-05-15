@@ -1,6 +1,7 @@
 """Tests for PyNHD package."""
 import io
 from pathlib import Path
+import tempfile
 
 import pytest
 from shapely.geometry import box
@@ -139,6 +140,13 @@ def test_nhdphr():
         flwb.shape[0] == 3892
         and flwi["NHDFlowline.OBJECTID"].tolist() == flwf["NHDFlowline.OBJECTID"].tolist()
     )
+
+
+def test_nhdplus_vaa():
+    with tempfile.NamedTemporaryFile(suffix=".parquet") as f:
+        vaa = nhd.nhdplus_vaa(f.name)
+
+    assert abs(vaa.slope.max() - 4.6) < 1e-3
 
 
 @pytest.mark.flaky(max_runs=3)
