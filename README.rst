@@ -1,6 +1,8 @@
 .. image:: https://raw.githubusercontent.com/cheginit/HyRiver-examples/main/notebooks/_static/pynhd_logo.png
     :target: https://github.com/cheginit/HyRiver
 
+|
+
 .. image:: https://joss.theoj.org/papers/b0df2f6192f0a18b9e622a3edff52e77/status.svg
     :target: https://joss.theoj.org/papers/b0df2f6192f0a18b9e622a3edff52e77
     :alt: JOSS
@@ -234,6 +236,19 @@ points <https://www.sciencebase.gov/catalog/item/5762b664e4b07657d19a71ea>`__:
     :target: https://github.com/cheginit/HyRiver-examples/blob/main/notebooks/nhdplus.ipynb
     :width: 400
     :align: center
+
+Also, we can get the slope data for each river segment from NHDPlus VAA database:
+
+.. code:: python
+
+    vaa = nhd.nhdplus_vaa("input_data/nhdplus_vaa.parquet")
+
+    flw_trib["comid"] = pd.to_numeric(flw_trib.nhdplus_comid)
+    slope = gpd.GeoDataFrame(
+        pd.merge(flw_trib, vaa[["comid", "slope"]], left_on="comid", right_on="comid"),
+        crs=flw_trib.crs,
+    )
+    slope[slope.slope < 0] = np.nan
 
 Next, we retrieve the medium- and high-resolution flowlines within the bounding box of our
 watershed and compare them. Moreover, Since serveral web services offer access to NHDPlus database,
