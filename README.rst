@@ -98,15 +98,15 @@ Features
 --------
 
 PyNHD is a part of `HyRiver <https://github.com/cheginit/HyRiver>`__ software stack that
-is designed to aid in watershed analysis through web services. This package provides
-access to
+is designed to aid in watershed analysis through web services.
+
+This package provides access to
 `WaterData <https://labs.waterdata.usgs.gov/geoserver/web/wicket/bookmarkable/org.geoserver.web.demo.MapPreviewPage?1>`__,
 the National Map's `NHDPlus HR <https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer>`__,
 and `NLDI <https://labs.waterdata.usgs.gov/about-nldi/>`_ web services. These web services
 can be used to navigate and extract vector data from NHDPlus V2 (both medium- and
 hight-resolution) database such as catchments, HUC8, HUC12, GagesII, flowlines, and water bodies.
-Moreover, PyNHD gives access to
-an item on `ScienceBase <https://sciencebase.usgs.gov>`_ called
+Moreover, PyNHD gives access to an item on `ScienceBase <https://sciencebase.usgs.gov>`_ called
 `Select Attributes for NHDPlus Version 2.1 Reach Catchments and Modified Network Routed Upstream Watersheds for the Conterminous United States <https://www.sciencebase.gov/catalog/item/5669a79ee4b08895842a1d47>`_.
 This item provides over 30 attributes at catchment-scale based on NHDPlus ComIDs.
 These attributes are available in three categories:
@@ -117,6 +117,11 @@ These attributes are available in three categories:
 
 A list of these attributes for each characteristic type can be accessed using ``nhdplus_attrs``
 function.
+
+Similarly, PyNHD uses `this <https://www.hydroshare.org/resource/6092c8a62fac45be97a09bfd0b0bf726/>`__
+item on Hydroshare to get ComID-linked NHDPlus Value Added Attributes. Thi dataset includes
+slope and roughness, among other attributes, for all the flowlines. You can use ``nhdplus_vaa``
+function to get this dataset.
 
 Additionally, PyNHD offers some extra utilities for processing the flowlines:
 
