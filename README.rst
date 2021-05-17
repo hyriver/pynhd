@@ -149,8 +149,8 @@ Installation
 
 You can install PyNHD using ``pip`` after installing ``libgdal`` on your system
 (for example, in Ubuntu run ``sudo apt install libgdal-dev``). Moreover, PyNHD has an optional
-dependecy for using persistent caching, ``requests-cache``. We highly recommend to install
-this package as it can significantly speedup send/recieve queries. You don't have to change
+dependency for using persistent caching, ``requests-cache``. We highly recommend to install
+this package as it can significantly speedup send/receive queries. You don't have to change
 anything in your code, since PyNHD under-the-hood looks for ``requests-cache`` and if available,
 it will automatically use persistent caching:
 
@@ -260,7 +260,7 @@ Also, we can get the slope data for each river segment from NHDPlus VAA database
     slope[slope.slope < 0] = np.nan
 
 Next, we retrieve the medium- and high-resolution flowlines within the bounding box of our
-watershed and compare them. Moreover, Since serveral web services offer access to NHDPlus database,
+watershed and compare them. Moreover, Since several web services offer access to NHDPlus database,
 ``NHDPlusHR`` has an argument for selecting a service and also an argument for automatically
 switching between services.
 
@@ -287,7 +287,7 @@ Moreover, ``WaterData`` can find features within a given radius (in meters) of a
     flw_rad = mr.bydistance(coords, rad, loc_crs=eck4)
     flw_rad = flw_rad.to_crs(eck4)
 
-Instead of getting all features withing a radius of the coordinate, we can snap to the closest
+Instead of getting all features within a radius of the coordinate, we can snap to the closest
 flowline using NLDI:
 
 .. code:: python

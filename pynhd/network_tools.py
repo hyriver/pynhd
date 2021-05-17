@@ -210,15 +210,15 @@ def topoogical_sort(
     upstream_nodes = {i: flowlines[flowlines.toID == i].ID.tolist() for i in flowlines.ID.tolist()}
     upstream_nodes[pd.NA] = flowlines[flowlines.toID.isna()].ID.tolist()
 
-    netwrok = nx.from_pandas_edgelist(
+    network = nx.from_pandas_edgelist(
         flowlines,
         source="ID",
         target="toID",
         create_using=nx.DiGraph,
         edge_attr=edge_attr,
     )
-    topo_sorted = list(nx.topological_sort(netwrok))
-    return topo_sorted, upstream_nodes, netwrok
+    topo_sorted = list(nx.topological_sort(network))
+    return topo_sorted, upstream_nodes, network
 
 
 def vector_accumulation(

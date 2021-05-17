@@ -474,7 +474,7 @@ class NLDI:
 
     @staticmethod
     def _missing_warning(n_miss: int, n_tot: int) -> None:
-        """Show a warning if there are misssing features."""
+        """Show a warning if there are missing features."""
         logger.warning(
             " ".join(
                 [
@@ -501,7 +501,7 @@ class NLDI:
         -------
         geopandas.GeoDataFrame or (geopandas.GeoDataFrame, list)
             NLDI indexed features in EPSG:4326. If some IDs don't return any features
-            a list of missing ID(s) are returnd as well.
+            a list of missing ID(s) are returned as well.
         """
         self._validate_fsource(fsource)
         fid = fid if isinstance(fid, list) else [fid]
@@ -532,7 +532,7 @@ class NLDI:
         -------
         geopandas.GeoDataFrame or (geopandas.GeoDataFrame, list)
             NLDI indexed ComID(s) in EPSG:4326. If some coords don't return any ComID
-            a list of missing coords are returnd as well.
+            a list of missing coords are returned as well.
         """
         coords = coords if isinstance(coords, list) else [coords]
         coords_4326 = list(zip(*MatchCRS.coords(tuple(zip(*coords)), loc_crs, DEF_CRS)))
@@ -565,7 +565,7 @@ class NLDI:
         -------
         geopandas.GeoDataFrame or (geopandas.GeoDataFrame, list)
             NLDI indexed basins in EPSG:4326. If some IDs don't return any features
-            a list of missing ID(s) are returnd as well.
+            a list of missing ID(s) are returned as well.
         """
         station_ids = station_ids if isinstance(station_ids, list) else [station_ids]
         urls = {s: f"{self.base_url}/linked-data/nwissite/USGS-{s}/basin" for s in station_ids}
@@ -654,7 +654,7 @@ class NLDI:
         return chars, todf(nd_dict)
 
     def get_validchars(self, char_type: str) -> pd.DataFrame:
-        """Get all the avialable characteristics IDs for a give characteristics type."""
+        """Get all the available characteristics IDs for a give characteristics type."""
         resp = self.session.get("/".join([self.base_url, "lookups", char_type, "characteristics"]))
         c_list = ogc.utils.traverse_json(resp.json(), ["characteristicMetadata", "characteristic"])
         return pd.DataFrame.from_dict(
@@ -669,7 +669,7 @@ class NLDI:
         source: str,
         distance: int = 500,
     ) -> gpd.GeoDataFrame:
-        """Navigate the NHDPlus databse from a single feature id up to a distance.
+        """Navigate the NHDPlus database from a single feature id up to a distance.
 
         Parameters
         ----------
@@ -720,7 +720,7 @@ class NLDI:
         loc_crs: str = DEF_CRS,
         distance: int = 500,
     ) -> gpd.GeoDataFrame:
-        """Navigate the NHDPlus databse from a coordinate.
+        """Navigate the NHDPlus database from a coordinate.
 
         Parameters
         ----------
@@ -771,7 +771,7 @@ class NLDI:
         Parameters
         ----------
         urls : dict
-            A dict with keys as feature ids and values as corresponsing url.
+            A dict with keys as feature ids and values as corresponding url.
 
         Returns
         -------
@@ -833,7 +833,7 @@ class ScienceBase:
         self.char_feather = Path(self.save_dir, "nhdplus_attrs.feather")
 
     def get_children(self, item: str) -> Dict[str, Any]:
-        """Get childern items of an item."""
+        """Get children items of an item."""
         url = "https://www.sciencebase.gov/catalog/items"
         payload = {
             "filter": f"parentIdExcludingLinks={item}",
