@@ -67,3 +67,7 @@ class MissingItems(Exception):
 
     def __str__(self) -> str:
         return self.message
+
+
+class InvalidInputRange(ValueError):
+    """Exception raised when a function argument is not in the valid range."""

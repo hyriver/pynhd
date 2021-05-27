@@ -19,7 +19,13 @@ from requests import Response
 from shapely.geometry import MultiPolygon, Polygon
 from simplejson import JSONDecodeError
 
-from .exceptions import InvalidInputType, InvalidInputValue, MissingItems, ZeroMatched
+from .exceptions import (
+    InvalidInputRange,
+    InvalidInputType,
+    InvalidInputValue,
+    MissingItems,
+    ZeroMatched,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -36,7 +42,7 @@ def nhdplus_vaa(parquet_name: Optional[Union[Path, str]] = None) -> pd.DataFrame
 
     Notes
     -----
-    This downloads a 200 MB `parquet` file from
+    This downloads a 200 MB ``parquet`` file from
     `here <https://www.hydroshare.org/resource/6092c8a62fac45be97a09bfd0b0bf726>`__ .
     Although this dataframe does not include geometry, it can be linked to other geospatial
     NHDPlus dataframes through ComIDs.
@@ -44,7 +50,7 @@ def nhdplus_vaa(parquet_name: Optional[Union[Path, str]] = None) -> pd.DataFrame
     Parameters
     ----------
     parquet_name : str or Path
-        Path to a file with `.parquet` extension for saving the processed to disk for
+        Path to a file with ``.parquet`` extension for saving the processed to disk for
         later use.
 
     Returns
@@ -122,8 +128,7 @@ def nhdplus_vaa(parquet_name: Optional[Union[Path, str]] = None) -> pd.DataFrame
     fpath = "data/contents/nhdplusVAA.parquet"
     url = f"https://www.hydroshare.org/hsapi/resource/{rid}/files/{fpath}"
 
-    cache_name = ogc.utils.create_cachefile()
-    resp = RetrySession(cache_name=cache_name).get(url)
+    resp = RetrySession().get(url)
 
     vaa = pd.read_parquet(io.BytesIO(resp.content))
     vaa = vaa.astype(dtypes, errors="ignore")
@@ -188,8 +193,8 @@ class WaterData:
         predicate : str, optional
             The geometric prediacte to use for requesting the data, defaults to
             INTERSECTS. Valid predicates are:
-            EQUALS, DISJOINT, INTERSECTS, TOUCHES, CROSSES, WITHIN, CONTAINS,
-            OVERLAPS, RELATE, BEYOND
+            ``EQUALS``, ``DISJOINT``, ``INTERSECTS``, ``TOUCHES``, ``CROSSES``, ``WITHIN``
+            ``CONTAINS``, ``OVERLAPS``, ``RELATE``, ``BEYOND``
 
         Returns
         -------
@@ -435,8 +440,10 @@ class NHDPlusHR(AGRBase):
         Target spatial reference, default to EPSG:4326
     service : str, optional
         Name of the web service to use, defaults to hydro. Supported web services are:
+
         * hydro: https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer
         * edits: https://edits.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/NHDPlus_HR/MapServer
+
     auto_switch : bool, optional
         Automatically switch to other services' URL if the first one doesn't work, default to False.
     """
@@ -463,8 +470,7 @@ class NLDI:
     def __init__(self) -> None:
         self.base_url = ServiceURL().restful.nldi
 
-        cache_name = ogc.utils.create_cachefile()
-        self.session = RetrySession(cache_name=cache_name)
+        self.session = RetrySession()
 
         resp = self.session.get("/".join([self.base_url, "linked-data"])).json()
         self.valid_fsources = {r["source"]: r["sourceName"] for r in resp}
@@ -675,7 +681,7 @@ class NLDI:
         ----------
         fsource : str
             The name of feature source. The valid sources are:
-            comid, huc12pp, nwissite, wade, WQP.
+            ``comid``, ``huc12pp``, ``nwissite``, ``wade``, ``WQP``.
         fid : str
             The ID of the feature.
         navigation : str
@@ -686,13 +692,17 @@ class NLDI:
         distance : int, optional
             Limit the search for navigation up to a distance in km,
             defaults is 500 km. Note that this is an expensive request so you
-            have be mindful of the value that you provide.
+            have be mindful of the value that you provide. The value must be
+            between 1 to 9999 km.
 
         Returns
         -------
         geopandas.GeoDataFrame
             NLDI indexed features in EPSG:4326.
         """
+        if not (1 <= distance <= 9999):
+            raise InvalidInputRange("``distance`` should be between 1 to 9999.")
+
         self._validate_fsource(fsource)
 
         url = "/".join([self.base_url, "linked-data", fsource, fid, "navigation"])
@@ -827,8 +837,7 @@ class ScienceBase:
         if not self.save_dir.exists():
             os.makedirs(self.save_dir)
 
-        cache_name = ogc.utils.create_cachefile()
-        self.session = RetrySession(cache_name=cache_name)
+        self.session = RetrySession()
         self.nhd_attr_item = "5669a79ee4b08895842a1d47"
         self.char_feather = Path(self.save_dir, "nhdplus_attrs.feather")
 
