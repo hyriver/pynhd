@@ -40,7 +40,7 @@ clean-build: ## remove build artifacts
 clean-pyc: ## remove Python file artifacts
 	find . -name '*.pyc' -exec rm -f {} +
 	find . -name '*.pyo' -exec rm -f {} +
-	find . -name '*~' -exec rm -fr {} +
+	find . -name '*~' -exec rm -f {} +
 	find . -name '__pycache__' -exec rm -fr {} +
 
 clean-test: ## remove test and coverage artifacts
@@ -50,7 +50,7 @@ lint: ## run pre-commit on all files
 	pre-commit run --all-files
 
 test: clean-test ## run tests using pytest in parallel in the current Python env
-	pytest -n=auto -v
+	pytest --doctest-modules -n=auto -v tests/test_*.py pynhd/*.py
 
 install: clean ## install the package to the active Python's site-packages
 	python -m pip install --no-deps --use-feature=in-tree-build .
