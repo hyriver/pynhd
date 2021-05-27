@@ -38,6 +38,9 @@ dependencies:
   - rasterio
   - xarray
 
+  # py3dep
+  - click
+
   # pynhd deps
   - networkx
   - pandas
@@ -63,12 +66,16 @@ dependencies:
   - mapclassify
   - cartopy
   - colorcet
+  - hvplot
+  - geoviews
 
   # dev deps
   - setuptools-scm
   - pytest-xdist
   - pytest-sugar
+  - pytest-console-scripts
   - flaky
+  - codespell
   - pre-commit
 
   - pip
