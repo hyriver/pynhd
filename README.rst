@@ -119,7 +119,7 @@ A list of these attributes for each characteristic type can be accessed using ``
 function.
 
 Similarly, PyNHD uses `this <https://www.hydroshare.org/resource/6092c8a62fac45be97a09bfd0b0bf726/>`__
-item on Hydroshare to get ComID-linked NHDPlus Value Added Attributes. Thi dataset includes
+item on Hydroshare to get ComID-linked NHDPlus Value Added Attributes. This dataset includes
 slope and roughness, among other attributes, for all the flowlines. You can use ``nhdplus_vaa``
 function to get this dataset.
 
@@ -156,7 +156,7 @@ it will automatically use persistent caching:
 
 .. code-block:: console
 
-    $ pip install pynhd[cache]
+    $ pip install pynhd
 
 Alternatively, PyNHD can be installed from the ``conda-forge`` repository
 using `Conda <https://docs.conda.io/en/latest/>`__:
@@ -228,8 +228,8 @@ and even set a distance limit (in km):
         distance=20,
     )
 
-Now, let’s get the `HUC12 pour
-points <https://www.sciencebase.gov/catalog/item/5762b664e4b07657d19a71ea>`__:
+Now, let’s get the
+`HUC12 pour points <https://www.sciencebase.gov/catalog/item/5762b664e4b07657d19a71ea>`__:
 
 .. code:: python
 
