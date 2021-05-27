@@ -60,7 +60,9 @@ def nhdplus_vaa(parquet_name: Optional[Union[Path, str]] = None) -> pd.DataFrame
 
     Examples
     --------
-    >>> vaa = nhdplus_vaa("nhdlus_vaa.parquet")
+    >>> import tempfile
+    >>> from pathlib import Path
+    >>> vaa = nhdplus_vaa(Path(tempfile.gettempdir(), "nhdplus_vaa.parquet"))
     >>> print(vaa.slope.max())
     4.6
     """

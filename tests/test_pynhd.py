@@ -143,7 +143,7 @@ def test_nhdphr():
 
 
 def test_nhdplus_vaa():
-    vaa = nhd.nhdplus_vaa(Path(tempfile.gettempdir(), "vaa.parquet"))
+    vaa = nhd.nhdplus_vaa(Path(tempfile.gettempdir(), "nhdplus_vaa.parquet"))
 
     assert abs(vaa.slope.max() - 4.6) < 1e-3
 
