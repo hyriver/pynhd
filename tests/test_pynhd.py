@@ -125,9 +125,10 @@ def test_waterdata_byfilter():
     crs = "epsg:3857"
     wd = WaterData("huc12", crs)
     wb = wd.byfilter(f"{wd.layer} LIKE '17030001%'")
-    coords = (wb.iloc[0].geometry.centroid.x, wb.iloc[0].geometry.centroid.y)
+    huc12 = wb[wb.huc12 == "170300010602"].geometry[0]
+    coords = (huc12.centroid.x, huc12.centroid.y)
     hucs = wd.bydistance(coords, 100, crs)
-    assert wb.shape[0] == 52 and hucs.huc12.values[0] == "170300010602"
+    assert wb.shape[0] == 52 and hucs.name[0] == "Upper Wenas River"
 
 
 @pytest.mark.flaky(max_runs=3)

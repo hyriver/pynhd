@@ -168,6 +168,17 @@ class WaterData:
             crs=ALT_CRS,
         )
 
+    def __repr__(self) -> str:
+        """Print the services properties."""
+        return (
+            "Connected to the WaterData web service on GeoServer:\n"
+            + f"URL: {self.wfs.url}\n"
+            + f"Version: {self.wfs.version}\n"
+            + f"Layer: {self.layer}\n"
+            + f"Output Format: {self.wfs.outformat}\n"
+            + f"Output CRS: {self.crs}"
+        )
+
     def bybox(
         self, bbox: Tuple[float, float, float, float], box_crs: str = DEF_CRS
     ) -> gpd.GeoDataFrame:
@@ -210,13 +221,11 @@ class WaterData:
         self, coords: Tuple[float, float], distance: int, loc_crs: str = DEF_CRS
     ) -> gpd.GeoDataFrame:
         """Get features within a radius (in meters) of a point."""
-        if isinstance(coords, (list, tuple)) and len(coords) != 2:
-            raise InvalidInputType("coords", "tuple or list of length 2.")
+        if not (isinstance(coords, tuple) and len(coords) == 2):
+            raise InvalidInputType("coods", "tuple of length 2", "(x, y)")
 
-        _coords = MatchCRS.coords(((coords[0],), (coords[1],)), loc_crs, ALT_CRS)
-        cql_filter = (
-            f"DWITHIN(the_geom,POINT({_coords[1][0]:.6f} {_coords[0][0]:.6f}),{distance},meters)"
-        )
+        x, y = MatchCRS(loc_crs, ALT_CRS).coords([coords])[0]
+        cql_filter = f"DWITHIN(the_geom,POINT({y:.6f} {x:.6f}),{distance},meters)"
         resp = self.wfs.getfeature_byfilter(cql_filter, "GET")
         return self._to_geodf(resp)
 
@@ -542,19 +551,16 @@ class NLDI:
             NLDI indexed ComID(s) in EPSG:4326. If some coords don't return any ComID
             a list of missing coords are returned as well.
         """
-        coords = coords if isinstance(coords, list) else [coords]
-        coords_4326 = list(zip(*MatchCRS.coords(tuple(zip(*coords)), loc_crs, DEF_CRS)))
+        coords_list = coords if isinstance(coords, list) else [coords]
+        coords_list = MatchCRS(loc_crs, DEF_CRS).coords(coords_list)
 
         base_url = "/".join([self.base_url, "linked-data", "comid", "position"])
-        urls = {
-            (coords[i][0], coords[i][1]): f"{base_url}?coords=POINT({lon} {lat})"
-            for i, (lon, lat) in enumerate(coords_4326)
-        }
+        urls = {(lon, lat): f"{base_url}?coords=POINT({lon} {lat})" for lon, lat in coords_list}
         comids, not_found = self._get_urls(urls)
         comids = comids.reset_index(level=2, drop=True)
 
         if len(not_found) > 0:
-            self._missing_warning(len(not_found), len(coords))
+            self._missing_warning(len(not_found), len(coords_list))
             return comids, not_found
 
         return comids
@@ -758,8 +764,10 @@ class NLDI:
         geopandas.GeoDataFrame
             NLDI indexed features in EPSG:4326.
         """
-        _coords = MatchCRS().coords(((coords[0],), (coords[1],)), loc_crs, DEF_CRS)
-        lon, lat = _coords[0][0], _coords[1][0]
+        if not (isinstance(coords, tuple) and len(coords) == 2):
+            raise InvalidInputType("coods", "tuple of length 2", "(x, y)")
+
+        lon, lat = MatchCRS(loc_crs, DEF_CRS).coords([coords])[0]
 
         url = "/".join([self.base_url, "linked-data", "comid", "position"])
         payload = {"coords": f"POINT({lon} {lat})"}
