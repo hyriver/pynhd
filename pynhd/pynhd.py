@@ -668,7 +668,7 @@ class NLDI:
         return chars, todf(nd_dict)
 
     def get_validchars(self, char_type: str) -> pd.DataFrame:
-        """Get all the available characteristics IDs for a give characteristics type."""
+        """Get all the available characteristics IDs for a given characteristics type."""
         resp = self.session.get("/".join([self.base_url, "lookups", char_type, "characteristics"]))
         c_list = ogc.utils.traverse_json(resp.json(), ["characteristicMetadata", "characteristic"])
         return pd.DataFrame.from_dict(
@@ -927,7 +927,7 @@ class ScienceBase:
                             "meta": u[1],
                         }
                     )
-        char_df = pd.DataFrame(chars, dtype="category")
+        char_df = pd.DataFrame(chars)
         char_df.to_feather(self.char_feather)
         return char_df
 
