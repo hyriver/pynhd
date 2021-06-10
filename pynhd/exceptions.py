@@ -3,7 +3,7 @@ from typing import Generator, List, Optional, Union
 
 
 class ZeroMatched(ValueError):
-    """Exception raised when a function argument is missing."""
+    """Exception raised when a function doesn't return any feature."""
 
 
 class InvalidInputValue(Exception):
