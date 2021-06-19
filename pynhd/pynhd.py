@@ -302,7 +302,7 @@ class AGRBase:
 
         return ArcGISRESTful(
             url,
-            valid_layers[self.layer],
+            valid_layers[self.layer.lower()],
             outformat="json",
             outfields=self.outfields,
             crs=self.crs,
