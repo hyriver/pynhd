@@ -25,7 +25,6 @@ class NHDPlusEPA(AGRBase):
         )
 
 
-@pytest.mark.flaky(max_runs=3)
 def test_agr():
     layer = "network flowline"
     sql_clause = "FTYPE NOT IN (420,428,566)"
@@ -42,7 +41,6 @@ def test_agr():
     assert abs(df.LENGTHKM.sum() - 8.917) < 1e-3
 
 
-@pytest.mark.flaky(max_runs=3)
 def test_nldi_navigate():
     stm = nldi.navigate_byid(site, station_id, UM, site)
     st100 = nldi.navigate_byid(site, station_id, UM, site, distance=100)
@@ -56,7 +54,6 @@ def test_nldi_navigate():
     )
 
 
-@pytest.mark.flaky(max_runs=3)
 def test_nldi_feature():
     station = nldi.getfeature_byid(site, station_id)
     lon = round(station.geometry[0].centroid.x, 1)
@@ -69,7 +66,6 @@ def test_nldi_feature():
     )
 
 
-@pytest.mark.flaky(max_runs=3)
 def test_nldi_basin():
     eck4 = "+proj=eck4 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=km"
     basin, missing = nldi.get_basins([STA_ID, "00000000"])
@@ -77,7 +73,6 @@ def test_nldi_basin():
     assert abs(basin.area.values[0] - 774.170) < 1e-3 and len(missing) == 1
 
 
-@pytest.mark.flaky(max_runs=3)
 def test_nldi_char():
     tot, prc = nldi.getcharacteristic_byid(
         "6710923", "local", char_ids="CAT_BFI", values_only=False
@@ -85,7 +80,6 @@ def test_nldi_char():
     assert abs(tot.CAT_BFI.values[0] - 57) < 1e-3 and prc.CAT_BFI.values[0] == 0
 
 
-@pytest.mark.flaky(max_runs=3)
 def test_nhd_attrs():
     meta = nhd.nhdplus_attrs(save_dir=".")
     cat = nhd.nhdplus_attrs("RECHG", ".")
@@ -93,7 +87,6 @@ def test_nhd_attrs():
     assert abs(cat[cat.COMID > 0].CAT_RECHG.sum() - 143215331.64) < 1e-3 and len(meta) == 609
 
 
-@pytest.mark.flaky(max_runs=3)
 def test_waterdata_byid():
     comids = nldi.navigate_byid(site, station_id, UT, "flowlines")
     comid_list = comids.nhdplus_comid.tolist()
@@ -111,7 +104,6 @@ def test_waterdata_byid():
     )
 
 
-@pytest.mark.flaky(max_runs=3)
 def test_waterdata_bybox():
     wd = WaterData("nhdwaterbody")
     print(wd)
@@ -120,7 +112,6 @@ def test_waterdata_bybox():
     assert abs(wb_b.areasqkm.sum() - wb_g.areasqkm.sum()) < 1e-3
 
 
-@pytest.mark.flaky(max_runs=3)
 def test_waterdata_byfilter():
     crs = "epsg:3857"
     wd = WaterData("huc12", crs)
@@ -131,7 +122,6 @@ def test_waterdata_byfilter():
     assert wb.shape[0] == 52 and hucs.name[0] == "Upper Wenas River"
 
 
-@pytest.mark.flaky(max_runs=3)
 def test_nhdphr():
     hr = nhd.NHDPlusHR("networknhdflowline", service="edits", auto_switch=True)
     flwb = hr.bygeom((-69.77, 45.07, -69.31, 45.45))
@@ -149,7 +139,6 @@ def test_nhdplus_vaa():
     assert abs(vaa.slope.max() - 4.6) < 1e-3
 
 
-@pytest.mark.flaky(max_runs=3)
 def test_acc():
     wd = WaterData("nhdflowline_network")
     comids = nldi.navigate_byid("nwissite", "USGS-11092450", UT, "flowlines")
