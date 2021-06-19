@@ -2,13 +2,24 @@
 History
 =======
 
-0.11.0 (unreleased)
+0.11.0 (2021-06-19)
 -------------------
+
+New Features
+~~~~~~~~~~~~
+- Add ``nhdplus_vaa`` to access NHDPlus Value Added Attributes for all its flowlines.
+- To see a list of available layers in NHDPlus HR, you can instantiate its class without
+  passing any argument like so ``NHDPlusHR()``.
 
 Breaking Changes
 ~~~~~~~~~~~~~~~~
-- Drop support for python 3.6 since many of the dependencies have done so, such as
-  ``xarray`` and ``pandas``.
+- Drop support for Python 3.6 since many of the dependencies such as ``xarray`` and ``pandas``
+  have done so.
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Use persistent caching for all requests which can help speed up network responses significantly.
+- Improve documnetation and testing.
 
 0.10.1 (2021-03-27)
 -------------------
