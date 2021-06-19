@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -255,56 +256,64 @@ class WaterData:
         return geoutils.json2geodf(resp.json(), ALT_CRS, self.crs)
 
 
+@dataclass
 class AGRBase:
     """Base class for accessing NHD(Plus) HR database through the National Map ArcGISRESTful.
 
     Parameters
     ----------
-    layer : str
-        A valid service layer. For a list of available layers pass an empty string to
-        the class.
+    layer : str, optional
+        A valid service layer. To see a list of available layers instantiate the class
+        without passing any argument.
     outfields : str or list, optional
         Target field name(s), default to "*" i.e., all the fields.
     crs : str, optional
         Target spatial reference, default to EPSG:4326
     """
 
-    def __init__(
-        self,
-        layer: str,
-        outfields: Union[str, List[str]] = "*",
-        crs: str = DEF_CRS,
-        service: Optional[ArcGISRESTful] = None,
-    ) -> None:
-        self.layer = layer
-        self.outfields = outfields
-        self.crs = crs
-        self.service = service
+    layer: Optional[str] = None
+    outfields: Union[str, List[str]] = "*"
+    crs: str = DEF_CRS
+    service: Optional[ArcGISRESTful] = None
 
     def _check_service(self) -> None:
         """Check if service is set."""
         if self.service is None:
             raise ValueError("First you should use _init_service(url) to initialize the service.")
 
+    @staticmethod
+    def get_validlayers(url):
+        """Get valid layer for a ArcGISREST service."""
+        resp = RetrySession().get(url, {"f": "json"})
+
+        try:
+            rjson = resp.json()
+            return {lyr["name"].lower(): lyr["id"] for lyr in rjson["layers"]}
+        except (JSONDecodeError, KeyError):
+            raise ServerError(url)
+
     def _init_service(self, url: str) -> ArcGISRESTful:
-        service = ArcGISRESTful(
+        valid_layers = self.get_validlayers(url)
+        if self.layer is None:
+            raise InvalidInputType("layer", "str")
+
+        if self.layer.lower() not in valid_layers:
+            raise InvalidInputValue("layer", list(valid_layers))
+
+        return ArcGISRESTful(
             url,
+            valid_layers[self.layer],
             outformat="json",
             outfields=self.outfields,
             crs=self.crs,
         )
-        valid_layers = {v.lower(): k for k, v in service.valid_layers.items()}
-        if self.layer not in valid_layers:
-            raise InvalidInputValue("layer", list(valid_layers))
-        service.layer = valid_layers[self.layer]
-        return service
 
     def connect_to(self, service: str, service_list: Dict[str, str], auto_switch: bool) -> None:
         """Connect to a web service.
 
         Parameters
         ----------
-        service : str, optional
+        service : str
             Name of the preferred web service to connect to from the list provided in service_list.
         service_list: dict
             A dict where keys are names of the web services and values are their URLs.
@@ -442,9 +451,9 @@ class NHDPlusHR(AGRBase):
 
     Parameters
     ----------
-    layer : str
-        A valid service layer. For a list of available layers pass an empty string to
-        the class.
+    layer : str, optional
+        A valid service layer. To see a list of available layers instantiate the class
+        without passing any argument like so ``NHDPlusHR()``.
     outfields : str or list, optional
         Target field name(s), default to "*" i.e., all the fields.
     crs : str, optional
@@ -461,7 +470,7 @@ class NHDPlusHR(AGRBase):
 
     def __init__(
         self,
-        layer: str,
+        layer: Optional[str] = None,
         outfields: Union[str, List[str]] = "*",
         crs: str = DEF_CRS,
         service: str = "hydro",
@@ -472,6 +481,8 @@ class NHDPlusHR(AGRBase):
             "hydro": ServiceURL().restful.nhdplushr,
             "edits": ServiceURL().restful.nhdplushr_edits,
         }
+        if layer is None:
+            raise InvalidInputValue("layer", list(self.get_validlayers(service_list[service])))
         self.connect_to(service, service_list, auto_switch)
 
 
@@ -816,10 +827,10 @@ class NLDI:
 
     def _get_url(self, url: str, payload: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Send a request to the service using GET method."""
-        if payload:
-            payload.update({"f": "json"})
-        else:
+        if payload is None:
             payload = {"f": "json"}
+        else:
+            payload.update({"f": "json"})
 
         try:
             return self.session.get(url, payload).json()
