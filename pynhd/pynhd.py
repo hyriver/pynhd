@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import pygeoogc as ogc
 import pygeoutils as geoutils
-from pygeoogc import WFS, ArcGISRESTful, MatchCRS, RetrySession, ServerError, ServiceURL
+from pygeoogc import WFS, ArcGISRESTful, MatchCRS, RetrySession, ServerError, ServiceURL, ServiceError
 from requests import Response
 from shapely.geometry import MultiPolygon, Polygon
 from simplejson import JSONDecodeError
@@ -815,7 +815,9 @@ class NLDI:
             try:
                 rjson = self._get_url(u)
                 resp.append((f, geoutils.json2geodf(rjson, ALT_CRS, DEF_CRS)))
-            except (ZeroMatched, JSONDecodeError, ConnectionError):
+            except ConnectionError:
+                raise ServiceError(self.base_url)
+            except (ZeroMatched, JSONDecodeError):
                 not_found.append(f)
 
         if len(resp) == 0:
