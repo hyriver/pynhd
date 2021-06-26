@@ -31,7 +31,7 @@ dependencies:
 
   # pygeoutils deps
   - affine
-  - dask
+  - dask-core
   - geopandas
   - netcdf4
   - numpy
@@ -50,7 +50,6 @@ dependencies:
   - folium
   - lxml
   - matplotlib-base
-  - openpyxl
 
   # pydaymet deps
   - scipy
@@ -63,6 +62,7 @@ dependencies:
   - contextily
   - mapclassify
   - cartopy
+  - cmocean
   - colorcet
   - hvplot
   - geoviews
@@ -74,6 +74,7 @@ dependencies:
   - psutil
   - pytest
   - pytest-clarity
+  - pytest-console-scripts
   - pytest-cov
   - pytest-sugar
   - pytest-xdist
