@@ -12,7 +12,7 @@ from .exceptions import InvalidInputType, MissingItems, ZeroMatched
 
 
 def prepare_nhdplus(
-    flw: gpd.GeoDataFrame,
+    flowlines: gpd.GeoDataFrame,
     min_network_size: float,
     min_path_length: float,
     min_path_size: float = 0,
@@ -25,11 +25,11 @@ def prepare_nhdplus(
 
     Parameters
     ----------
-    flw : geopandas.GeoDataFrame
+    flowlines : geopandas.GeoDataFrame
         NHDPlus flowlines with at least the following columns:
-        COMID, LENGTHKM, FTYPE, TerminalFl, FromNode, ToNode, TotDASqKM,
-        StartFlag, StreamOrde, StreamCalc, TerminalPa, Pathlength,
-        Divergence, Hydroseq, LevelPathI
+        ``comid``, ``lengthkm``, ``ftype``, ``terminalfl``, ``fromnode``, ``tonode``,
+        ``totdasqkm``, ``startflag``, ``streamorde``, ``streamcalc``, ``terminalpa``,
+        ``pathlength``, ``divergence``, ``hydroseq``, ``levelpathi``.
     min_network_size : float
         Minimum size of drainage network in sqkm
     min_path_length : float
@@ -48,7 +48,17 @@ def prepare_nhdplus(
     geopandas.GeoDataFrame
         Cleaned up flowlines. Note that all column names are converted to lower case.
     """
+    flw = flowlines.copy()
     flw.columns = flw.columns.str.lower()
+
+    if not ("fcode" in flw and "ftype" in flw):
+        raise MissingItems(["fcode", "ftype"])
+
+    if "fcode" in flw:
+        flw = flw[flw["fcode"] != 566600]
+    else:
+        flw = flw[(flw["ftype"] != "Coastline") | (flw["ftype"] != 566)]
+
     nrows = flw.shape[0]
 
     req_cols = [
@@ -60,30 +70,26 @@ def prepare_nhdplus(
         "streamcalc",
         "divergence",
         "fromnode",
-        "ftype",
     ]
 
     check_requirements(req_cols, flw)
-    flw[req_cols[:-1]] = flw[req_cols[:-1]].astype("Int64")
+    flw[req_cols] = flw[req_cols].astype("Int64")
 
     if not any(flw.terminalfl == 1):
-        if not all(flw.terminalpa == flw.terminalpa.iloc[0]):
-            raise ZeroMatched("No terminal flag were found in the dataframe.")
+        if not len(flw.terminalpa.unique()) == 1:
+            raise ZeroMatched("Found no terminal flag in the dataframe.")
 
         flw.loc[flw.hydroseq == flw.hydroseq.min(), "terminalfl"] = 1
 
     if purge_non_dendritic:
-        flw = flw[
-            ((flw.ftype != "Coastline") | (flw.ftype != 566)) & (flw.streamorde == flw.streamcalc)
-        ]
+        flw = flw[flw.streamorde == flw.streamcalc]
     else:
-        flw = flw[(flw.ftype != "Coastline") | (flw.ftype != 566)]
         flw.loc[flw.divergence == 2, "fromnode"] = pd.NA
 
     flw = _remove_tinynetworks(flw, min_path_size, min_path_length, min_network_size)
 
     if verbose:
-        print(f"Removed {nrows - flw.shape[0]} paths from the flowlines.")
+        print(f"Removed {nrows - flw.shape[0]} segments from the flowlines.")
 
     if flw.shape[0] > 0:
         flw = _add_tocomid(flw)
@@ -131,7 +137,6 @@ def _remove_tinynetworks(
         "pathlength",
     ]
     check_requirements(req_cols, flw)
-
     flw[req_cols[:-2]] = flw[req_cols[:-2]].astype("Int64")
 
     if min_path_size > 0:
@@ -140,8 +145,8 @@ def _remove_tinynetworks(
             & (x.totdasqkm < min_path_size)
             & (x.totdasqkm >= 0)
         )
-        short_paths = short_paths.index.get_level_values("levelpathi")[short_paths].tolist()
-        flw = flw[~flw.levelpathi.isin(short_paths)]
+        short_idx = short_paths.index.get_level_values("levelpathi")[short_paths]
+        flw = flw[~flw.levelpathi.isin(short_idx)]
 
     terminal_filter = (flw.terminalfl == 1) & (flw.totdasqkm < min_network_size)
     start_filter = (flw.startflag == 1) & (flw.pathlength < min_path_length)
@@ -171,7 +176,6 @@ def _add_tocomid(flw: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """
     req_cols = ["comid", "terminalpa", "fromnode", "tonode"]
     check_requirements(req_cols, flw)
-
     flw[req_cols] = flw[req_cols].astype("Int64")
 
     def tocomid(group: pd.core.groupby.generic.DataFrameGroupBy) -> pd.DataFrame:
@@ -183,7 +187,7 @@ def _add_tocomid(flw: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
         return group.apply(toid, axis=1)
 
-    flw["tocomid"] = pd.concat([tocomid(g) for _, g in flw.groupby("terminalpa")])
+    flw["tocomid"] = pd.concat(tocomid(g) for _, g in flw.groupby("terminalpa"))
     return flw
 
 
