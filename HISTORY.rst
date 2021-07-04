@@ -2,6 +2,20 @@
 History
 =======
 
+0.11.1 (unreleased)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Add a function for getting all NHD Fcodes as a dataframe, called ``nhd_fcode``.
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Migrate to using ``AsyncRetriever`` for handling communications with web services.
+- Catch the ``ConnectionError`` separately in ``NLDI`` and raise a ``ServiceError`` instead.
+  So user knows that data cannot be returned due to the out of service status of the server
+  not ``ZeroMatched``.
+
 0.11.0 (2021-06-19)
 -------------------
 
