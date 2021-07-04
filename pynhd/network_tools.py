@@ -7,8 +7,9 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from pandas._libs.missing import NAType
+from pygeoutils import InvalidInputType
 
-from .exceptions import InvalidInputType, MissingItems, ZeroMatched
+from .exceptions import MissingItems, ZeroMatched
 
 
 def prepare_nhdplus(
@@ -21,7 +22,7 @@ def prepare_nhdplus(
 ) -> gpd.GeoDataFrame:
     """Clean up and fix common issues of NHDPlus flowline database.
 
-    Ported from `nhdplusTools <https://github.com/USGS-R/nhdplusTools>`__
+    Ported from `nhdplusTools <https://github.com/USGS-R/nhdplusTools>`__.
 
     Parameters
     ----------
@@ -55,7 +56,7 @@ def prepare_nhdplus(
         raise MissingItems(["fcode", "ftype"])
 
     if "fcode" in flw:
-        flw = flw[flw["fcode"] != 566600]
+        flw = flw[flw["fcode"] != 56600]
     else:
         flw = flw[(flw["ftype"] != "Coastline") | (flw["ftype"] != 566)]
 
@@ -72,7 +73,7 @@ def prepare_nhdplus(
         "fromnode",
     ]
 
-    check_requirements(req_cols, flw)
+    _check_requirements(req_cols, flw)
     flw[req_cols] = flw[req_cols].astype("Int64")
 
     if not any(flw.terminalfl == 1):
@@ -136,7 +137,7 @@ def _remove_tinynetworks(
         "totdasqkm",
         "pathlength",
     ]
-    check_requirements(req_cols, flw)
+    _check_requirements(req_cols, flw)
     flw[req_cols[:-2]] = flw[req_cols[:-2]].astype("Int64")
 
     if min_path_size > 0:
@@ -175,7 +176,7 @@ def _add_tocomid(flw: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         The input dataframe With an additional column named ``tocomid``.
     """
     req_cols = ["comid", "terminalpa", "fromnode", "tonode"]
-    check_requirements(req_cols, flw)
+    _check_requirements(req_cols, flw)
     flw[req_cols] = flw[req_cols].astype("Int64")
 
     def tocomid(group: pd.core.groupby.generic.DataFrameGroupBy) -> pd.DataFrame:
@@ -300,7 +301,7 @@ def vector_accumulation(
     return acc
 
 
-def check_requirements(reqs: Iterable, cols: List[str]) -> None:
+def _check_requirements(reqs: Iterable, cols: List[str]) -> None:
     """Check for all the required data.
 
     Parameters

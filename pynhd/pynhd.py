@@ -9,33 +9,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import async_retriever as ar
 import cytoolz as tlz
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pygeoogc as ogc
 import pygeoutils as geoutils
-from pygeoogc import (
-    WFS,
-    ArcGISRESTful,
-    MatchCRS,
-    RetrySession,
-    ServerError,
-    ServiceError,
-    ServiceURL,
-)
+from pygeoogc import WFS, ArcGISRESTful, ServiceError, ServiceUnavailable, ServiceURL
+from pygeoutils import InvalidInputType, InvalidInputValue
 from requests import Response
-from requests.exceptions import RequestException
 from shapely.geometry import MultiPolygon, Polygon
 from simplejson import JSONDecodeError
 
-from .exceptions import (
-    InvalidInputRange,
-    InvalidInputType,
-    InvalidInputValue,
-    MissingItems,
-    ZeroMatched,
-)
+from .exceptions import InvalidInputRange, MissingItems, ZeroMatched
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -70,9 +57,7 @@ def nhdplus_vaa(parquet_name: Optional[Union[Path, str]] = None) -> pd.DataFrame
 
     Examples
     --------
-    >>> import tempfile
-    >>> from pathlib import Path
-    >>> vaa = nhdplus_vaa(Path(tempfile.gettempdir(), "nhdplus_vaa.parquet"))
+    >>> vaa = nhdplus_vaa()
     >>> print(vaa.slope.max())
     4.6
     """
@@ -140,9 +125,9 @@ def nhdplus_vaa(parquet_name: Optional[Union[Path, str]] = None) -> pd.DataFrame
     fpath = "data/contents/nhdplusVAA.parquet"
     url = f"https://www.hydroshare.org/hsapi/resource/{rid}/files/{fpath}"
 
-    resp = RetrySession().get(url)
+    resp = ar.retrieve([url], "binary")
 
-    vaa = pd.read_parquet(io.BytesIO(resp.content))
+    vaa = pd.read_parquet(io.BytesIO(resp[0]))
     vaa = vaa.astype(dtypes, errors="ignore")
     vaa.to_parquet(output)
     return vaa
@@ -234,7 +219,7 @@ class WaterData:
         if not (isinstance(coords, tuple) and len(coords) == 2):
             raise InvalidInputType("coods", "tuple of length 2", "(x, y)")
 
-        x, y = MatchCRS(loc_crs, ALT_CRS).coords([coords])[0]
+        x, y = ogc.utils.match_crs([coords], loc_crs, ALT_CRS)[0]
         cql_filter = f"DWITHIN(the_geom,POINT({y:.6f} {x:.6f}),{distance},meters)"
         resp = self.wfs.getfeature_byfilter(cql_filter, "GET")
         return self._to_geodf(resp)
@@ -262,7 +247,7 @@ class WaterData:
         geopandas.GeoDataFrame
             The requested features in a GeoDataFrames.
         """
-        return geoutils.json2geodf(resp.json(), ALT_CRS, self.crs)
+        return geoutils.json2geodf(resp, ALT_CRS, self.crs)
 
 
 @dataclass
@@ -293,13 +278,11 @@ class AGRBase:
     @staticmethod
     def get_validlayers(url):
         """Get valid layer for a ArcGISREST service."""
-        resp = RetrySession().get(url, {"f": "json"})
-
         try:
-            rjson = resp.json()
+            rjson = ar.retrieve([url], "json", [{"params": {"f": "json"}}])[0]
             return {lyr["name"].lower(): lyr["id"] for lyr in rjson["layers"]}
         except (JSONDecodeError, KeyError):
-            raise ServerError(url)
+            raise ServiceError(url)
 
     def _init_service(self, url: str) -> ArcGISRESTful:
         valid_layers = self.get_validlayers(url)
@@ -335,9 +318,9 @@ class AGRBase:
         url = service_list.pop(service)
         try:
             self.service = self._init_service(url)
-        except (ServerError, ConnectionError):
+        except (ServiceError, ConnectionError):
             if not auto_switch:
-                raise ServerError(url)
+                raise ServiceError(url)
 
             while len(service_list) > 0:
                 next_service = next(iter(service_list.keys()))
@@ -346,11 +329,11 @@ class AGRBase:
                     url = service_list.pop(next_service)
                     self.service = self._init_service(url)
                     logger.info(f"Connected to {url}.")
-                except (ServerError, ConnectionError):
+                except (ServiceError, ConnectionError):
                     continue
 
         if self.service is None:
-            raise ServerError(url)
+            raise ServiceError(url)
 
     def bygeom(
         self,
@@ -501,12 +484,10 @@ class NLDI:
     def __init__(self) -> None:
         self.base_url = ServiceURL().restful.nldi
 
-        self.session = RetrySession()
-
-        resp = self.session.get("/".join([self.base_url, "linked-data"])).json()
+        resp = ar.retrieve(["/".join([self.base_url, "linked-data"])], "json")[0]
         self.valid_fsources = {r["source"]: r["sourceName"] for r in resp}
 
-        resp = self.session.get("/".join([self.base_url, "lookups"])).json()
+        resp = ar.retrieve(["/".join([self.base_url, "lookups"])], "json")[0]
         self.valid_chartypes = {r["type"]: r["typeName"] for r in resp}
 
     @staticmethod
@@ -572,7 +553,7 @@ class NLDI:
             a list of missing coords are returned as well.
         """
         coords_list = coords if isinstance(coords, list) else [coords]
-        coords_list = MatchCRS(loc_crs, DEF_CRS).coords(coords_list)
+        coords_list = ogc.utils.match_crs(coords_list, loc_crs, DEF_CRS)
 
         base_url = "/".join([self.base_url, "linked-data", "comid", "position"])
         urls = {(lon, lat): f"{base_url}?coords=POINT({lon} {lat})" for lon, lat in coords_list}
@@ -689,8 +670,10 @@ class NLDI:
 
     def get_validchars(self, char_type: str) -> pd.DataFrame:
         """Get all the available characteristics IDs for a given characteristics type."""
-        resp = self.session.get("/".join([self.base_url, "lookups", char_type, "characteristics"]))
-        c_list = ogc.utils.traverse_json(resp.json(), ["characteristicMetadata", "characteristic"])
+        resp = ar.retrieve(
+            ["/".join([self.base_url, "lookups", char_type, "characteristics"])], "json"
+        )
+        c_list = ogc.utils.traverse_json(resp[0], ["characteristicMetadata", "characteristic"])
         return pd.DataFrame.from_dict(
             {c.pop("characteristic_id"): c for c in c_list}, orient="index"
         )
@@ -787,7 +770,7 @@ class NLDI:
         if not (isinstance(coords, tuple) and len(coords) == 2):
             raise InvalidInputType("coods", "tuple of length 2", "(x, y)")
 
-        lon, lat = MatchCRS(loc_crs, DEF_CRS).coords([coords])[0]
+        lon, lat = ogc.utils.match_crs([coords], loc_crs, DEF_CRS)[0]
 
         url = "/".join([self.base_url, "linked-data", "comid", "position"])
         payload = {"coords": f"POINT({lon} {lat})"}
@@ -824,7 +807,7 @@ class NLDI:
             try:
                 rjson = self._get_url(u)
                 resp.append((f, geoutils.json2geodf(rjson, ALT_CRS, DEF_CRS)))
-            except (ZeroMatched, RequestException):
+            except (ZeroMatched, InvalidInputType):
                 not_found.append(f)
 
         if len(resp) == 0:
@@ -842,11 +825,11 @@ class NLDI:
             payload.update({"f": "json"})
 
         try:
-            return self.session.get(url, payload).json()
+            return ar.retrieve([url], "json", [{"params": payload}])[0]
         except JSONDecodeError:
             raise ZeroMatched("No feature was found with the provided inputs.")
         except ConnectionError:
-            raise ServiceError(self.base_url)
+            raise ServiceUnavailable(self.base_url)
 
 
 class ScienceBase:
@@ -867,7 +850,6 @@ class ScienceBase:
         if not self.save_dir.exists():
             os.makedirs(self.save_dir)
 
-        self.session = RetrySession()
         self.nhd_attr_item = "5669a79ee4b08895842a1d47"
         self.char_feather = Path(self.save_dir, "nhdplus_attrs.feather")
 
@@ -879,13 +861,13 @@ class ScienceBase:
             "fields": "title,id",
             "format": "json",
         }
-        return self.session.get(url, payload=payload).json()
+        return ar.retrieve([url], "json", [{"params": payload}])[0]
 
     def get_files(self, item: str) -> Dict[str, Tuple[str, str]]:
         """Get all the available zip files in an item."""
         url = "https://www.sciencebase.gov/catalog/item"
         payload = {"fields": "files,downloadUri", "format": "json"}
-        r = self.session.get(f"{url}/{item}", payload=payload).json()
+        r = ar.retrieve([f"{url}/{item}"], "json", [{"params": payload}])[0]
         files_url = zip(tlz.pluck("name", r["files"]), tlz.pluck("url", r["files"]))
         meta = list(tlz.pluck("metadataHtmlViewUri", r["files"], default=""))[-1]
         return {f.replace("_CONUS.zip", ""): (u, meta) for f, u in files_url if ".zip" in f}
@@ -987,3 +969,14 @@ def nhdplus_attrs(name: Optional[str] = None, save_dir: Optional[str] = None) ->
         raise ValueError("The given characteristic name is not in the database.")
 
     return pd.read_csv(url, compression="zip")
+
+
+def nhd_fcode() -> pd.DataFrame:
+    """Get all the NHDPlus FCodes."""
+    url = "/".join(
+        [
+            "https://gist.githubusercontent.com/cheginit",
+            "8f9730f75b2b9918f492a236c77c180c/raw/nhd_fcode.json",
+        ]
+    )
+    return pd.read_json(url)
