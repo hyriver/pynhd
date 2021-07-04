@@ -3,7 +3,6 @@ import io
 import tempfile
 from pathlib import Path
 
-import pytest
 from shapely.geometry import box
 
 import pynhd as nhd
@@ -58,7 +57,8 @@ def test_nldi_feature():
     station = nldi.getfeature_byid(site, station_id)
     lon = round(station.geometry[0].centroid.x, 1)
     lat = round(station.geometry[0].centroid.y, 1)
-    comid, missing = nldi.comid_byloc([(lon, lat), (lat, lon)])
+    _, missing = nldi.comid_byloc([(lon, lat), (lat, lon)])
+    comid = nldi.comid_byloc((lon, lat))
     assert (
         station.comid.values[0] == "1722317"
         and comid.comid.values[0] == "1722211"
@@ -68,14 +68,14 @@ def test_nldi_feature():
 
 def test_nldi_basin():
     eck4 = "+proj=eck4 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=km"
-    basin, missing = nldi.get_basins([STA_ID, "00000000"])
-    basin = basin.to_crs(eck4)
+    _, missing = nldi.get_basins([STA_ID, "00000000"])
+    basin = nldi.get_basins(STA_ID).to_crs(eck4)
     assert abs(basin.area.values[0] - 774.170) < 1e-3 and len(missing) == 1
 
 
 def test_nldi_char():
     tot, prc = nldi.getcharacteristic_byid(
-        "6710923", "local", char_ids="CAT_BFI", values_only=False
+        "6710923", "local", char_ids="all", values_only=False
     )
     assert abs(tot.CAT_BFI.values[0] - 57) < 1e-3 and prc.CAT_BFI.values[0] == 0
 
@@ -123,19 +123,20 @@ def test_waterdata_byfilter():
 
 
 def test_nhdphr():
-    hr = nhd.NHDPlusHR("networknhdflowline", service="edits", auto_switch=True)
+    hr = nhd.NHDPlusHR("networknhdflowline", service="hydro", auto_switch=True)
     flwb = hr.bygeom((-69.77, 45.07, -69.31, 45.45))
-    flwi = hr.byids("NHDFlowline.PERMANENT_IDENTIFIER", ["103455178", "103454362", "103453218"])
-    flwf = hr.bysql("NHDFlowline.PERMANENT_IDENTIFIER IN ('103455178', '103454362', '103453218')")
+    flwi = hr.byids("PERMANENT_IDENTIFIER", ["103455178", "103454362", "103453218"])
+    flwf = hr.bysql("PERMANENT_IDENTIFIER IN ('103455178', '103454362', '103453218')")
     assert (
-        flwb.shape[0] == 3892
-        and flwi["NHDFlowline.OBJECTID"].tolist() == flwf["NHDFlowline.OBJECTID"].tolist()
+        flwb.shape[0] == 3887
+        and flwi["OBJECTID"].tolist() == flwf["OBJECTID"].tolist()
     )
 
 
 def test_nhdplus_vaa():
-    vaa = nhd.nhdplus_vaa(Path(tempfile.gettempdir(), "nhdplus_vaa.parquet"))
-
+    fname = Path("nhdplus_vaa.parquet")
+    vaa = nhd.nhdplus_vaa(fname)
+    fname.unlink()
     assert abs(vaa.slope.max() - 4.6) < 1e-3
 
 
@@ -161,6 +162,11 @@ def test_acc():
     diff = flw.arbolatesu - flw.acc_lengthkm
 
     assert diff.abs().sum() < 1e-5
+
+
+def test_fcode():
+    fcode = nhd.nhd_fcode()
+    assert fcode.loc[57100, "Feature Type"] == "DAM"
 
 
 def test_show_versions():
