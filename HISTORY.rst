@@ -8,6 +8,8 @@ History
 New Features
 ~~~~~~~~~~~~
 - Add a function for getting all NHD Fcodes as a dataframe, called ``nhd_fcode``.
+- Improve ``prepare_nhdplus`` function by removing all coastlines and better detection
+  of the terminal point in a network.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
