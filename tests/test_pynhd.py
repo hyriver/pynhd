@@ -74,9 +74,7 @@ def test_nldi_basin():
 
 
 def test_nldi_char():
-    tot, prc = nldi.getcharacteristic_byid(
-        "6710923", "local", char_ids="all", values_only=False
-    )
+    tot, prc = nldi.getcharacteristic_byid("6710923", "local", char_ids="all", values_only=False)
     assert abs(tot.CAT_BFI.values[0] - 57) < 1e-3 and prc.CAT_BFI.values[0] == 0
 
 
@@ -127,10 +125,7 @@ def test_nhdphr():
     flwb = hr.bygeom((-69.77, 45.07, -69.31, 45.45))
     flwi = hr.byids("PERMANENT_IDENTIFIER", ["103455178", "103454362", "103453218"])
     flwf = hr.bysql("PERMANENT_IDENTIFIER IN ('103455178', '103454362', '103453218')")
-    assert (
-        flwb.shape[0] == 3887
-        and flwi["OBJECTID"].tolist() == flwf["OBJECTID"].tolist()
-    )
+    assert flwb.shape[0] == 3887 and flwi["OBJECTID"].tolist() == flwf["OBJECTID"].tolist()
 
 
 def test_nhdplus_vaa():
