@@ -92,6 +92,7 @@ class TestNLDI:
 
 def test_nhd_attrs():
     meta = nhd.nhdplus_attrs(save_dir=".")
+    _ = nhd.nhdplus_attrs("RECHG", ".")
     cat = nhd.nhdplus_attrs("RECHG", ".")
     Path("nhdplus_attrs.feather").unlink()
     assert abs(cat[cat.COMID > 0].CAT_RECHG.sum() - 143215331.64) < SMALL and len(meta) == 609
