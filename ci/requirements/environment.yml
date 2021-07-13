@@ -3,15 +3,25 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  # pygeoogc deps
+  # async_retriever
+  - aiodns
+  - aiohttp
+  - aiohttp-client-cache
+  - aiosqlite
+  - brotlipy
+  - cchardet
   - cytoolz
+  - nest-asyncio
+  - orjson
+
+  # pygeoogc deps
   - defusedxml
   - owslib
+  - pydantic
   - pyyaml
   - pyproj
   - requests
   - requests-cache
-  - setuptools
   - shapely
   - simplejson
   - urllib3
@@ -20,9 +30,8 @@ dependencies:
   - affine
   - dask
   - geopandas
-  - numpy
   - netcdf4
-  - orjson
+  - numpy
   - rasterio
   - xarray
 
@@ -47,5 +56,6 @@ dependencies:
 
   - pip
   - pip:
+    - git+https://github.com/cheginit/async_retriever.git
     - git+https://github.com/cheginit/pygeoogc.git
     - git+https://github.com/cheginit/pygeoutils.git
