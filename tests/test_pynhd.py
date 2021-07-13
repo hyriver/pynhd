@@ -54,9 +54,15 @@ class TestNLDI:
         st100 = self.nldi.navigate_byid(site, station_id, UM, site, distance=100)
         assert st100.shape[0] == 3
 
+<<<<<<< HEAD
     def test_navigate_fsource(self):
         pp = self.nldi.navigate_byid(site, station_id, UT, "huc12pp")
         assert pp.shape[0] == 12
+=======
+def test_nldi_char():
+    tot, prc = nldi.getcharacteristic_byid("6710923", "local", char_ids="all", values_only=False)
+    assert abs(tot.CAT_BFI.values[0] - 57) < 1e-3 and prc.CAT_BFI.values[0] == 0
+>>>>>>> 7294f3d0b688d755fd8ce66ad812056612204a40
 
     def test_navigate_loc(self):
         wqp = self.nldi.navigate_byloc((-70, 44), UT, "wqp")
