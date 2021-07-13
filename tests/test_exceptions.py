@@ -1,6 +1,6 @@
 import pytest
 
-from pynhd import InvalidInputRange, MissingItems, ZeroMatched
+from pynhd import InvalidInputRange, MissingItems
 
 
 def missing_items():
