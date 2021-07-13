@@ -1,10 +1,8 @@
 """Access NLDI and WaterData databases."""
 import io
 import logging
-import os
 import re
 import sys
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -16,13 +14,13 @@ import numpy as np
 import pandas as pd
 import pygeoogc as ogc
 import pygeoutils as geoutils
-from pygeoogc import WFS, ArcGISRESTful, ServiceError, ServiceUnavailable, ServiceURL
+from pygeoogc import WFS, ArcGISRESTful, ServiceError, ServiceUnavailable, ServiceURL, ZeroMatched
 from pygeoutils import InvalidInputType, InvalidInputValue
 from requests import Response
 from shapely.geometry import MultiPolygon, Polygon
 from simplejson import JSONDecodeError
 
-from .exceptions import InvalidInputRange, MissingItems, ZeroMatched
+from .exceptions import InvalidInputRange, MissingItems
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -62,13 +60,13 @@ def nhdplus_vaa(parquet_name: Optional[Union[Path, str]] = None) -> pd.DataFrame
     4.6
     """
     if parquet_name is None:
-        output = Path(tempfile.gettempdir(), "nhdplus_vaa.parquet")
+        output = Path("cache", "nhdplus_vaa.parquet")
     else:
         if ".parquet" not in str(parquet_name):
             raise InvalidInputValue("parquet_name", ["a filename with `.parquet` extension."])
 
         output = Path(parquet_name)
-        os.makedirs(output.parent, exist_ok=True)
+    output.parent.mkdir(parents=True, exist_ok=True)
 
     if output.exists():
         return pd.read_parquet(output)
@@ -268,37 +266,38 @@ class AGRBase:
     layer: Optional[str] = None
     outfields: Union[str, List[str]] = "*"
     crs: str = DEF_CRS
-    service: Optional[ArcGISRESTful] = None
 
-    def _check_service(self) -> None:
-        """Check if service is set."""
-        if self.service is None:
-            raise ValueError("First you should use _init_service(url) to initialize the service.")
+    @property
+    def service(self) -> ArcGISRESTful:
+        """Connect to a RESTFul service."""
+        return self._service
 
-    @staticmethod
-    def get_validlayers(url):
-        """Get valid layer for a ArcGISREST service."""
-        try:
-            rjson = ar.retrieve([url], "json", [{"params": {"f": "json"}}])[0]
-            return {lyr["name"].lower(): lyr["id"] for lyr in rjson["layers"]}
-        except (JSONDecodeError, KeyError):
-            raise ServiceError(url)
-
-    def _init_service(self, url: str) -> ArcGISRESTful:
-        valid_layers = self.get_validlayers(url)
+    @service.setter
+    def service(self, value: str) -> None:
+        valid_layers = self.get_validlayers(value)
         if self.layer is None:
             raise InvalidInputType("layer", "str")
 
         if self.layer.lower() not in valid_layers:
             raise InvalidInputValue("layer", list(valid_layers))
 
-        return ArcGISRESTful(
-            url,
+        self._service = ArcGISRESTful(
+            value,
             valid_layers[self.layer.lower()],
             outformat="json",
             outfields=self.outfields,
             crs=self.crs,
         )
+
+    @staticmethod
+    def get_validlayers(url):
+        """Get valid layer for a ArcGISREST service."""
+        try:
+            rjson = ar.retrieve([url], "json", [{"params": {"f": "json"}}])[0]
+        except (JSONDecodeError, KeyError) as ex:
+            raise ServiceError(url) from ex
+        else:
+            return {lyr["name"].lower(): lyr["id"] for lyr in rjson["layers"]}
 
     def connect_to(self, service: str, service_list: Dict[str, str], auto_switch: bool) -> None:
         """Connect to a web service.
@@ -313,21 +312,21 @@ class AGRBase:
             Automatically switch to other services' URL if the first one doesn't work, default to False.
         """
         if service not in service_list:
-            raise InvalidInputValue("service", list(service_list.keys()))
+            raise InvalidInputValue("service", list(service_list))
 
         url = service_list.pop(service)
         try:
-            self.service = self._init_service(url)
-        except (ServiceError, ConnectionError):
+            self.service = url
+        except (ServiceError, ConnectionError) as ex:
             if not auto_switch:
-                raise ServiceError(url)
+                raise ServiceError(url) from ex
 
             while len(service_list) > 0:
                 next_service = next(iter(service_list.keys()))
                 logger.warning(f"Connection to {url} failed. Will try {next_service} next ...")
                 try:
                     url = service_list.pop(next_service)
-                    self.service = self._init_service(url)
+                    self.service = url
                     logger.info(f"Connected to {url}.")
                 except (ServiceError, ConnectionError):
                     continue
@@ -363,11 +362,7 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        self._check_service()
-
-        self.service.oids_bygeom(  # type: ignore
-            geom, geo_crs=geo_crs, sql_clause=sql_clause, distance=distance
-        )
+        self.service.oids_bygeom(geom, geo_crs=geo_crs, sql_clause=sql_clause, distance=distance)
         return self._getfeatures(return_m)
 
     def byids(
@@ -389,9 +384,7 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        self._check_service()
-
-        self.service.oids_byfield(field, fids)  # type: ignore
+        self.service.oids_byfield(field, fids)
         return self._getfeatures(return_m)
 
     def bysql(self, sql_clause: str, return_m: bool = False) -> gpd.GeoDataFrame:
@@ -414,9 +407,7 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        self._check_service()
-
-        self.service.oids_bysql(sql_clause)  # type: ignore
+        self.service.oids_bysql(sql_clause)
         return self._getfeatures(return_m)
 
     def _getfeatures(self, return_m: bool = False) -> gpd.GeoDataFrame:
@@ -432,10 +423,7 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        self._check_service()
-
-        resp = self.service.get_features(return_m)  # type: ignore
-        return geoutils.json2geodf(resp)
+        return geoutils.json2geodf(self.service.get_features(return_m))
 
 
 class NHDPlusHR(AGRBase):
@@ -712,7 +700,7 @@ class NLDI:
             NLDI indexed features in EPSG:4326.
         """
         if not (1 <= distance <= 9999):
-            raise InvalidInputRange("``distance`` should be between 1 to 9999.")
+            raise InvalidInputRange("distance", "[1, 9999]")
 
         self._validate_fsource(fsource)
 
@@ -786,7 +774,7 @@ class NLDI:
         """Check if the given feature source is valid."""
         if fsource not in self.valid_fsources:
             valids = [f'"{s}" for {d}' for s, d in self.valid_fsources.items()]
-            raise InvalidInputValue("feature source", valids)
+            raise InvalidInputValue("fsource", valids)
 
     def _get_urls(self, urls: Dict[Any, str]) -> Tuple[gpd.GeoDataFrame, List[str]]:
         """Get basins for a list of station IDs.
@@ -811,7 +799,7 @@ class NLDI:
                 not_found.append(f)
 
         if len(resp) == 0:
-            raise ZeroMatched("No feature was found with the provided inputs.")
+            raise ZeroMatched
 
         resp_df = gpd.GeoDataFrame(pd.concat(dict(resp)))
 
@@ -826,10 +814,10 @@ class NLDI:
 
         try:
             return ar.retrieve([url], "json", [{"params": payload}])[0]
-        except JSONDecodeError:
-            raise ZeroMatched("No feature was found with the provided inputs.")
-        except ConnectionError:
-            raise ServiceUnavailable(self.base_url)
+        except JSONDecodeError as ex:
+            raise ZeroMatched from ex
+        except ConnectionError as ex:
+            raise ServiceUnavailable(self.base_url) from ex
 
 
 class ScienceBase:
@@ -846,14 +834,14 @@ class ScienceBase:
     """
 
     def __init__(self, save_dir: Optional[str] = None) -> None:
-        self.save_dir = Path(save_dir) if save_dir else Path(tempfile.gettempdir())
-        if not self.save_dir.exists():
-            os.makedirs(self.save_dir)
+        self.save_dir = Path(save_dir) if save_dir else Path("cache")
+        self.save_dir.mkdir(parents=True, exist_ok=True)
 
         self.nhd_attr_item = "5669a79ee4b08895842a1d47"
         self.char_feather = Path(self.save_dir, "nhdplus_attrs.feather")
 
-    def get_children(self, item: str) -> Dict[str, Any]:
+    @staticmethod
+    def get_children(item: str) -> Dict[str, Any]:
         """Get children items of an item."""
         url = "https://www.sciencebase.gov/catalog/items"
         payload = {
@@ -863,7 +851,8 @@ class ScienceBase:
         }
         return ar.retrieve([url], "json", [{"params": payload}])[0]
 
-    def get_files(self, item: str) -> Dict[str, Tuple[str, str]]:
+    @staticmethod
+    def get_files(item: str) -> Dict[str, Tuple[str, str]]:
         """Get all the available zip files in an item."""
         url = "https://www.sciencebase.gov/catalog/item"
         payload = {"fields": "files,downloadUri", "format": "json"}
@@ -965,8 +954,8 @@ def nhdplus_attrs(name: Optional[str] = None, save_dir: Optional[str] = None) ->
 
     try:
         url = char_df[char_df.name == name].url.values[0]
-    except IndexError:
-        raise ValueError("The given characteristic name is not in the database.")
+    except IndexError as ex:
+        raise InvalidInputValue("name", char_df.name.unique()) from ex
 
     return pd.read_csv(url, compression="zip")
 

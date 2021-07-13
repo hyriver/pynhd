@@ -9,7 +9,8 @@ import pandas as pd
 from pandas._libs.missing import NAType
 from pygeoutils import InvalidInputType
 
-from .exceptions import MissingItems, ZeroMatched
+from .exceptions import MissingItems
+from .pynhd import logger
 
 
 def prepare_nhdplus(
@@ -77,8 +78,8 @@ def prepare_nhdplus(
     flw[req_cols] = flw[req_cols].astype("Int64")
 
     if not any(flw.terminalfl == 1):
-        if not len(flw.terminalpa.unique()) == 1:
-            raise ZeroMatched("Found no terminal flag in the dataframe.")
+        if len(flw.terminalpa.unique()) != 1:
+            logger.error("Found no terminal flag in the dataframe.")
 
         flw.loc[flw.hydroseq == flw.hydroseq.min(), "terminalfl"] = 1
 
@@ -279,8 +280,6 @@ def vector_accumulation(
     outflow = flowlines.set_index(id_col)[attr_col].to_dict()
 
     init = flowlines.iloc[0][attr_col]
-    if not isinstance(init, (np.ndarray, list, numbers.Number)):
-        raise InvalidInputType("values of attr_col", "a scalar or an array")
 
     if isinstance(init, numbers.Number):
         outflow["0"] = 0.0
