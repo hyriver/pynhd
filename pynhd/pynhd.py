@@ -795,7 +795,7 @@ class NLDI:
             try:
                 rjson = self._get_url(u)
                 resp.append((f, geoutils.json2geodf(rjson, ALT_CRS, DEF_CRS)))
-            except (ZeroMatched, InvalidInputType):
+            except (ZeroMatched, InvalidInputType, ar.ServiceError):
                 not_found.append(f)
 
         if len(resp) == 0:
