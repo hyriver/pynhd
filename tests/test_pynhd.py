@@ -90,12 +90,12 @@ class TestNLDI:
         assert abs(tot.CAT_BFI.values[0] - 57) < SMALL and prc.CAT_BFI.values[0] == 0
 
 
-def test_nhd_attrs():
-    meta = nhd.nhdplus_attrs(save_dir=".")
-    _ = nhd.nhdplus_attrs("RECHG", ".")
-    cat = nhd.nhdplus_attrs("RECHG", ".")
-    Path("nhdplus_attrs.feather").unlink()
-    assert abs(cat[cat.COMID > 0].CAT_RECHG.sum() - 143215331.64) < SMALL and len(meta) == 609
+# def test_nhd_attrs():
+#     meta = nhd.nhdplus_attrs(save_dir=".")
+#     _ = nhd.nhdplus_attrs("RECHG", ".")
+#     cat = nhd.nhdplus_attrs("RECHG", ".")
+#     Path("nhdplus_attrs.feather").unlink()
+#     assert abs(cat[cat.COMID > 0].CAT_RECHG.sum() - 143215331.64) < SMALL and len(meta) == 609
 
 
 class TestWaterData:
