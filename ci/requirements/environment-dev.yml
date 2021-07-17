@@ -39,6 +39,7 @@ dependencies:
 
   # py3dep
   - click
+  - scipy
   - richdem
 
   # pynhd deps
@@ -50,9 +51,6 @@ dependencies:
   - folium
   - lxml
   - matplotlib-base
-
-  # pydaymet deps
-  - scipy
 
   # optional deps to speed up xarray and geopandas
   - bottleneck
