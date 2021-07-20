@@ -127,10 +127,10 @@ def nhdplus_vaa(parquet_name: Optional[Union[Path, str]] = None) -> pd.DataFrame
         "roughness": "f8",
     }
 
-    url = (
-        "https://www.hydroshare.org/resource/6092c8a62fac45be97a09bfd0b0bf726"
-        + "/data/contents/nhdplusVAA.parquet"
-    )
+    rid = "6092c8a62fac45be97a09bfd0b0bf726"
+    fpath = "data/contents/nhdplusVAA.parquet"
+    url = f"https://www.hydroshare.org/hsapi/resource/{rid}/files/{fpath}"
+
     resp = ar.retrieve([url], "binary")
 
     vaa = pd.read_parquet(io.BytesIO(resp[0]))
