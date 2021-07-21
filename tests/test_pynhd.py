@@ -90,12 +90,13 @@ class TestNLDI:
         assert abs(tot.CAT_BFI.values[0] - 57) < SMALL and prc.CAT_BFI.values[0] == 0
 
 
-# def test_nhd_attrs():
-#     meta = nhd.nhdplus_attrs(save_dir=".")
-#     _ = nhd.nhdplus_attrs("RECHG", ".")
-#     cat = nhd.nhdplus_attrs("RECHG", ".")
-#     Path("nhdplus_attrs.feather").unlink()
-#     assert abs(cat[cat.COMID > 0].CAT_RECHG.sum() - 143215331.64) < SMALL and len(meta) == 609
+@pytest.mark.xfail
+def test_nhd_attrs():
+    meta = nhd.nhdplus_attrs(save_dir=".")
+    _ = nhd.nhdplus_attrs("RECHG", ".")
+    cat = nhd.nhdplus_attrs("RECHG", ".")
+    Path("nhdplus_attrs.feather").unlink()
+    assert abs(cat[cat.COMID > 0].CAT_RECHG.sum() - 143215331.64) < SMALL and len(meta) == 609
 
 
 class TestWaterData:
@@ -134,6 +135,7 @@ def test_nhdphr():
     assert flwb.shape[0] == 3887 and flwi["OBJECTID"].tolist() == flwf["OBJECTID"].tolist()
 
 
+@pytest.mark.xfail
 def test_nhdplus_vaa():
     fname = Path("nhdplus_vaa.parquet")
     vaa = nhd.nhdplus_vaa(fname)
