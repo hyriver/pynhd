@@ -90,7 +90,7 @@ class TestNLDI:
         assert abs(tot.CAT_BFI.values[0] - 57) < SMALL and prc.CAT_BFI.values[0] == 0
 
 
-@pytest.mark.xfail
+@pytest.mark.xfail(reason="Service is unstable.")
 def test_nhd_attrs():
     meta = nhd.nhdplus_attrs(save_dir=".")
     _ = nhd.nhdplus_attrs("RECHG", ".")
@@ -135,7 +135,7 @@ def test_nhdphr():
     assert flwb.shape[0] == 3887 and flwi["OBJECTID"].tolist() == flwf["OBJECTID"].tolist()
 
 
-@pytest.mark.xfail
+@pytest.mark.xfail(reason="Service is unstable.")
 def test_nhdplus_vaa():
     fname = Path("nhdplus_vaa.parquet")
     vaa = nhd.nhdplus_vaa(fname)
