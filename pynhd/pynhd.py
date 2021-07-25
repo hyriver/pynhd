@@ -640,7 +640,7 @@ class NLDI:
             payload = {"characteristicId": ",".join(_char_ids)}
 
         for comid in comids:
-            url = "/".join([self.base_url, "linked-data", "comid", comid, char_type])
+            url = "/".join([self.base_url, "linked-data", "comid", f"{comid}", char_type])
             rjson = self._get_url(url, payload)
             char = pd.DataFrame.from_dict(rjson["characteristics"], orient="columns").T
             char.columns = char.iloc[0]
