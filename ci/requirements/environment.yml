@@ -45,7 +45,6 @@ dependencies:
   - bottleneck
 
   # test deps
-  - nox
   - pre-commit
   - psutil
   - pytest
