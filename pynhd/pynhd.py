@@ -119,8 +119,8 @@ class PyGeoAPI:
         >>> from pynhd import PyGeoAPI
         >>> pygeoapi = PyGeoAPI()
         >>> gdf = pygeoapi.flow_trace(
-            (1774209.63, 856381.68), crs="ESRI:102003", raindrop=False, direction="none"
-        )
+        ...     (1774209.63, 856381.68), crs="ESRI:102003", raindrop=False, direction="none"
+        ... )
         >>> print(gdf.comid.iloc[0])
         22294818
         """
@@ -159,7 +159,7 @@ class PyGeoAPI:
         >>> pygeoapi = PyGeoAPI()
         >>> gdf = pygeoapi.split_catchment((-73.82705, 43.29139), crs=DEF_CRS, upstream=False)
         >>> print(gdf.catchmentID.iloc[0])
-        '22294818'
+        22294818
         """
         _coord = self._check_coords(coord, crs)
         url = self._get_url("splitcatchment")
@@ -196,8 +196,8 @@ class PyGeoAPI:
         >>> from pynhd import PyGeoAPI
         >>> pygeoapi = PyGeoAPI()
         >>> gdf = pygeoapi.elevation_profile(
-            [(-103.801086, 40.26772), (-103.80097, 40.270568)], numpts=101, dem_res=1, crs=DEF_CRS
-        )
+        ...     [(-103.801086, 40.26772), (-103.80097, 40.270568)], numpts=101, dem_res=1, crs=DEF_CRS
+        ... )
         >>> print(gdf.iloc[-1, 1])
         411.5906
         """
