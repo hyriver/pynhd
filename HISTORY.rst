@@ -2,6 +2,15 @@
 History
 =======
 
+0.11.1 (2021-08-26)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Add support for `PyGeoAPI <https://labs.waterdata.usgs.gov/api/nldi/pygeoapi>`__. It offers
+  four functionalities: ``flow_trace``, ``split_catchment``, ``elevation_profile``, and
+  ``cross_section``.
+
 0.11.1 (2021-07-31)
 -------------------
 
