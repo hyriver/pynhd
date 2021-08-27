@@ -6,7 +6,7 @@ import pytest
 from shapely.geometry import box
 
 import pynhd as nhd
-from pynhd import NLDI, AGRBase, WaterData
+from pynhd import NLDI, AGRBase, PyGeoAPI, WaterData
 
 STA_ID = "01031500"
 station_id = f"USGS-{STA_ID}"
@@ -14,6 +14,7 @@ site = "nwissite"
 UM = "upstreamMain"
 UT = "upstreamTributaries"
 SMALL = 1e-3
+DEF_CRS = "epsg:4326"
 
 
 @pytest.fixture
@@ -23,7 +24,7 @@ def comids():
 
 class NHDPlusEPA(AGRBase):
     def __init__(self, layer):
-        super().__init__(layer, "*", "epsg:4326")
+        super().__init__(layer, "*", DEF_CRS)
         self.service = "https://watersgeo.epa.gov/arcgis/rest/services/NHDPlus/NHDPlus/MapServer"
 
 
@@ -39,6 +40,32 @@ def test_agr():
         geom, geo_crs="epsg:4269", sql_clause="FTYPE NOT IN (420,428,566)", distance=1500
     )
     assert abs(df.LENGTHKM.sum() - 8.917) < SMALL
+
+
+class TestPyGeoAPI:
+    pygeoapi = PyGeoAPI()
+
+    def test_flowtrace(self):
+        gdf = self.pygeoapi.flow_trace(
+            (1774209.63, 856381.68), crs="ESRI:102003", raindrop=False, direction="none"
+        )
+        assert gdf.comid.iloc[0] == 22294818
+
+    def test_splitcatchment(self):
+        gdf = self.pygeoapi.split_catchment((-73.82705, 43.29139), crs=DEF_CRS, upstream=False)
+        assert gdf.catchmentID.iloc[0] == "22294818"
+
+    def test_elevation_profile(self):
+        gdf = self.pygeoapi.elevation_profile(
+            [(-103.801086, 40.26772), (-103.80097, 40.270568)], numpts=101, dem_res=1, crs=DEF_CRS
+        )
+        assert abs(gdf.iloc[-1, 1] - 411.5906) < SMALL
+
+    def test_cross_section(self):
+        gdf = self.pygeoapi.cross_section(
+            (-103.80119, 40.2684), width=1000.0, numpts=101, crs=DEF_CRS
+        )
+        assert abs(gdf.iloc[-1, 1] - 1000.0) < SMALL
 
 
 class TestNLDI:
