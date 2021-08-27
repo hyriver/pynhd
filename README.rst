@@ -109,7 +109,8 @@ is designed to aid in watershed analysis through web services.
 This package provides access to
 `WaterData <https://labs.waterdata.usgs.gov/geoserver/web/wicket/bookmarkable/org.geoserver.web.demo.MapPreviewPage?1>`__,
 the National Map's `NHDPlus HR <https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer>`__,
-and `NLDI <https://labs.waterdata.usgs.gov/about-nldi/>`_ web services. These web services
+`NLDI <https://labs.waterdata.usgs.gov/about-nldi/>`__,
+and `PyGeoAPI <https://labs.waterdata.usgs.gov/api/nldi/pygeoapi>`__ web services. These web services
 can be used to navigate and extract vector data from NHDPlus V2 (both medium- and
 hight-resolution) database such as catchments, HUC8, HUC12, GagesII, flowlines, and water bodies.
 Moreover, PyNHD gives access to an item on `ScienceBase <https://sciencebase.usgs.gov>`_ called
@@ -120,6 +121,13 @@ These attributes are available in three categories:
 1. Local (`local`): For individual reach catchments,
 2. Total (`upstream_acc`): For network-accumulated values using total cumulative drainage area,
 3. Divergence (`div_routing`): For network-accumulated values using divergence-routed.
+
+Moreover, the PyGeoAPI service provides four functionalities:
+
+1. ``flow_trace``: Trace flow from a starting point to up/downstream direction.
+2. ``split_catchment``: Split the local catchment of a point of interest at the point's location.
+3. ``elevation_profile``: Extract elevation profile along a flow path between two points.
+4. ``cross_section``: Extract cross-section at a point of interest along a flow line.
 
 A list of these attributes for each characteristic type can be accessed using ``nhdplus_attrs``
 function.
@@ -264,6 +272,24 @@ Also, we can get the slope data for each river segment from NHDPlus VAA database
         crs=flw_trib.crs,
     )
     slope[slope.slope < 0] = np.nan
+
+Now, let's explore the PyGeoAPI capabilities:
+
+.. code:: python
+
+    pygeoapi = PyGeoAPI()
+
+    trace = pygeoapi.flow_trace(
+        (1774209.63, 856381.68), crs="ESRI:102003", raindrop=False, direction="none"
+    )
+
+    split = pygeoapi.split_catchment((-73.82705, 43.29139), crs="epsg:4326", upstream=False)
+
+    profile = pygeoapi.elevation_profile(
+        [(-103.801086, 40.26772), (-103.80097, 40.270568)], numpts=101, dem_res=1, crs="epsg:4326"
+    )
+
+    section = pygeoapi.cross_section((-103.80119, 40.2684), width=1000.0, numpts=101, crs="epsg:4326")
 
 Next, we retrieve the medium- and high-resolution flowlines within the bounding box of our
 watershed and compare them. Moreover, Since several web services offer access to NHDPlus database,
