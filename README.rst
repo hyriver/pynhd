@@ -291,6 +291,11 @@ Now, let's explore the PyGeoAPI capabilities:
 
     section = pygeoapi.cross_section((-103.80119, 40.2684), width=1000.0, numpts=101, crs="epsg:4326")
 
+.. image:: https://raw.githubusercontent.com/cheginit/HyRiver-examples/main/notebooks/_static/split_catchment.png
+    :target: https://github.com/cheginit/HyRiver-examples/blob/main/notebooks/pygeoapi.ipynb
+    :width: 400
+    :align: center
+
 Next, we retrieve the medium- and high-resolution flowlines within the bounding box of our
 watershed and compare them. Moreover, Since several web services offer access to NHDPlus database,
 ``NHDPlusHR`` has an argument for selecting a service and also an argument for automatically
