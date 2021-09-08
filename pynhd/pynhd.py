@@ -930,9 +930,10 @@ class NLDI:
         if source not in valid_sources:
             raise InvalidInputValue("source", list(valid_sources.keys()))
 
-        url = f"{valid_sources[source]}?distance={int(distance)}"
+        url = valid_sources[source]
+        payload = {"distance": int(distance)}
 
-        return geoutils.json2geodf(self._get_url(url), ALT_CRS, DEF_CRS)
+        return geoutils.json2geodf(self._get_url(url, payload), ALT_CRS, DEF_CRS)
 
     def navigate_byloc(
         self,
