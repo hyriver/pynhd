@@ -931,7 +931,7 @@ class NLDI:
             raise InvalidInputValue("source", list(valid_sources.keys()))
 
         url = valid_sources[source]
-        payload = {"distance": int(distance)}
+        payload = {"distance": f"{int(distance)}"}
 
         return geoutils.json2geodf(self._get_url(url, payload), ALT_CRS, DEF_CRS)
 
