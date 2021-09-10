@@ -5,10 +5,10 @@ History
 0.11.3 (2021-09-10)
 -------------------
 
-Bug Fixes
-~~~~~~~~~
-- Fix an issue in ``NLDI.navigate_byid`` that adds an extra ``distance`` keyword
-  to the request, leading to failed response.
+Internal Changes
+~~~~~~~~~~~~~~~~
+- More robust handling of inputs and outputs of ``NLDI``'s methods.
+- Use an alternative download link for NHDPlus VAA file on Hydroshare.
 
 0.11.2 (2021-08-26)
 -------------------
