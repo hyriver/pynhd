@@ -25,7 +25,6 @@ dependencies:
   - requests
   - requests-cache
   - shapely
-  - simplejson
   - urllib3
 
   # pygeoutils deps
