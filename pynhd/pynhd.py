@@ -5,7 +5,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 import async_retriever as ar
 import cytoolz as tlz
@@ -27,7 +27,6 @@ from pygeoogc import (
 from pygeoutils import InvalidInputType
 from requests import Response
 from shapely.geometry import MultiPolygon, Polygon
-from simplejson import JSONDecodeError
 
 from .exceptions import InvalidInputRange, MissingItems
 
@@ -334,7 +333,7 @@ def nhdplus_vaa(parquet_name: Optional[Union[Path, str]] = None) -> pd.DataFrame
 
     rid = "6092c8a62fac45be97a09bfd0b0bf726"
     fpath = "data/contents/nhdplusVAA.parquet"
-    url = f"https://www.hydroshare.org/hsapi/resource/{rid}/files/{fpath}"
+    url = f"https://www.hydroshare.org/resource/{rid}/{fpath}"
 
     resp = ar.retrieve([url], "binary")
 
@@ -507,8 +506,8 @@ class AGRBase:
         """Get valid layer for a ArcGISREST service."""
         try:
             rjson = ar.retrieve([url], "json", [{"params": {"f": "json"}}])[0]
-        except (JSONDecodeError, KeyError) as ex:
-            raise ServiceError(url) from ex
+        except (ar.ServiceError, KeyError) as ex:
+            raise ar.ServiceError(url) from ex
         else:
             return {lyr["name"].lower(): lyr["id"] for lyr in rjson["layers"]}
 
@@ -724,7 +723,7 @@ class NLDI:
         """
         self._validate_fsource(fsource)
         fid = fid if isinstance(fid, list) else [fid]
-        urls = {f: "/".join([self.base_url, "linked-data", fsource, f]) for f in fid}
+        urls = {f: ("/".join([self.base_url, "linked-data", fsource, f]), None) for f in fid}
         features, not_found = self._get_urls(urls)
 
         if len(not_found) > 0:
@@ -753,16 +752,26 @@ class NLDI:
             NLDI indexed ComID(s) in EPSG:4326. If some coords don't return any ComID
             a list of missing coords are returned as well.
         """
-        coords_list = coords if isinstance(coords, list) else [coords]
-        coords_list = ogc.utils.match_crs(coords_list, loc_crs, DEF_CRS)
+        _coords = [coords] if isinstance(coords, tuple) else coords
+
+        if not isinstance(_coords, list) or any(len(c) != 2 for c in _coords):
+            raise InvalidInputType("coords", "list or tuple")
+
+        _coords = ogc.utils.match_crs(_coords, loc_crs, DEF_CRS)
 
         base_url = "/".join([self.base_url, "linked-data", "comid", "position"])
-        urls = {(lon, lat): f"{base_url}?coords=POINT({lon} {lat})" for lon, lat in coords_list}
+        urls = {
+            f"{(lon, lat)}": (base_url, {"coords": f"POINT({lon} {lat})"}) for lon, lat in _coords
+        }
         comids, not_found = self._get_urls(urls)
-        comids = comids.reset_index(level=2, drop=True)
+
+        if len(comids) == 0:
+            raise ZeroMatched
+
+        comids = comids.reset_index(drop=True)
 
         if len(not_found) > 0:
-            self._missing_warning(len(not_found), len(coords_list))
+            self._missing_warning(len(not_found), len(_coords))
             return comids, not_found
 
         return comids
@@ -784,7 +793,9 @@ class NLDI:
             a list of missing ID(s) are returned as well.
         """
         station_ids = station_ids if isinstance(station_ids, list) else [station_ids]
-        urls = {s: f"{self.base_url}/linked-data/nwissite/USGS-{s}/basin" for s in station_ids}
+        urls = {
+            s: (f"{self.base_url}/linked-data/nwissite/USGS-{s}/basin", None) for s in station_ids
+        }
         basins, not_found = self._get_urls(urls)
         basins = basins.reset_index(level=1, drop=True)
         basins.index.rename("identifier", inplace=True)
@@ -971,13 +982,9 @@ class NLDI:
         """
         if not (isinstance(coords, tuple) and len(coords) == 2):
             raise InvalidInputType("coods", "tuple of length 2", "(x, y)")
-
-        lon, lat = ogc.utils.match_crs([coords], loc_crs, DEF_CRS)[0]
-
-        url = "/".join([self.base_url, "linked-data", "comid", "position"])
-        payload = {"coords": f"POINT({lon} {lat})"}
-        rjson = self._get_url(url, payload)
-        comid = geoutils.json2geodf(rjson, ALT_CRS, DEF_CRS).comid.iloc[0]
+        resp = self.comid_byloc(coords, loc_crs)
+        comid_df = resp[0] if isinstance(resp, tuple) else resp
+        comid = comid_df.comid.iloc[0]
 
         if navigation is None or source is None:
             raise MissingItems(["navigation", "source"])
@@ -990,13 +997,15 @@ class NLDI:
             valids = [f'"{s}" for {d}' for s, d in self.valid_fsources.items()]
             raise InvalidInputValue("fsource", valids)
 
-    def _get_urls(self, urls: Dict[Any, str]) -> Tuple[gpd.GeoDataFrame, List[str]]:
+    def _get_urls(
+        self, urls: Mapping[Any, Tuple[str, Optional[Dict[str, str]]]]
+    ) -> Tuple[gpd.GeoDataFrame, List[str]]:
         """Get basins for a list of station IDs.
 
         Parameters
         ----------
         urls : dict
-            A dict with keys as feature ids and values as corresponding url.
+            A dict with keys as feature ids and values as corresponding url and payload.
 
         Returns
         -------
@@ -1005,9 +1014,9 @@ class NLDI:
         """
         not_found = []
         resp = []
-        for f, u in urls.items():
+        for f, (u, p) in urls.items():
             try:
-                rjson = self._get_url(u)
+                rjson = self._get_url(u, p)
                 resp.append((f, geoutils.json2geodf(rjson, ALT_CRS, DEF_CRS)))
             except (ZeroMatched, InvalidInputType, ar.ServiceError):
                 not_found.append(f)
@@ -1028,7 +1037,7 @@ class NLDI:
 
         try:
             return ar.retrieve([url], "json", [{"params": payload}])[0]
-        except JSONDecodeError as ex:
+        except ar.ServiceError as ex:
             raise ZeroMatched from ex
         except ConnectionError as ex:
             raise ServiceUnavailable(self.base_url) from ex
