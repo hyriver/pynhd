@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  # async_retriever
+  # async_retriever deps
   - aiodns
   - aiohttp
   - aiohttp-client-cache
