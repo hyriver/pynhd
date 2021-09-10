@@ -2,6 +2,14 @@
 History
 =======
 
+0.11.3 (2021-09-10)
+-------------------
+
+Bug Fixes
+~~~~~~~~~
+- Fix an issue in ``NLDI.navigate_byid`` that adds an extra ``distance`` keyword
+  to the request, leading to failed response.
+
 0.11.2 (2021-08-26)
 -------------------
 
