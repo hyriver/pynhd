@@ -53,8 +53,11 @@ class PyGeoAPI:
         url: str, payload: Dict[str, Dict[str, List[Dict[str, Any]]]]
     ) -> gpd.GeoDataFrame:
         """Post the request and return the response as GeoDataFrame."""
-        resp = ar.retrieve([url], "json", [payload], "POST")
-        return geoutils.json2geodf(resp[0]["outputs"])
+        resp = ar.retrieve([url], "json", [payload], "POST")[0]
+        try:
+            return geoutils.json2geodf(resp["outputs"])
+        except KeyError as ex:
+            raise ar.ServiceError(resp) from ex
 
     @staticmethod
     def _check_coords(
