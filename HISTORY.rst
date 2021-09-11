@@ -2,6 +2,13 @@
 History
 =======
 
+0.11.4 (unreleased)
+-------------------
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Catch service errors in ``PyGeoAPI`` and show useful error messages.
+
 0.11.3 (2021-09-10)
 -------------------
 
