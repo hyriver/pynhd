@@ -11,11 +11,7 @@ import cytoolz as tlz
 import geopandas as gpd
 import pandas as pd
 import pygeoutils as geoutils
-from pygeoogc import (
-    ArcGISRESTful,
-    InvalidInputValue,
-    ServiceError
-)
+from pygeoogc import ArcGISRESTful, InvalidInputValue, ServiceError
 from pygeoutils import InvalidInputType
 from shapely.geometry import Polygon
 

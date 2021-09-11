@@ -1,14 +1,12 @@
 """Access NLDI and WaterData databases."""
 import io
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Union
 
 import async_retriever as ar
 import pandas as pd
-from pygeoogc import (
-    InvalidInputValue
-)
+from pygeoogc import InvalidInputValue
+
 from .core import ScienceBase
 
 
