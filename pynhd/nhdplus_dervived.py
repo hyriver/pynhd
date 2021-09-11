@@ -33,8 +33,8 @@ def nhdplus_vaa(parquet_name: Optional[Union[Path, str]] = None) -> pd.DataFrame
 
     Examples
     --------
-    >>> vaa = nhdplus_vaa()
-    >>> print(vaa.slope.max())
+    >>> vaa = nhdplus_vaa() # doctest: +SKIP
+    >>> print(vaa.slope.max()) # doctest: +SKIP
     4.6
     """
     if parquet_name is None:
