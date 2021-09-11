@@ -8,7 +8,7 @@ dependencies:
   # async_retriever
   - aiodns
   - aiohttp
-  - aiohttp-client-cache
+  - aiohttp-client-cache>=0.5.1
   - aiosqlite
   - brotlipy
   - cchardet
