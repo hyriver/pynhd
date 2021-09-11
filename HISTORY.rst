@@ -9,6 +9,11 @@ Internal Changes
 ~~~~~~~~~~~~~~~~
 - More robust handling of inputs and outputs of ``NLDI``'s methods.
 - Use an alternative download link for NHDPlus VAA file on Hydroshare.
+- Restructure the code base to reduce the complexity of ``pynhd.py`` file
+  by dividing it into three files: ``pynhd`` all classes that provide access
+  to the supported web services, ``core`` that includes base classes, and
+  ``nhdplus_derived`` that has functions for getting databases that provided
+  additional attributes for the NHDPlus database.
 
 0.11.2 (2021-08-26)
 -------------------
