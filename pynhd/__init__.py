@@ -1,6 +1,4 @@
 """Top-level package for PyNHD."""
-from pkg_resources import DistributionNotFound, get_distribution
-
 from .core import AGRBase
 from .exceptions import InvalidInputRange, MissingItems
 from .network_tools import prepare_nhdplus, topoogical_sort, vector_accumulation
@@ -9,8 +7,13 @@ from .print_versions import show_versions
 from .pynhd import NLDI, NHDPlusHR, PyGeoAPI, WaterData
 
 try:
-    __version__ = get_distribution(__name__).version
-except DistributionNotFound:
+    import importlib.metadata as metadata
+except ImportError:
+    import importlib_metadata as metadata  # type: ignore[no-redef]
+
+try:
+    __version__ = metadata.version("async_retriever")
+except Exception:
     __version__ = "999"
 
 __all__ = [
