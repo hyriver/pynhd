@@ -43,7 +43,6 @@ dependencies:
   - bottleneck
 
   # test deps
-  - pre-commit
   - psutil
   - pytest
   - pytest-clarity
