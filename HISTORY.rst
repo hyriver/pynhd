@@ -2,8 +2,13 @@
 History
 =======
 
-0.11.4 (2021-11-09)
+0.11.4 (2021-11-12)
 -------------------
+
+New Features
+~~~~~~~~~~~~
+- Add a new argument to ``NLDI.get_basins`` called ``split_catchment`` which
+  if set to ``True`` will split the basin geometry at the watershed outlet.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
