@@ -491,7 +491,9 @@ class NLDI:
         return comids
 
     def get_basins(
-        self, station_ids: Union[str, List[str]]
+        self,
+        station_ids: Union[str, List[str]],
+        split_catchment: bool = False,
     ) -> Union[gpd.GeoDataFrame, Tuple[gpd.GeoDataFrame, List[str]]]:
         """Get basins for a list of station IDs.
 
@@ -499,6 +501,8 @@ class NLDI:
         ----------
         station_ids : str or list
             USGS station ID(s).
+        split_catchment : bool, optional
+            If True, split the basin at the watershed outlet location. Default to False.
 
         Returns
         -------
@@ -507,8 +511,10 @@ class NLDI:
             a list of missing ID(s) are returned as well.
         """
         station_ids = station_ids if isinstance(station_ids, list) else [station_ids]
+        payload = {"splitCatchment": "true"} if split_catchment else None
         urls = {
-            s: (f"{self.base_url}/linked-data/nwissite/USGS-{s}/basin", None) for s in station_ids
+            s: (f"{self.base_url}/linked-data/nwissite/USGS-{s}/basin", payload)
+            for s in station_ids
         }
         basins, not_found = self._get_urls(urls)
         basins = basins.reset_index(level=1, drop=True)
