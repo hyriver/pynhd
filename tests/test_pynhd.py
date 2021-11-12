@@ -104,7 +104,8 @@ class TestNLDI:
     def test_basin(self):
         eck4 = "+proj=eck4 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=km"
         basin = self.nldi.get_basins(STA_ID).to_crs(eck4)
-        assert abs(basin.area.values[0] - 774.170) < SMALL
+        split = self.nldi.get_basins(STA_ID, split_catchment=True).to_crs(eck4)
+        assert abs((split.area.values[0] - basin.area.values[0]) - 1.824) < SMALL
 
     def test_basin_missing(self):
         _, missing = self.nldi.get_basins([STA_ID, "00000000"])
