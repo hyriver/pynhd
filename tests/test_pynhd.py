@@ -18,8 +18,10 @@ DEF_CRS = "epsg:4326"
 
 
 @pytest.fixture
-def comids():
-    return NLDI().navigate_byid(site, station_id, UT, "flowlines")
+def trib():
+    comids = NLDI().navigate_byid(site, station_id, UT, "flowlines")
+    wd = WaterData("nhdflowline_network")
+    return wd.byid("comid", comids.nhdplus_comid.tolist())
 
 
 class NHDPlusEPA(AGRBase):
@@ -118,24 +120,22 @@ class TestNLDI:
         assert abs(tot.CAT_BFI.values[0] - 57) < SMALL and prc.CAT_BFI.values[0] == 0
 
 
-@pytest.mark.xfail(reason="Service is unstable.")
+@pytest.mark.xfail(reason="ScienceBase is unstable.")
 def test_nhd_attrs():
-    meta = nhd.nhdplus_attrs(save_dir=".")
-    _ = nhd.nhdplus_attrs("RECHG", ".")
-    cat = nhd.nhdplus_attrs("RECHG", ".")
-    Path("nhdplus_attrs.feather").unlink()
+    meta = nhd.nhdplus_attrs(parquet_path="nhdplus_attrs.parquet")
+    _ = nhd.nhdplus_attrs("RECHG")
+    cat = nhd.nhdplus_attrs("RECHG")
+    Path("nhdplus_attrs.parquet").unlink()
     assert abs(cat[cat.COMID > 0].CAT_RECHG.sum() - 143215331.64) < SMALL and len(meta) == 609
 
 
 class TestWaterData:
-    def test_byid_flw(self, comids):
-        wd = WaterData("nhdflowline_network")
-        trib = wd.byid("comid", comids.nhdplus_comid.tolist())
+    def test_byid_flw(self, trib):
         assert trib.shape[0] == 432 and abs(trib.lengthkm.sum() - 565.755) < SMALL
 
-    def test_byid(self, comids):
+    def test_byid(self, trib):
         wd = WaterData("catchmentsp")
-        ct = wd.byid("featureid", comids.nhdplus_comid.tolist())
+        ct = wd.byid("featureid", trib.comid.tolist())
         assert abs(ct.areasqkm.sum() - 773.954) < SMALL
 
     def test_bybox(self):
@@ -163,7 +163,7 @@ def test_nhdphr():
     assert flwb.shape[0] == 3887 and flwi["OBJECTID"].tolist() == flwf["OBJECTID"].tolist()
 
 
-@pytest.mark.xfail(reason="Service is unstable.")
+@pytest.mark.xfail(reason="Hydroshare is unstable.")
 def test_nhdplus_vaa():
     fname = Path("nhdplus_vaa.parquet")
     vaa = nhd.nhdplus_vaa(fname)
@@ -171,13 +171,17 @@ def test_nhdplus_vaa():
     assert abs(vaa.slope.max() - 4.6) < SMALL
 
 
-def test_acc(comids):
-    wd = WaterData("nhdflowline_network")
-    comid_list = comids.nhdplus_comid.tolist()
-    trib = wd.byid("comid", comid_list)
+def test_use_enhd(trib):
+    org_attrs = nhd.prepare_nhdplus(trib, 0, 0, 0, use_enhd_attrs=False)
+    enhd_attrs_na = nhd.prepare_nhdplus(trib, 0, 0, 0, use_enhd_attrs=False, terminal2nan=False)
+    enhd_attrs = nhd.prepare_nhdplus(trib, 0, 0, 0, use_enhd_attrs=True, terminal2nan=True)
+    assert (enhd_attrs.tocomid != org_attrs.tocomid).sum() and (
+        enhd_attrs_na.tocomid != enhd_attrs.tocomid
+    ).sum()
 
-    nhd.prepare_nhdplus(trib, 0, 0, 0, False, False)
-    flw = nhd.prepare_nhdplus(trib, 1, 1, 1, True, True)
+
+def test_acc(trib):
+    flw = nhd.prepare_nhdplus(trib, 1, 1, 1, purge_non_dendritic=True, verbose=True)
 
     def routing(qin, q):
         return qin + q
