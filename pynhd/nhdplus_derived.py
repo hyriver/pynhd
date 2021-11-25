@@ -7,10 +7,48 @@ import async_retriever as ar
 import pandas as pd
 from pygeoogc import InvalidInputValue
 
-from .core import ScienceBase
+from .core import ScienceBase, get_parquet, stage_nhdplus_attrs
+
+__all__ = ["enhd_attrs", "nhdplus_vaa", "nhdplus_attrs", "nhd_fcode"]
 
 
-def nhdplus_vaa(parquet_name: Optional[Union[Path, str]] = None) -> pd.DataFrame:
+def enhd_attrs(parquet_path: Optional[Union[Path, str]] = None) -> pd.DataFrame:
+    """Get updated NHDPlus attributes from ENHD.
+
+    Notes
+    -----
+    This downloads a 330 MB ``csv`` file from
+    `here <https://www.sciencebase.gov/catalog/item/60c92503d34e86b9389df1c9>`__ .
+    This dataframe does not include geometry.
+
+    Parameters
+    ----------
+    parquet_path : str or Path
+        Path to a file with ``.parquet`` extension for saving the processed to disk for
+        later use.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A dataframe that includes ComID-level attributes for 2.7 million NHDPlus flowlines.
+    """
+    if parquet_path is None:
+        output = get_parquet(Path("cache", "enhd_attrs.parquet"))
+    else:
+        output = get_parquet(parquet_path)
+
+    if output.exists():
+        return pd.read_parquet(output)
+
+    sb = ScienceBase()
+    files = sb.get_file_urls("60c92503d34e86b9389df1c9")
+    resp = ar.retrieve([files.loc["enhd_nhdplusatts.csv"].url], "text")
+    enhd_attrs = pd.read_csv(io.StringIO(resp[0]))
+    enhd_attrs.to_parquet(output)
+    return enhd_attrs
+
+
+def nhdplus_vaa(parquet_path: Optional[Union[Path, str]] = None) -> pd.DataFrame:
     """Get NHDPlus Value Added Attributes with ComID-level roughness and slope values.
 
     Notes
@@ -22,7 +60,7 @@ def nhdplus_vaa(parquet_name: Optional[Union[Path, str]] = None) -> pd.DataFrame
 
     Parameters
     ----------
-    parquet_name : str or Path
+    parquet_path : str or Path
         Path to a file with ``.parquet`` extension for saving the processed to disk for
         later use.
 
@@ -37,14 +75,10 @@ def nhdplus_vaa(parquet_name: Optional[Union[Path, str]] = None) -> pd.DataFrame
     >>> print(vaa.slope.max()) # doctest: +SKIP
     4.6
     """
-    if parquet_name is None:
-        output = Path("cache", "nhdplus_vaa.parquet")
+    if parquet_path is None:
+        output = get_parquet(Path("cache", "nldplus_vaa.parquet"))
     else:
-        if ".parquet" not in str(parquet_name):
-            raise InvalidInputValue("parquet_name", ["a filename with `.parquet` extension."])
-
-        output = Path(parquet_name)
-    output.parent.mkdir(parents=True, exist_ok=True)
+        output = get_parquet(parquet_path)
 
     if output.exists():
         return pd.read_parquet(output)
@@ -109,7 +143,9 @@ def nhdplus_vaa(parquet_name: Optional[Union[Path, str]] = None) -> pd.DataFrame
     return vaa
 
 
-def nhdplus_attrs(name: Optional[str] = None, save_dir: Optional[str] = None) -> pd.DataFrame:
+def nhdplus_attrs(
+    name: Optional[str] = None, parquet_path: Optional[Union[Path, str]] = None
+) -> pd.DataFrame:
     """Access NHDPlus V2.1 Attributes from ScienceBase over CONUS.
 
     More info can be found `here <https://www.sciencebase.gov/catalog/item/5669a79ee4b08895842a1d47>`_.
@@ -119,21 +155,19 @@ def nhdplus_attrs(name: Optional[str] = None, save_dir: Optional[str] = None) ->
     name : str, optional
         Name of the NHDPlus attribute, defaults to None which returns a dataframe containing
         metadata of all the available attributes in the database.
-    save_dir : str, optional
-        Directory to save the staged data frame containing metadata for the database,
-        defaults to system's temp directory. The metadata dataframe is saved as a feather
-        file, nhdplus_attrs.feather, in save_dir that can be loaded with Pandas.
+    parquet_path : str or Path, optional
+        Path to a file with ``.parquet`` extension for saving the processed to disk for
+        later use. Defaults to ``./cache/nhdplus_attrs.parquet``.
 
     Returns
     -------
     pandas.DataFrame
         Either a dataframe containing the database metadata or the requested attribute over CONUS.
     """
-    sb = ScienceBase(save_dir)
-    if sb.char_feather.exists():
-        char_df = pd.read_feather(sb.char_feather)
+    if parquet_path is not None and Path(parquet_path).exists():
+        char_df = pd.read_parquet(parquet_path)
     else:
-        char_df = sb.stage_data()
+        char_df = stage_nhdplus_attrs(parquet_path)
 
     if name is None:
         return char_df
