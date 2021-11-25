@@ -9,8 +9,11 @@ import pandas as pd
 from pandas._libs.missing import NAType
 from pygeoutils import InvalidInputType
 
+from . import nhdplus_derived as derived
+from .core import logger
 from .exceptions import MissingItems
-from .pynhd import logger
+
+__all__ = ["prepare_nhdplus", "topoogical_sort", "vector_accumulation"]
 
 
 def prepare_nhdplus(
@@ -20,6 +23,8 @@ def prepare_nhdplus(
     min_path_size: float = 0,
     purge_non_dendritic: bool = False,
     verbose: bool = False,
+    use_enhd_attrs: bool = False,
+    terminal2nan: bool = True,
 ) -> gpd.GeoDataFrame:
     """Clean up and fix common issues of NHDPlus flowline database.
 
@@ -44,6 +49,14 @@ def prepare_nhdplus(
         Whether to remove non dendritic paths, defaults to False
     verbose : bool, optional
         Whether to show a message about the removed features, defaults to True.
+    use_enhd_attrs : bool, optional
+        Whether to replace the attributes with the ENHD attributes, defaults to False.
+        For more information, see
+        `this <https://www.sciencebase.gov/catalog/item/60c92503d34e86b9389df1c9>`__.
+    terminal2nan : bool, optional
+        Whether to replace the COMID of the terminal flowline of the network with NaN,
+        defaults to True. If False, the terminal COMID will be set from the
+        ENHD attributes i.e. use_enhd_attrs will be set to True.
 
     Returns
     -------
@@ -55,6 +68,15 @@ def prepare_nhdplus(
 
     if not ("fcode" in flw and "ftype" in flw):
         raise MissingItems(["fcode", "ftype"])
+
+    if use_enhd_attrs or not terminal2nan:
+        if not terminal2nan and not use_enhd_attrs:
+            logger.info("The use_enhd_attrs is set to True, so all attrs will be updated.")
+        enhd_attrs = derived.enhd_attrs()
+        flw["tocomid"] = flw["comid"].astype("Int64")
+        flw = flw.reset_index().set_index("comid")
+        flw.update(enhd_attrs.set_index("comid"))
+        flw = flw.reset_index().set_index("index")
 
     if "fcode" in flw:
         flw = flw[flw["fcode"] != 56600]
@@ -93,7 +115,7 @@ def prepare_nhdplus(
     if verbose:
         print(f"Removed {nrows - flw.shape[0]} segments from the flowlines.")
 
-    if flw.shape[0] > 0:
+    if flw.shape[0] > 0 and ("tocomid" not in flw or terminal2nan):
         flw = _add_tocomid(flw)
 
     return flw
