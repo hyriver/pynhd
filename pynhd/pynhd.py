@@ -1,6 +1,4 @@
 """Access NLDI and WaterData databases."""
-import logging
-import sys
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 import async_retriever as ar
@@ -15,17 +13,8 @@ from pygeoutils import InvalidInputType
 from requests import Response
 from shapely.geometry import MultiPolygon, Polygon
 
-from .core import AGRBase
+from .core import ALT_CRS, DEF_CRS, AGRBase, logger
 from .exceptions import InvalidInputRange, MissingItems
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-handler = logging.StreamHandler(sys.stdout)
-handler.setFormatter(logging.Formatter(""))
-logger.handlers = [handler]
-logger.propagate = False
-DEF_CRS = "epsg:4326"
-ALT_CRS = "epsg:4269"
 
 
 class PyGeoAPI:
