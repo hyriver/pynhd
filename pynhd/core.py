@@ -21,7 +21,22 @@ handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(logging.Formatter(""))
 logger.handlers = [handler]
 logger.propagate = False
+
 DEF_CRS = "epsg:4326"
+ALT_CRS = "epsg:4269"
+
+__all__ = ["AGRBase", "ScienceBase", "stage_nhdplus_attrs"]
+
+
+def get_parquet(parquet_path: Union[Path, str]) -> Path:
+    """Get a parquet filename from a path or a string."""
+    if Path(parquet_path).suffix != "parquet":
+        raise InvalidInputValue("parquet_path", ["a filename with `.parquet` extension."])
+
+    output = Path(parquet_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    return output
 
 
 @dataclass
@@ -203,24 +218,7 @@ class AGRBase:
 
 
 class ScienceBase:
-    """Access NHDPlus V2.1 Attributes from ScienceBase over CONUS.
-
-    More info can be found `here <https://www.sciencebase.gov/catalog/item/5669a79ee4b08895842a1d47>`_.
-
-    Parameters
-    ----------
-    save_dir : str
-        Directory to save the staged data frame containing metadata for the database,
-        defaults to system's temp directory. The metadata dataframe is saved as a feather
-        file, nhdplus_attrs.feather, in save_dir that can be loaded with Pandas.
-    """
-
-    def __init__(self, save_dir: Optional[str] = None) -> None:
-        self.save_dir = Path(save_dir) if save_dir else Path("cache")
-        self.save_dir.mkdir(parents=True, exist_ok=True)
-
-        self.nhd_attr_item = "5669a79ee4b08895842a1d47"
-        self.char_feather = Path(self.save_dir, "nhdplus_attrs.feather")
+    """Access and explore files on ScienceBase."""
 
     @staticmethod
     def get_children(item: str) -> Dict[str, Any]:
@@ -234,6 +232,45 @@ class ScienceBase:
         return ar.retrieve([url], "json", [{"params": payload}])[0]
 
     @staticmethod
+    def get_file_urls(item: str) -> pd.DataFrame:
+        """Get download and meta URLs of all the available files for an item."""
+        url = "https://www.sciencebase.gov/catalog/item"
+        payload = {"fields": "files,downloadUri", "format": "json"}
+        r = ar.retrieve([f"{url}/{item}"], "json", [{"params": payload}])[0]
+        urls = zip(
+            tlz.pluck("name", r["files"]),
+            tlz.pluck("url", r["files"]),
+            tlz.pluck("metadataHtmlViewUri", r["files"], default=None),
+        )
+        files = pd.DataFrame(urls, columns=["name", "url", "metadata_url"])
+        return files.set_index("name")
+
+
+def stage_nhdplus_attrs(parquet_path: Optional[Union[Path, str]] = None) -> pd.DataFrame:
+    """Stage the NHDPlus Attributes database and save to nhdplus_attrs.parquet.
+
+    More info can be found `here <https://www.sciencebase.gov/catalog/item/5669a79ee4b08895842a1d47>`_.
+
+    Parameters
+    ----------
+    parquet_path : str or Path
+        Path to a file with ``.parquet`` extension for saving the processed to disk for
+        later use.
+    """
+    if parquet_path is None:
+        output = get_parquet(Path("cache", "nhdplus_attrs.parquet"))
+    else:
+        output = get_parquet(parquet_path)
+
+    sb = ScienceBase()
+    r = sb.get_children("5669a79ee4b08895842a1d47")
+
+    titles = tlz.pluck("title", r["items"])
+    titles = tlz.concat(tlz.map(tlz.partial(re.findall, "Select(.*?)Attributes"), titles))
+    titles = tlz.map(str.strip, titles)
+
+    main_items = dict(zip(titles, tlz.pluck("id", r["items"])))
+
     def get_files(item: str) -> Dict[str, Tuple[str, str]]:
         """Get all the available zip files in an item."""
         url = "https://www.sciencebase.gov/catalog/item"
@@ -243,63 +280,53 @@ class ScienceBase:
         meta = list(tlz.pluck("metadataHtmlViewUri", r["files"], default=""))[-1]
         return {f.replace("_CONUS.zip", ""): (u, meta) for f, u in files_url if ".zip" in f}
 
-    def stage_data(self) -> pd.DataFrame:
-        """Stage the NHDPlus Attributes database and save to nhdplus_attrs.feather."""
-        r = self.get_children(self.nhd_attr_item)
+    files = {}
+    soil = main_items.pop("Soil")
+    for i, item in main_items.items():
+        r = sb.get_children(item)
 
-        titles = tlz.pluck("title", r["items"])
-        titles = tlz.concat(tlz.map(tlz.partial(re.findall, "Select(.*?)Attributes"), titles))
-        titles = tlz.map(str.strip, titles)
-
-        main_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-
-        files = {}
-        soil = main_items.pop("Soil")
-        for i, item in main_items.items():
-            r = self.get_children(item)
-
-            titles = tlz.pluck("title", r["items"])
-            titles = tlz.map(lambda s: s.split(":")[1].strip() if ":" in s else s, titles)
-
-            child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-            files[i] = {t: self.get_files(c) for t, c in child_items.items()}
-
-        r = self.get_children(soil)
         titles = tlz.pluck("title", r["items"])
         titles = tlz.map(lambda s: s.split(":")[1].strip() if ":" in s else s, titles)
 
         child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-        stat = child_items.pop("STATSGO Soil Characteristics")
-        ssur = child_items.pop("SSURGO Soil Characteristics")
-        files["Soil"] = {t: self.get_files(c) for t, c in child_items.items()}
+        files[i] = {t: get_files(c) for t, c in child_items.items()}
 
-        r = self.get_children(stat)
-        titles = tlz.pluck("title", r["items"])
-        titles = tlz.map(lambda s: s.split(":")[1].split(",")[1].strip(), titles)
-        child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-        files["STATSGO"] = {t: self.get_files(c) for t, c in child_items.items()}
+    r = sb.get_children(soil)
+    titles = tlz.pluck("title", r["items"])
+    titles = tlz.map(lambda s: s.split(":")[1].strip() if ":" in s else s, titles)
 
-        r = self.get_children(ssur)
-        titles = tlz.pluck("title", r["items"])
-        titles = tlz.map(lambda s: s.split(":")[1].strip(), titles)
-        child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-        files["SSURGO"] = {t: self.get_files(c) for t, c in child_items.items()}
+    child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
+    stat = child_items.pop("STATSGO Soil Characteristics")
+    ssur = child_items.pop("SSURGO Soil Characteristics")
+    files["Soil"] = {t: get_files(c) for t, c in child_items.items()}
 
-        chars = []
-        types = {"CAT": "local", "TOT": "upstream_acc", "ACC": "div_routing"}
-        for t, dd in files.items():
-            for d, fd in dd.items():
-                for f, u in fd.items():
-                    chars.append(
-                        {
-                            "name": f,
-                            "type": types.get(f[-3:], "other"),
-                            "theme": t,
-                            "description": d,
-                            "url": u[0],
-                            "meta": u[1],
-                        }
-                    )
-        char_df = pd.DataFrame(chars)
-        char_df.to_feather(self.char_feather)
-        return char_df
+    r = sb.get_children(stat)
+    titles = tlz.pluck("title", r["items"])
+    titles = tlz.map(lambda s: s.split(":")[1].split(",")[1].strip(), titles)
+    child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
+    files["STATSGO"] = {t: get_files(c) for t, c in child_items.items()}
+
+    r = sb.get_children(ssur)
+    titles = tlz.pluck("title", r["items"])
+    titles = tlz.map(lambda s: s.split(":")[1].strip(), titles)
+    child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
+    files["SSURGO"] = {t: get_files(c) for t, c in child_items.items()}
+
+    chars = []
+    types = {"CAT": "local", "TOT": "upstream_acc", "ACC": "div_routing"}
+    for t, dd in files.items():
+        for d, fd in dd.items():
+            for f, u in fd.items():
+                chars.append(
+                    {
+                        "name": f,
+                        "type": types.get(f[-3:], "other"),
+                        "theme": t,
+                        "description": d,
+                        "url": u[0],
+                        "meta": u[1],
+                    }
+                )
+    char_df = pd.DataFrame(chars)
+    char_df.to_parquet(output)
+    return char_df
