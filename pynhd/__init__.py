@@ -2,7 +2,7 @@
 from .core import AGRBase
 from .exceptions import InvalidInputRange, MissingItems
 from .network_tools import prepare_nhdplus, topoogical_sort, vector_accumulation
-from .nhdplus_derived import nhd_fcode, nhdplus_attrs, nhdplus_vaa
+from .nhdplus_derived import enhd_attrs, nhd_fcode, nhdplus_attrs, nhdplus_vaa
 from .print_versions import show_versions
 from .pynhd import NLDI, NHDPlusHR, PyGeoAPI, WaterData
 
@@ -30,5 +30,6 @@ __all__ = [
     "WaterData",
     "nhd_fcode",
     "nhdplus_attrs",
+    "enhd_attrs",
     "nhdplus_vaa",
 ]
