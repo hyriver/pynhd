@@ -17,15 +17,16 @@ def enhd_attrs(parquet_path: Optional[Union[Path, str]] = None) -> pd.DataFrame:
 
     Notes
     -----
-    This downloads a 330 MB ``csv`` file from
+    This downloads a 140 MB ``parquet`` file from
     `here <https://www.sciencebase.gov/catalog/item/60c92503d34e86b9389df1c9>`__ .
-    This dataframe does not include geometry.
+    Although this dataframe does not include geometry, it can be linked to other geospatial
+    NHDPlus dataframes through ComIDs.
 
     Parameters
     ----------
-    parquet_path : str or Path
-        Path to a file with ``.parquet`` extension for saving the processed to disk for
-        later use.
+    parquet_path : str or Path, optional
+        Path to a file with ``.parquet`` extension for storing the file, defaults to
+        ``./cache/enhd_attrs.parquet``.
 
     Returns
     -------
@@ -42,8 +43,8 @@ def enhd_attrs(parquet_path: Optional[Union[Path, str]] = None) -> pd.DataFrame:
 
     sb = ScienceBase()
     files = sb.get_file_urls("60c92503d34e86b9389df1c9")
-    resp = ar.retrieve([files.loc["enhd_nhdplusatts.csv"].url], "text")
-    enhd_attrs = pd.read_csv(io.StringIO(resp[0]))
+    resp = ar.retrieve([files.loc["enhd_nhdplusatts.parquet"].url], "binary")
+    enhd_attrs = pd.read_parquet(io.BytesIO(resp[0]))
     enhd_attrs.to_parquet(output)
     return enhd_attrs
 
@@ -60,9 +61,9 @@ def nhdplus_vaa(parquet_path: Optional[Union[Path, str]] = None) -> pd.DataFrame
 
     Parameters
     ----------
-    parquet_path : str or Path
-        Path to a file with ``.parquet`` extension for saving the processed to disk for
-        later use.
+    parquet_path : str or Path, optional
+        Path to a file with ``.parquet`` extension for storing the file, defaults to
+        ``./cache/nldplus_vaa.parquet``.
 
     Returns
     -------
