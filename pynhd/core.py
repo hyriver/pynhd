@@ -30,7 +30,7 @@ __all__ = ["AGRBase", "ScienceBase", "stage_nhdplus_attrs"]
 
 def get_parquet(parquet_path: Union[Path, str]) -> Path:
     """Get a parquet filename from a path or a string."""
-    if Path(parquet_path).suffix != "parquet":
+    if Path(parquet_path).suffix != ".parquet":
         raise InvalidInputValue("parquet_path", ["a filename with `.parquet` extension."])
 
     output = Path(parquet_path)

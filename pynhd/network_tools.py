@@ -112,7 +112,7 @@ def prepare_nhdplus(
 
     flw = _remove_tinynetworks(flw, min_path_size, min_path_length, min_network_size)
 
-    if verbose and len(nrows - flw.shape[0]) > 0:
+    if verbose and (nrows - flw.shape[0]) > 0:
         logger.info(f"Removed {nrows - flw.shape[0]} segments from the flowlines.")
 
     if flw.shape[0] > 0 and ("tocomid" not in flw or terminal2nan):
