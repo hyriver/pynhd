@@ -44,9 +44,9 @@ def enhd_attrs(parquet_path: Optional[Union[Path, str]] = None) -> pd.DataFrame:
     sb = ScienceBase()
     files = sb.get_file_urls("60c92503d34e86b9389df1c9")
     resp = ar.retrieve([files.loc["enhd_nhdplusatts.parquet"].url], "binary")
-    enhd_attrs = pd.read_parquet(io.BytesIO(resp[0]))
-    enhd_attrs.to_parquet(output)
-    return enhd_attrs
+    attrs = pd.read_parquet(io.BytesIO(resp[0]))
+    attrs.to_parquet(output)
+    return attrs
 
 
 def nhdplus_vaa(parquet_path: Optional[Union[Path, str]] = None) -> pd.DataFrame:
