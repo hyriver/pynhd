@@ -95,7 +95,7 @@ repos:
       name: Static type checking with mypy
       exclude: tests
       files: pynhd
-      additional_dependencies: [types-all, types-dataclasses]
+      additional_dependencies: [types-all]
 
   - repo: https://github.com/PyCQA/bandit
     rev: 1.7.1
