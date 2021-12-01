@@ -2,6 +2,14 @@
 History
 =======
 
+0.11.5 (unreleased)
+-------------------
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Refactor ``prepare_nhdplus`` to reduce code complexity by grouping all the
+  NHDPlus tools as a private class.
+
 0.11.4 (2021-11-12)
 -------------------
 
