@@ -16,13 +16,178 @@ from .exceptions import MissingItems
 __all__ = ["prepare_nhdplus", "topoogical_sort", "vector_accumulation"]
 
 
+class NHDTools:
+    """Prepare NHDPlus data for downstream analysis.
+
+    Notes
+    -----
+    Some of these tools are ported from
+    `nhdplusTools <https://github.com/USGS-R/nhdplusTools>`__.
+
+    Parameters
+    ----------
+    flowlines : geopandas.GeoDataFrame
+        NHDPlus flowlines with at least the following columns:
+        ``comid``, ``lengthkm``, ``ftype``, ``terminalfl``, ``fromnode``, ``tonode``,
+        ``totdasqkm``, ``startflag``, ``streamorde``, ``streamcalc``, ``terminalpa``,
+        ``pathlength``, ``divergence``, ``hydroseq``, and ``levelpathi``.
+    """
+
+    def __init__(
+        self,
+        flowlines: gpd.GeoDataFrame,
+    ):
+        self.flw: gpd.GeoDataFrame = flowlines.copy()
+        self.nrows: int = flowlines.shape[0]
+
+    def clean_flowlines(self, use_enhd_attrs: bool, terminal2nan: bool) -> None:
+        """Clean up flowlines."""
+        self.flw.columns = self.flw.columns.str.lower()
+
+        if not ("fcode" in self.flw and "ftype" in self.flw):
+            raise MissingItems(["fcode", "ftype"])
+
+        if use_enhd_attrs or not terminal2nan:
+            if not terminal2nan and not use_enhd_attrs:
+                logger.info("The use_enhd_attrs is set to True, so all attrs will be updated.")
+            enhd_attrs = derived.enhd_attrs()
+            self.flw["tocomid"] = self.flw["comid"].astype("Int64")
+            self.flw = self.flw.reset_index().set_index("comid")
+            self.flw.update(enhd_attrs.set_index("comid"))
+            self.flw = self.flw.reset_index().set_index("index")
+
+        if "fcode" in self.flw:
+            self.flw = self.flw[self.flw["fcode"] != 56600].copy()
+        else:
+            self.flw = self.flw[
+                (self.flw["ftype"] != "Coastline") | (self.flw["ftype"] != 566)
+            ].copy()
+
+        req_cols = [
+            "comid",
+            "terminalfl",
+            "terminalpa",
+            "hydroseq",
+            "streamorde",
+            "streamcalc",
+            "divergence",
+            "fromnode",
+        ]
+
+        self.check_requirements(req_cols, self.flw)
+        self.flw[req_cols] = self.flw[req_cols].astype("Int64")
+
+    def remove_tinynetworks(
+        self,
+        min_path_size: float,
+        min_path_length: float,
+        min_network_size: float,
+    ) -> None:
+        """Remove small paths in NHDPlus flowline database.
+
+        Notes
+        -----
+        This functions requires the following columns:
+        ``levelpathi``, ``hydroseq``, ``totdasqkm``, ``terminalfl``, ``startflag``,
+        ``pathlength``, and ``terminalpa``.
+
+        Parameters
+        ----------
+        min_network_size : float
+            Minimum size of drainage network in sqkm.
+        min_path_length : float
+            Minimum length of terminal level path of a network in km.
+        min_path_size : float
+            Minimum size of outlet level path of a drainage basin in km.
+            Drainage basins with an outlet drainage area smaller than
+            this value will be removed.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            Flowlines with small paths removed.
+        """
+        req_cols = [
+            "levelpathi",
+            "hydroseq",
+            "terminalfl",
+            "startflag",
+            "terminalpa",
+            "totdasqkm",
+            "pathlength",
+        ]
+        self.check_requirements(req_cols, self.flw)
+        self.flw[req_cols[:-2]] = self.flw[req_cols[:-2]].astype("Int64")
+
+        if min_path_size > 0:
+            short_paths = self.flw.groupby("levelpathi").apply(
+                lambda x: (x.hydroseq == x.hydroseq.min())
+                & (x.totdasqkm < min_path_size)
+                & (x.totdasqkm >= 0)
+            )
+            short_idx = short_paths.index.get_level_values("levelpathi")[short_paths]
+            self.flw = self.flw[~self.flw.levelpathi.isin(short_idx)]
+
+        terminal_filter = (self.flw.terminalfl == 1) & (self.flw.totdasqkm < min_network_size)
+        start_filter = (self.flw.startflag == 1) & (self.flw.pathlength < min_path_length)
+
+        if any(terminal_filter.dropna()) or any(start_filter.dropna()):
+            tiny_networks = self.flw[terminal_filter].append(self.flw[start_filter])
+            self.flw = self.flw[~self.flw.terminalpa.isin(tiny_networks.terminalpa.unique())]
+
+    def add_tocomid(self) -> None:
+        """Find the downstream comid(s) of each comid in NHDPlus flowline database.
+
+        Notes
+        -----
+        This functions requires the following columns:
+            ``comid``, ``terminalpa``, ``fromnode``, ``tonode``
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            The input dataframe With an additional column named ``tocomid``.
+        """
+        req_cols = ["comid", "terminalpa", "fromnode", "tonode"]
+        self.check_requirements(req_cols, self.flw)
+        self.flw[req_cols] = self.flw[req_cols].astype("Int64")
+
+        def tocomid(group: pd.core.groupby.generic.DataFrameGroupBy) -> pd.DataFrame:
+            def toid(row: pd.DataFrame) -> pd.Int64Dtype:
+                try:
+                    return group[group.fromnode == row.tonode].comid.to_numpy()[0]
+                except IndexError:
+                    return pd.NA
+
+            return group.apply(toid, axis=1)
+
+        self.flw["tocomid"] = pd.concat(tocomid(g) for _, g in self.flw.groupby("terminalpa"))
+
+    @staticmethod
+    def check_requirements(reqs: Iterable, cols: List[str]) -> None:
+        """Check for all the required data.
+
+        Parameters
+        ----------
+        reqs : iterable
+            A list of required data names (str)
+        cols : list
+            A list of variable names (str)
+        """
+        if not isinstance(reqs, Iterable):
+            raise InvalidInputType("reqs", "iterable")
+
+        missing = [r for r in reqs if r not in cols]
+        if missing:
+            raise MissingItems(missing)
+
+
 def prepare_nhdplus(
     flowlines: gpd.GeoDataFrame,
     min_network_size: float,
     min_path_length: float,
     min_path_size: float = 0,
     purge_non_dendritic: bool = False,
-    verbose: bool = False,
     use_enhd_attrs: bool = False,
     terminal2nan: bool = True,
 ) -> gpd.GeoDataFrame:
@@ -47,8 +212,6 @@ def prepare_nhdplus(
         this value will be removed. Defaults to 0.
     purge_non_dendritic : bool, optional
         Whether to remove non dendritic paths, defaults to False
-    verbose : bool, optional
-        Whether to show a message about the removed features, defaults to True.
     use_enhd_attrs : bool, optional
         Whether to replace the attributes with the ENHD attributes, defaults to False.
         For more information, see
@@ -63,156 +226,29 @@ def prepare_nhdplus(
     geopandas.GeoDataFrame
         Cleaned up flowlines. Note that all column names are converted to lower case.
     """
-    flw = flowlines.copy()
-    flw.columns = flw.columns.str.lower()
+    nhd = NHDTools(flowlines)
+    nhd.clean_flowlines(use_enhd_attrs, terminal2nan)
 
-    if not ("fcode" in flw and "ftype" in flw):
-        raise MissingItems(["fcode", "ftype"])
-
-    if use_enhd_attrs or not terminal2nan:
-        if not terminal2nan and not use_enhd_attrs:
-            logger.info("The use_enhd_attrs is set to True, so all attrs will be updated.")
-        enhd_attrs = derived.enhd_attrs()
-        flw["tocomid"] = flw["comid"].astype("Int64")
-        flw = flw.reset_index().set_index("comid")
-        flw.update(enhd_attrs.set_index("comid"))
-        flw = flw.reset_index().set_index("index")
-
-    if "fcode" in flw:
-        flw = flw[flw["fcode"] != 56600]
-    else:
-        flw = flw[(flw["ftype"] != "Coastline") | (flw["ftype"] != 566)]
-
-    nrows = flw.shape[0]
-
-    req_cols = [
-        "comid",
-        "terminalfl",
-        "terminalpa",
-        "hydroseq",
-        "streamorde",
-        "streamcalc",
-        "divergence",
-        "fromnode",
-    ]
-
-    _check_requirements(req_cols, flw)
-    flw[req_cols] = flw[req_cols].astype("Int64")
-
-    if not any(flw.terminalfl == 1):
-        if len(flw.terminalpa.unique()) != 1:
+    if not any(nhd.flw.terminalfl == 1):
+        if len(nhd.flw.terminalpa.unique()) != 1:
             logger.error("Found no terminal flag in the dataframe.")
 
-        flw.loc[flw.hydroseq == flw.hydroseq.min(), "terminalfl"] = 1
+        nhd.flw.loc[nhd.flw.hydroseq == nhd.flw.hydroseq.min(), "terminalfl"] = 1
 
     if purge_non_dendritic:
-        flw = flw[flw.streamorde == flw.streamcalc]
+        nhd.flw = nhd.flw[nhd.flw.streamorde == nhd.flw.streamcalc].copy()
     else:
-        flw.loc[flw.divergence == 2, "fromnode"] = pd.NA
+        nhd.flw.loc[nhd.flw.divergence == 2, "fromnode"] = pd.NA
 
-    flw = _remove_tinynetworks(flw, min_path_size, min_path_length, min_network_size)
+    nhd.remove_tinynetworks(min_path_size, min_path_length, min_network_size)
 
-    if verbose and (nrows - flw.shape[0]) > 0:
-        logger.info(f"Removed {nrows - flw.shape[0]} segments from the flowlines.")
+    if (nhd.nrows - nhd.flw.shape[0]) > 0:
+        logger.info(f"Removed {nhd.nrows - nhd.flw.shape[0]} segments from the flowlines.")
 
-    if flw.shape[0] > 0 and ("tocomid" not in flw or terminal2nan):
-        flw = _add_tocomid(flw)
+    if nhd.flw.shape[0] > 0 and ("tocomid" not in nhd.flw or terminal2nan):
+        nhd.add_tocomid()
 
-    return flw
-
-
-def _remove_tinynetworks(
-    flw: gpd.GeoDataFrame,
-    min_path_size: float,
-    min_path_length: float,
-    min_network_size: float,
-) -> gpd.GeoDataFrame:
-    """Remove small paths in NHDPlus flowline database.
-
-    Ported from `nhdplusTools <https://github.com/USGS-R/nhdplusTools>`__
-
-    Parameters
-    ----------
-    flw : geopandas.GeoDataFrame
-        NHDPlus flowlines with at least the following columns:
-        levelpathi, hydroseq, totdasqkm, terminalfl, startflag,
-        pathlength, terminalpa
-    min_network_size : float
-        Minimum size of drainage network in sqkm.
-    min_path_length : float
-        Minimum length of terminal level path of a network in km.
-    min_path_size : float
-        Minimum size of outlet level path of a drainage basin in km.
-        Drainage basins with an outlet drainage area smaller than
-        this value will be removed.
-
-    Returns
-    -------
-    geopandas.GeoDataFrame
-        Flowlines with small paths removed.
-    """
-    req_cols = [
-        "levelpathi",
-        "hydroseq",
-        "terminalfl",
-        "startflag",
-        "terminalpa",
-        "totdasqkm",
-        "pathlength",
-    ]
-    _check_requirements(req_cols, flw)
-    flw[req_cols[:-2]] = flw[req_cols[:-2]].astype("Int64")
-
-    if min_path_size > 0:
-        short_paths = flw.groupby("levelpathi").apply(
-            lambda x: (x.hydroseq == x.hydroseq.min())
-            & (x.totdasqkm < min_path_size)
-            & (x.totdasqkm >= 0)
-        )
-        short_idx = short_paths.index.get_level_values("levelpathi")[short_paths]
-        flw = flw[~flw.levelpathi.isin(short_idx)]
-
-    terminal_filter = (flw.terminalfl == 1) & (flw.totdasqkm < min_network_size)
-    start_filter = (flw.startflag == 1) & (flw.pathlength < min_path_length)
-
-    if any(terminal_filter.dropna()) or any(start_filter.dropna()):
-        tiny_networks = flw[terminal_filter].append(flw[start_filter])
-        flw = flw[~flw.terminalpa.isin(tiny_networks.terminalpa.unique())]
-
-    return flw
-
-
-def _add_tocomid(flw: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Find the downstream comid(s) of each comid in NHDPlus flowline database.
-
-    Ported from `nhdplusTools <https://github.com/USGS-R/nhdplusTools>`__
-
-    Parameters
-    ----------
-    flw : geopandas.GeoDataFrame
-        NHDPlus flowlines with at least the following columns:
-        ``comid``, ``terminalpa``, ``fromnode``, ``tonode``
-
-    Returns
-    -------
-    geopandas.GeoDataFrame
-        The input dataframe With an additional column named ``tocomid``.
-    """
-    req_cols = ["comid", "terminalpa", "fromnode", "tonode"]
-    _check_requirements(req_cols, flw)
-    flw[req_cols] = flw[req_cols].astype("Int64")
-
-    def tocomid(group: pd.core.groupby.generic.DataFrameGroupBy) -> pd.DataFrame:
-        def toid(row: pd.DataFrame) -> pd.Int64Dtype:
-            try:
-                return group[group.fromnode == row.tonode].comid.to_numpy()[0]
-            except IndexError:
-                return pd.NA
-
-        return group.apply(toid, axis=1)
-
-    flw["tocomid"] = pd.concat(tocomid(g) for _, g in flw.groupby("terminalpa"))
-    return flw
+    return nhd.flw
 
 
 def topoogical_sort(
@@ -320,21 +356,3 @@ def vector_accumulation(
     acc = pd.Series(outflow).loc[sorted_nodes[:-1]]
     acc = acc.rename_axis("comid").rename(f"acc_{attr_col}")
     return acc
-
-
-def _check_requirements(reqs: Iterable, cols: List[str]) -> None:
-    """Check for all the required data.
-
-    Parameters
-    ----------
-    reqs : iterable
-        A list of required data names (str)
-    cols : list
-        A list of variable names (str)
-    """
-    if not isinstance(reqs, Iterable):
-        raise InvalidInputType("reqs", "iterable")
-
-    missing = [r for r in reqs if r not in cols]
-    if missing:
-        raise MissingItems(missing)
