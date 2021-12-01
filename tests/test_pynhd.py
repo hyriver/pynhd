@@ -181,7 +181,7 @@ def test_use_enhd(trib):
 
 
 def test_acc(trib):
-    flw = nhd.prepare_nhdplus(trib, 1, 1, 1, purge_non_dendritic=True, verbose=True)
+    flw = nhd.prepare_nhdplus(trib, 1, 1, 1, purge_non_dendritic=True)
 
     def routing(qin, q):
         return qin + q
