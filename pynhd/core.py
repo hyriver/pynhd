@@ -153,8 +153,10 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        self.service.oids_bygeom(geom, geo_crs=geo_crs, sql_clause=sql_clause, distance=distance)
-        return self._getfeatures(return_m)
+        oids = self.service.oids_bygeom(
+            geom, geo_crs=geo_crs, sql_clause=sql_clause, distance=distance
+        )
+        return self._getfeatures(oids, return_m)
 
     def byids(
         self, field: str, fids: Union[str, List[str]], return_m: bool = False
@@ -175,8 +177,8 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        self.service.oids_byfield(field, fids)
-        return self._getfeatures(return_m)
+        oids = self.service.oids_byfield(field, fids)
+        return self._getfeatures(oids, return_m)
 
     def bysql(self, sql_clause: str, return_m: bool = False) -> gpd.GeoDataFrame:
         """Get feature IDs using a valid SQL 92 WHERE clause.
@@ -198,10 +200,10 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        self.service.oids_bysql(sql_clause)
-        return self._getfeatures(return_m)
+        oids = self.service.oids_bysql(sql_clause)
+        return self._getfeatures(oids, return_m)
 
-    def _getfeatures(self, return_m: bool = False) -> gpd.GeoDataFrame:
+    def _getfeatures(self, oids: List[Tuple[str, ...]], return_m: bool = False) -> gpd.GeoDataFrame:
         """Send a request for getting data based on object IDs.
 
         Parameters
@@ -214,7 +216,7 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        return geoutils.json2geodf(self.service.get_features(return_m))
+        return geoutils.json2geodf(self.service.get_features(oids, return_m))
 
 
 class ScienceBase:
