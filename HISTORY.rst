@@ -9,19 +9,21 @@ Internal Changes
 ~~~~~~~~~~~~~~~~
 - Refactor ``prepare_nhdplus`` to reduce code complexity by grouping all the
   NHDPlus tools as a private class.
+- Modify ``AGRBase`` to reflect the latest API changes in ``pygeoogc.ArcGISRESTfull``
+  class.
 
 0.11.4 (2021-11-12)
 -------------------
 
 New Features
 ~~~~~~~~~~~~
-- Add a new argument to ``NLDI.get_basins`` called ``split_catchment`` which
-  if set to ``True`` will split the basin geometry at the watershed outlet.
+- Add a new argument to ``NLDI.get_basins`` called ``split_catchment`` that
+  if is set to ``True`` will split the basin geometry at the watershed outlet.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
 - Catch service errors in ``PyGeoAPI`` and show useful error messages.
-- Use ``importlib-metadata`` for getting the version insead of ``pkg_resources``
+- Use ``importlib-metadata`` for getting the version instead of ``pkg_resources``
   to decrease import time as discussed in this
   `issue <https://github.com/pydata/xarray/issues/5676>`__.
 
@@ -52,7 +54,7 @@ New Features
 
 New Features
 ~~~~~~~~~~~~
-- Add a function for getting all NHD Fcodes as a dataframe, called ``nhd_fcode``.
+- Add a function for getting all NHD FCodes as a data frame, called ``nhd_fcode``.
 - Improve ``prepare_nhdplus`` function by removing all coastlines and better detection
   of the terminal point in a network.
 
@@ -80,18 +82,18 @@ Breaking Changes
 Internal Changes
 ~~~~~~~~~~~~~~~~
 - Use persistent caching for all requests which can help speed up network responses significantly.
-- Improve documnetation and testing.
+- Improve documentation and testing.
 
 0.10.1 (2021-03-27)
 -------------------
 
-- Add announcement regarding the new name for the softwate stack, HyRiver.
+- Add announcement regarding the new name for the software stack, HyRiver.
 - Improve ``pip`` installation and release workflow.
 
 0.10.0 (2021-03-06)
 -------------------
 
-- The first release after renaming hydrodata to pygeohydro.
+- The first release after renaming hydrodata to PyGeoHydro.
 - Make ``mypy`` checks more strict and fix all the errors and prevent possible
   bugs.
 - Speed up CI testing by using ``mamba`` and caching.
@@ -99,7 +101,7 @@ Internal Changes
 0.9.0 (2021-02-14)
 ------------------
 
-- Bump version to the same version as pygeohydro.
+- Bump version to the same version as PyGeoHydro.
 
 Breaking Changes
 ~~~~~~~~~~~~~~~~
@@ -118,7 +120,7 @@ Breaking Changes
 New Features
 ~~~~~~~~~~~~
 - Add a new argument to ``topoogical_sort`` called ``edge_attr`` that allows to
-  add attribute(s) to the returned Networkx Graph. By default it is ``None``.
+  add attribute(s) to the returned Networkx Graph. By default, it is ``None``.
 - A new base class, ``AGRBase`` for connecting to ArcGISRESTful-based services such as National Map
   and EPA's WaterGEOS.
 - Add support for setting the buffer distance for the input geometries to ``AGRBase.bygeom``.
@@ -133,7 +135,7 @@ Breaking Changes
 ~~~~~~~~~~~~~~~~
 - Re-wrote the ``NLDI`` function to use API v3 of the NLDI service.
 - The ``crs`` argument of ``WaterData`` now is the target CRS of the output dataframe.
-  The service CRS is now EPSG:4269 for all the layers.
+  The service CRS is now ``EPSG:4269`` for all the layers.
 - Remove the ``url_only`` argument of ``NLDI`` since it's not applicable anymore.
 
 New Features
@@ -147,7 +149,7 @@ New Features
 * ``characteristics_dataframe``: For getting all the available catchment-scale characteristics
   as a dataframe.
 * ``get_validchars``: For getting a list of available characteristic IDs for a specified
-  characteristic type,.
+  characteristic type.
 
 - The following function is added to ``WaterData``:
 
