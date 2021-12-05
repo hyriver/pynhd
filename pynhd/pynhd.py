@@ -319,6 +319,9 @@ class WaterData:
         """Get features based on IDs."""
         resp = self.wfs.getfeature_byid(featurename, featureids)
         features = self._to_geodf(resp)
+        if features.empty:
+            raise ZeroMatched
+
         fids = [str(f) for f in featureids] if isinstance(featureids, list) else [str(featureids)]
         missing = set(fids).difference(set(features[featurename].astype(str)))
         if missing:
