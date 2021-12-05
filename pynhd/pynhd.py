@@ -319,8 +319,6 @@ class WaterData:
         """Get features based on IDs."""
         resp = self.wfs.getfeature_byid(featurename, featureids)
         features = self._to_geodf(resp)
-        if features.empty:
-            raise ZeroMatched
 
         fids = [str(f) for f in featureids] if isinstance(featureids, list) else [str(featureids)]
         missing = set(fids).difference(set(features[featurename].astype(str)))
@@ -350,7 +348,10 @@ class WaterData:
         geopandas.GeoDataFrame
             The requested features in a GeoDataFrames.
         """
-        return geoutils.json2geodf(resp, ALT_CRS, self.crs)
+        features = geoutils.json2geodf(resp, ALT_CRS, self.crs)
+        if features.empty:
+            raise ZeroMatched
+        return features
 
 
 class NHDPlusHR(AGRBase):
