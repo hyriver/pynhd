@@ -318,7 +318,16 @@ class WaterData:
     def byid(self, featurename: str, featureids: Union[List[str], str]) -> gpd.GeoDataFrame:
         """Get features based on IDs."""
         resp = self.wfs.getfeature_byid(featurename, featureids)
-        return self._to_geodf(resp)
+        features = self._to_geodf(resp)
+        fids = [str(f) for f in featureids] if isinstance(featureids, list) else [str(featureids)]
+        missing = set(fids).difference(set(features[featurename].astype(str)))
+        if missing:
+            verb = "ID was" if len(missing) == 1 else "IDs were"
+            logger.warning(
+                f"The following requested feature {verb} not found in WaterData:\n"
+                + ", ".join(missing)
+            )
+        return features
 
     def byfilter(self, cql_filter: str, method: str = "GET") -> gpd.GeoDataFrame:
         """Get features based on a CQL filter."""
