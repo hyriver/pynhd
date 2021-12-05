@@ -8,8 +8,9 @@ History
 New Features
 ~~~~~~~~~~~~
 - In ``WaterData.byid`` show a warning if there were any missing feature IDs that were
-  requested by user but are not available in the dataset. Also, throw a ``ZeroMatched``
-  exception if no features are found.
+  requested by user but are not available in the dataset.
+- For all ``by*`` methods of ``WaterData`` throw a ``ZeroMatched`` exception if no
+  features are found.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
