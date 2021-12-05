@@ -5,6 +5,12 @@ History
 0.11.5 (unreleased)
 -------------------
 
+New Features
+~~~~~~~~~~~~
+- In ``WaterData.byid`` show a warning if there were any missing feature IDs that were
+  requested by user but are not available in the dataset. Also, throw a ``ZeroMatched``
+  exception if no features are found.
+
 Internal Changes
 ~~~~~~~~~~~~~~~~
 - Refactor ``prepare_nhdplus`` to reduce code complexity by grouping all the
