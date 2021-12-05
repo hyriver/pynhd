@@ -8,7 +8,7 @@ class MissingItems(Exception):
     Parameters
     ----------
     missing : tuple
-        The server url
+        The missing items.
     """
 
     def __init__(self, missing: List[str]) -> None:
