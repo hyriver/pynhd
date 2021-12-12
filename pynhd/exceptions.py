@@ -1,6 +1,30 @@
 """Customized PyNHD exceptions."""
 from typing import List
 
+import async_retriever as ar
+
+
+class ServiceError(ar.ServiceError):
+    """Exception raised when the requested data is not available on the server.
+
+    Parameters
+    ----------
+    err : str
+        Service error message.
+    """
+
+
+class InvalidInputValue(ar.InvalidInputValue):
+    """Exception raised for invalid input.
+
+    Parameters
+    ----------
+    inp : str
+        Name of the input parameter
+    valid_inputs : tuple
+        List of valid inputs
+    """
+
 
 class MissingItems(Exception):
     """Exception raised when a required item is missing.
