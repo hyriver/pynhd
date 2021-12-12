@@ -11,9 +11,11 @@ import cytoolz as tlz
 import geopandas as gpd
 import pandas as pd
 import pygeoutils as geoutils
-from pygeoogc import ArcGISRESTful, InvalidInputValue, ServiceError
-from pygeoutils import InvalidInputType
+from pydantic import AnyHttpUrl
+from pygeoogc import ArcGISRESTful
 from shapely.geometry import Polygon
+
+from .exceptions import InvalidInputValue
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -24,6 +26,7 @@ logger.propagate = False
 
 DEF_CRS = "epsg:4326"
 ALT_CRS = "epsg:4269"
+EXPIRE = -1
 
 __all__ = ["AGRBase", "ScienceBase", "stage_nhdplus_attrs"]
 
@@ -39,12 +42,14 @@ def get_parquet(parquet_path: Union[Path, str]) -> Path:
     return output
 
 
-@dataclass
 class AGRBase:
     """Base class for accessing NHD(Plus) HR database through the National Map ArcGISRESTful.
 
     Parameters
     ----------
+    base_url : str, optional
+        The ArcGIS RESTful service url. The URL must either include a layer number
+        after the last ``/`` in the url or the target layer must be passed as an argument.
     layer : str, optional
         A valid service layer. To see a list of available layers instantiate the class
         without passing any argument.
@@ -52,78 +57,69 @@ class AGRBase:
         Target field name(s), default to "*" i.e., all the fields.
     crs : str, optional
         Target spatial reference, default to EPSG:4326
+    expire_after : int, optional
+        Expiration time for response caching in seconds, defaults to -1 (never expire).
+    disable_caching : bool, optional
+        If ``True``, disable caching requests, defaults to False.
     """
 
-    layer: Optional[str] = None
-    outfields: Union[str, List[str]] = "*"
-    crs: str = DEF_CRS
-
-    @property
-    def service(self) -> ArcGISRESTful:
-        """Connect to a RESTFul service."""
-        return self._service
-
-    @service.setter
-    def service(self, value: str) -> None:
-        valid_layers = self.get_validlayers(value)
-        if self.layer is None:
-            raise InvalidInputType("layer", "str")
-
-        if self.layer.lower() not in valid_layers:
-            raise InvalidInputValue("layer", list(valid_layers))
-
-        self._service = ArcGISRESTful(
-            value,
-            valid_layers[self.layer.lower()],
-            outformat="json",
-            outfields=self.outfields,
-            crs=self.crs,
-        )
-
-    @staticmethod
-    def get_validlayers(url):
-        """Get valid layer for a ArcGISREST service."""
-        try:
-            rjson = ar.retrieve([url], "json", [{"params": {"f": "json"}}])[0]
-        except (ar.ServiceError, KeyError) as ex:
-            raise ar.ServiceError(url) from ex
+    def __init__(
+        self,
+        base_url: AnyHttpUrl,
+        layer: Optional[str] = None,
+        outfields: Union[str, List[str]] = "*",
+        crs: str = DEF_CRS,
+        expire_after: float = EXPIRE,
+        disable_caching: bool = False,
+    ) -> None:
+        self.expire_after = expire_after
+        self.disable_caching = disable_caching
+        if isinstance(layer, str):
+            valid_layers = self.get_validlayers(base_url)
+            try:
+                self.client = ArcGISRESTful(
+                    base_url,
+                    valid_layers[layer.lower()],
+                    outformat="json",
+                    outfields=outfields,
+                    crs=crs,
+                    expire_after=expire_after,
+                    disable_caching=disable_caching,
+                )
+            except KeyError as ex:
+                raise InvalidInputValue("layer", list(valid_layers)) from ex
         else:
-            return {lyr["name"].lower(): lyr["id"] for lyr in rjson["layers"]}
+            self.client = ArcGISRESTful(
+                base_url,
+                None,
+                outformat="json",
+                outfields=outfields,
+                crs=crs,
+                expire_after=expire_after,
+                disable_caching=disable_caching,
+            )
 
-    def connect_to(self, service: str, service_list: Dict[str, str], auto_switch: bool) -> None:
-        """Connect to a web service.
+    def get_validlayers(self, url: str) -> Dict[str, str]:
+        """Get a list of valid layers.
 
         Parameters
         ----------
-        service : str
-            Name of the preferred web service to connect to from the list provided in service_list.
-        service_list: dict
-            A dict where keys are names of the web services and values are their URLs.
-        auto_switch : bool, optional
-            Automatically switch to other services' URL if the first one doesn't work, default to False.
+        url : str
+            The URL of the ArcGIS REST service.
+
+        Returns
+        -------
+        dict
+            A dictionary of valid layers.
         """
-        if service not in service_list:
-            raise InvalidInputValue("service", list(service_list))
-
-        url = service_list.pop(service)
-        try:
-            self.service = url
-        except (ServiceError, ConnectionError) as ex:
-            if not auto_switch:
-                raise ServiceError(url) from ex
-
-            while len(service_list) > 0:
-                next_service = next(iter(service_list.keys()))
-                logger.warning(f"Connection to {url} failed. Will try {next_service} next ...")
-                try:
-                    url = service_list.pop(next_service)
-                    self.service = url
-                    logger.info(f"Connected to {url}.")
-                except (ServiceError, ConnectionError):
-                    continue
-
-        if self.service is None:
-            raise ServiceError(url)
+        rjson = ar.retrieve(
+            [url],
+            "json",
+            [{"params": {"f": "json"}}],
+            expire_after=self.expire_after,
+            disable=self.disable_caching,
+        )
+        return {lyr["name"].lower(): lyr["id"] for lyr in rjson[0]["layers"]}
 
     def bygeom(
         self,
@@ -153,7 +149,7 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        oids = self.service.oids_bygeom(
+        oids = self.client.oids_bygeom(
             geom, geo_crs=geo_crs, sql_clause=sql_clause, distance=distance
         )
         return self._getfeatures(oids, return_m)
@@ -177,7 +173,7 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        oids = self.service.oids_byfield(field, fids)
+        oids = self.client.oids_byfield(field, fids)
         return self._getfeatures(oids, return_m)
 
     def bysql(self, sql_clause: str, return_m: bool = False) -> gpd.GeoDataFrame:
@@ -193,14 +189,14 @@ class AGRBase:
         sql_clause : str
             A valid SQL 92 WHERE clause.
         return_m : bool
-            Whether to activate the Return M (measure) in the request, defaults to False.
+            Whether to activate the measure in the request, defaults to False.
 
         Returns
         -------
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        oids = self.service.oids_bysql(sql_clause)
+        oids = self.client.oids_bysql(sql_clause)
         return self._getfeatures(oids, return_m)
 
     def _getfeatures(self, oids: List[Tuple[str, ...]], return_m: bool = False) -> gpd.GeoDataFrame:
@@ -216,14 +212,29 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        return geoutils.json2geodf(self.service.get_features(oids, return_m))
+        return geoutils.json2geodf(self.client.get_features(oids, return_m))
+
+    def __repr__(self) -> str:
+        """Print the service configuration."""
+        return self.client.__repr__()
 
 
+@dataclass
 class ScienceBase:
-    """Access and explore files on ScienceBase."""
+    """Access and explore files on ScienceBase.
 
-    @staticmethod
-    def get_children(item: str) -> Dict[str, Any]:
+    Parameters
+    ----------
+    expire_after : int, optional
+        Expiration time for response caching in seconds, defaults to -1 (never expire).
+    disable_caching : bool, optional
+        If ``True``, disable caching requests, defaults to False.
+    """
+
+    expire_after: float = EXPIRE
+    disable_caching: bool = False
+
+    def get_children(self, item: str) -> Dict[str, Any]:
         """Get children items of an item."""
         url = "https://www.sciencebase.gov/catalog/items"
         payload = {
@@ -231,24 +242,40 @@ class ScienceBase:
             "fields": "title,id",
             "format": "json",
         }
-        return ar.retrieve([url], "json", [{"params": payload}])[0]
+        resp = ar.retrieve(
+            [url],
+            "json",
+            [{"params": payload}],
+            expire_after=self.expire_after,
+            disable=self.disable_caching,
+        )
+        return resp[0]
 
-    @staticmethod
-    def get_file_urls(item: str) -> pd.DataFrame:
+    def get_file_urls(self, item: str) -> pd.DataFrame:
         """Get download and meta URLs of all the available files for an item."""
         url = "https://www.sciencebase.gov/catalog/item"
         payload = {"fields": "files,downloadUri", "format": "json"}
-        r = ar.retrieve([f"{url}/{item}"], "json", [{"params": payload}])[0]
+        resp = ar.retrieve(
+            [f"{url}/{item}"],
+            "json",
+            [{"params": payload}],
+            expire_after=self.expire_after,
+            disable=self.disable_caching,
+        )
         urls = zip(
-            tlz.pluck("name", r["files"]),
-            tlz.pluck("url", r["files"]),
-            tlz.pluck("metadataHtmlViewUri", r["files"], default=None),
+            tlz.pluck("name", resp[0]["files"]),
+            tlz.pluck("url", resp[0]["files"]),
+            tlz.pluck("metadataHtmlViewUri", resp[0]["files"], default=None),
         )
         files = pd.DataFrame(urls, columns=["name", "url", "metadata_url"])
         return files.set_index("name")
 
 
-def stage_nhdplus_attrs(parquet_path: Optional[Union[Path, str]] = None) -> pd.DataFrame:
+def stage_nhdplus_attrs(
+    parquet_path: Optional[Union[Path, str]] = None,
+    expire_after: float = EXPIRE,
+    disable_caching: bool = False,
+) -> pd.DataFrame:
     """Stage the NHDPlus Attributes database and save to nhdplus_attrs.parquet.
 
     More info can be found `here <https://www.sciencebase.gov/catalog/item/5669a79ee4b08895842a1d47>`_.
@@ -258,13 +285,22 @@ def stage_nhdplus_attrs(parquet_path: Optional[Union[Path, str]] = None) -> pd.D
     parquet_path : str or Path
         Path to a file with ``.parquet`` extension for saving the processed to disk for
         later use.
+    expire_after : int, optional
+        Expiration time for response caching in seconds, defaults to -1 (never expire).
+    disable_caching : bool, optional
+        If ``True``, disable caching requests, defaults to False.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The staged data as a DataFrame.
     """
     if parquet_path is None:
         output = get_parquet(Path("cache", "nhdplus_attrs.parquet"))
     else:
         output = get_parquet(parquet_path)
 
-    sb = ScienceBase()
+    sb = ScienceBase(expire_after, disable_caching)
     r = sb.get_children("5669a79ee4b08895842a1d47")
 
     titles = tlz.pluck("title", r["items"])
@@ -277,9 +313,15 @@ def stage_nhdplus_attrs(parquet_path: Optional[Union[Path, str]] = None) -> pd.D
         """Get all the available zip files in an item."""
         url = "https://www.sciencebase.gov/catalog/item"
         payload = {"fields": "files,downloadUri", "format": "json"}
-        r = ar.retrieve([f"{url}/{item}"], "json", [{"params": payload}])[0]
-        files_url = zip(tlz.pluck("name", r["files"]), tlz.pluck("url", r["files"]))
-        meta = list(tlz.pluck("metadataHtmlViewUri", r["files"], default=""))[-1]
+        resp = ar.retrieve(
+            [f"{url}/{item}"],
+            "json",
+            [{"params": payload}],
+            expire_after=expire_after,
+            disable=disable_caching,
+        )
+        files_url = zip(tlz.pluck("name", resp[0]["files"]), tlz.pluck("url", resp[0]["files"]))
+        meta = list(tlz.pluck("metadataHtmlViewUri", resp[0]["files"], default=""))[-1]
         return {f.replace("_CONUS.zip", ""): (u, meta) for f, u in files_url if ".zip" in f}
 
     files = {}
