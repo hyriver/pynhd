@@ -11,6 +11,10 @@ New Features
   requested by user but are not available in the dataset.
 - For all ``by*`` methods of ``WaterData`` throw a ``ZeroMatched`` exception if no
   features are found.
+- Add ``expire_after`` and ``disable_caching`` arguments to all functions that use
+  ``async_retriever``. Set the default request caching expiration time to never expire.
+  You can use ``disable_caching`` if you don't want to use the cached responses. Please
+  refer to documentations of the functions for more details.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
