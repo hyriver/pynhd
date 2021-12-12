@@ -149,6 +149,14 @@ Additionally, PyNHD offers some extra utilities for processing the flowlines:
 These utilities are developed based on an ``R`` package called
 `nhdplusTools <https://github.com/USGS-R/nhdplusTools>`__.
 
+All functions and classes that request data from web services use ``async_retriever``
+that offers response caching. By default, the expiration time is set to never expire.
+All these functions and classes have two optional parameters for controlling the cache:
+``expire_after`` and ``disable_caching``. You can use ``expire_after`` to set the expiration
+time in seconds. If ``expire_after`` is set to ``-1``, the cache will never expire (default).
+You can use ``disable_caching`` if you don't want to use the cached responses. The cached
+responses are stored in the ``./cache/aiohttp_cache.sqlite`` file.
+
 You can find some example notebooks `here <https://github.com/cheginit/HyRiver-examples>`__.
 
 Please note that since this project is in early development stages, while the provided
@@ -162,18 +170,14 @@ Installation
 ------------
 
 You can install PyNHD using ``pip`` after installing ``libgdal`` on your system
-(for example, in Ubuntu run ``sudo apt install libgdal-dev``). Moreover, PyNHD has an optional
-dependency for using persistent caching, ``requests-cache``. We highly recommend to install
-this package as it can significantly speedup send/receive queries. You don't have to change
-anything in your code, since PyNHD under-the-hood looks for ``requests-cache`` and if available,
-it will automatically use persistent caching:
+(for example, in Ubuntu run ``sudo apt install libgdal-dev``):
 
 .. code-block:: console
 
     $ pip install pynhd
 
 Alternatively, PyNHD can be installed from the ``conda-forge`` repository
-using `Conda <https://docs.conda.io/en/latest/>`__:
+using `Conda <https://docs.conda.io/en/latest/>`__ or `Mamba https://github.com/conda-forge/miniforge>`__:
 
 .. code-block:: console
 
