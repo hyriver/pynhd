@@ -177,7 +177,7 @@ You can install PyNHD using ``pip`` after installing ``libgdal`` on your system
     $ pip install pynhd
 
 Alternatively, PyNHD can be installed from the ``conda-forge`` repository
-using `Conda <https://docs.conda.io/en/latest/>`__ or `Mamba https://github.com/conda-forge/miniforge>`__:
+using `Conda <https://docs.conda.io/en/latest/>`__ or `Mamba <https://github.com/conda-forge/miniforge>`__:
 
 .. code-block:: console
 
