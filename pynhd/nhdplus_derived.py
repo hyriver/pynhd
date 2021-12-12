@@ -7,12 +7,16 @@ import async_retriever as ar
 import pandas as pd
 from pygeoogc import InvalidInputValue
 
-from .core import ScienceBase, get_parquet, stage_nhdplus_attrs
+from .core import EXPIRE, ScienceBase, get_parquet, stage_nhdplus_attrs
 
 __all__ = ["enhd_attrs", "nhdplus_vaa", "nhdplus_attrs", "nhd_fcode"]
 
 
-def enhd_attrs(parquet_path: Optional[Union[Path, str]] = None) -> pd.DataFrame:
+def enhd_attrs(
+    parquet_path: Optional[Union[Path, str]] = None,
+    expire_after: float = EXPIRE,
+    disable_caching: bool = False,
+) -> pd.DataFrame:
     """Get updated NHDPlus attributes from ENHD.
 
     Notes
@@ -27,6 +31,10 @@ def enhd_attrs(parquet_path: Optional[Union[Path, str]] = None) -> pd.DataFrame:
     parquet_path : str or Path, optional
         Path to a file with ``.parquet`` extension for storing the file, defaults to
         ``./cache/enhd_attrs.parquet``.
+    expire_after : int, optional
+        Expiration time for response caching in seconds, defaults to -1 (never expire).
+    disable_caching : bool, optional
+        If ``True``, disable caching requests, defaults to False.
 
     Returns
     -------
@@ -41,7 +49,7 @@ def enhd_attrs(parquet_path: Optional[Union[Path, str]] = None) -> pd.DataFrame:
     if output.exists():
         return pd.read_parquet(output)
 
-    sb = ScienceBase()
+    sb = ScienceBase(expire_after, disable_caching)
     files = sb.get_file_urls("60c92503d34e86b9389df1c9")
     resp = ar.retrieve([files.loc["enhd_nhdplusatts.parquet"].url], "binary")
     attrs = pd.read_parquet(io.BytesIO(resp[0]))
@@ -49,7 +57,11 @@ def enhd_attrs(parquet_path: Optional[Union[Path, str]] = None) -> pd.DataFrame:
     return attrs
 
 
-def nhdplus_vaa(parquet_path: Optional[Union[Path, str]] = None) -> pd.DataFrame:
+def nhdplus_vaa(
+    parquet_path: Optional[Union[Path, str]] = None,
+    expire_after: float = EXPIRE,
+    disable_caching: bool = False,
+) -> pd.DataFrame:
     """Get NHDPlus Value Added Attributes with ComID-level roughness and slope values.
 
     Notes
@@ -64,6 +76,10 @@ def nhdplus_vaa(parquet_path: Optional[Union[Path, str]] = None) -> pd.DataFrame
     parquet_path : str or Path, optional
         Path to a file with ``.parquet`` extension for storing the file, defaults to
         ``./cache/nldplus_vaa.parquet``.
+    expire_after : int, optional
+        Expiration time for response caching in seconds, defaults to -1 (never expire).
+    disable_caching : bool, optional
+        If ``True``, disable caching requests, defaults to False.
 
     Returns
     -------
@@ -136,7 +152,7 @@ def nhdplus_vaa(parquet_path: Optional[Union[Path, str]] = None) -> pd.DataFrame
     fpath = "data/contents/nhdplusVAA.parquet"
     url = f"https://www.hydroshare.org/resource/{rid}/{fpath}"
 
-    resp = ar.retrieve([url], "binary")
+    resp = ar.retrieve([url], "binary", expire_after=expire_after, disable=disable_caching)
 
     vaa = pd.read_parquet(io.BytesIO(resp[0]))
     vaa = vaa.astype(dtypes, errors="ignore")
@@ -145,7 +161,10 @@ def nhdplus_vaa(parquet_path: Optional[Union[Path, str]] = None) -> pd.DataFrame
 
 
 def nhdplus_attrs(
-    name: Optional[str] = None, parquet_path: Optional[Union[Path, str]] = None
+    name: Optional[str] = None,
+    parquet_path: Optional[Union[Path, str]] = None,
+    expire_after: float = EXPIRE,
+    disable_caching: bool = False,
 ) -> pd.DataFrame:
     """Access NHDPlus V2.1 Attributes from ScienceBase over CONUS.
 
@@ -159,6 +178,10 @@ def nhdplus_attrs(
     parquet_path : str or Path, optional
         Path to a file with ``.parquet`` extension for saving the processed to disk for
         later use. Defaults to ``./cache/nhdplus_attrs.parquet``.
+    expire_after : int, optional
+        Expiration time for response caching in seconds, defaults to -1 (never expire).
+    disable_caching : bool, optional
+        If ``True``, disable caching requests, defaults to False.
 
     Returns
     -------
@@ -177,8 +200,8 @@ def nhdplus_attrs(
         url = char_df[char_df.name == name].url.values[0]
     except IndexError as ex:
         raise InvalidInputValue("name", char_df.name.unique()) from ex
-
-    return pd.read_csv(url, compression="zip")
+    resp = ar.retrieve([url], "binary", expire_after=expire_after, disable=disable_caching)
+    return pd.read_csv(io.BytesIO(resp[0]), compression="zip")
 
 
 def nhd_fcode() -> pd.DataFrame:
