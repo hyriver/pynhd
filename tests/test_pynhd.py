@@ -26,8 +26,8 @@ def trib():
 
 class NHDPlusEPA(AGRBase):
     def __init__(self, layer):
-        super().__init__(layer, "*", DEF_CRS)
-        self.service = "https://watersgeo.epa.gov/arcgis/rest/services/NHDPlus/NHDPlus/MapServer"
+        url = "https://watersgeo.epa.gov/arcgis/rest/services/NHDPlus/NHDPlus/MapServer"
+        super().__init__(url, layer, "*", DEF_CRS)
 
 
 def test_agr():
@@ -44,6 +44,7 @@ def test_agr():
     assert abs(df.LENGTHKM.sum() - 8.917) < SMALL
 
 
+@pytest.mark.xfail(reason="PyGeoAPI is unstable.")
 class TestPyGeoAPI:
     pygeoapi = PyGeoAPI()
 
@@ -156,7 +157,7 @@ class TestWaterData:
 
 
 def test_nhdphr():
-    hr = nhd.NHDPlusHR("networknhdflowline", service="hydro", auto_switch=True)
+    hr = nhd.NHDPlusHR("networknhdflowline")
     flwb = hr.bygeom((-69.77, 45.07, -69.31, 45.45))
     flwi = hr.byids("PERMANENT_IDENTIFIER", ["103455178", "103454362", "103453218"])
     flwf = hr.bysql("PERMANENT_IDENTIFIER IN ('103455178', '103454362', '103453218')")
