@@ -1,4 +1,5 @@
 """Access NLDI and WaterData databases."""
+from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 import async_retriever as ar
@@ -13,12 +14,24 @@ from pygeoutils import InvalidInputType
 from requests import Response
 from shapely.geometry import MultiPolygon, Polygon
 
-from .core import ALT_CRS, DEF_CRS, AGRBase, logger
-from .exceptions import InvalidInputRange, MissingItems
+from .core import ALT_CRS, DEF_CRS, EXPIRE, AGRBase, logger
+from .exceptions import InvalidInputRange, MissingItems, ServiceError
 
 
+@dataclass
 class PyGeoAPI:
-    """Access `PyGeoAPI <https://labs.waterdata.usgs.gov/api/nldi/pygeoapi>`__ service."""
+    """Access `PyGeoAPI <https://labs.waterdata.usgs.gov/api/nldi/pygeoapi>`__ service.
+
+    Parameters
+    ----------
+    expire_after : int, optional
+        Expiration time for response caching in seconds, defaults to -1 (never expire).
+    disable_caching : bool, optional
+        If ``True``, disable caching requests, defaults to False.
+    """
+
+    expire_after: float = EXPIRE
+    disable_caching: bool = False
 
     @staticmethod
     def _get_url(operation: str) -> str:
@@ -37,16 +50,22 @@ class PyGeoAPI:
         }
         return {"json": data}
 
-    @staticmethod
     def _get_response(
-        url: str, payload: Dict[str, Dict[str, List[Dict[str, Any]]]]
+        self, url: str, payload: Dict[str, Dict[str, List[Dict[str, Any]]]]
     ) -> gpd.GeoDataFrame:
         """Post the request and return the response as GeoDataFrame."""
-        resp = ar.retrieve([url], "json", [payload], "POST")[0]
+        resp = ar.retrieve(
+            [url],
+            "json",
+            [payload],
+            "POST",
+            expire_after=self.expire_after,
+            disable=self.disable_caching,
+        )
         try:
-            return geoutils.json2geodf(resp["outputs"])
+            return geoutils.json2geodf(resp[0]["outputs"])
         except KeyError as ex:
-            raise ar.ServiceError(resp) from ex
+            raise ServiceError(resp[0]) from ex
 
     @staticmethod
     def _check_coords(
@@ -359,9 +378,9 @@ class NHDPlusHR(AGRBase):
 
     Parameters
     ----------
-    layer : str, optional
+    layer : str
         A valid service layer. To see a list of available layers instantiate the class
-        without passing any argument like so ``NHDPlusHR()``.
+        with passing an empty string like so ``NHDPlusHR("")``.
     outfields : str or list, optional
         Target field name(s), default to "*" i.e., all the fields.
     crs : str, optional
@@ -371,40 +390,46 @@ class NHDPlusHR(AGRBase):
 
         * hydro: https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer
         * edits: https://edits.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/NHDPlus_HR/MapServer
-
-    auto_switch : bool, optional
-        Automatically switch to other services' URL if the first one doesn't work, default to False.
     """
 
     def __init__(
         self,
-        layer: Optional[str] = None,
+        layer: str,
         outfields: Union[str, List[str]] = "*",
         crs: str = DEF_CRS,
         service: str = "hydro",
-        auto_switch: bool = False,
     ):
-        super().__init__(layer, outfields, crs)
-        service_list = {
+        valid_services = {
             "hydro": ServiceURL().restful.nhdplushr,
             "edits": ServiceURL().restful.nhdplushr_edits,
         }
-        if layer is None:
-            raise InvalidInputValue("layer", list(self.get_validlayers(service_list[service])))
-        self.connect_to(service, service_list, auto_switch)
+        if service not in valid_services:
+            raise InvalidInputValue("service", list(valid_services))
+
+        super().__init__(valid_services[service], layer, outfields, crs)
 
 
 class NLDI:
-    """Access the Hydro Network-Linked Data Index (NLDI) service."""
+    """Access the Hydro Network-Linked Data Index (NLDI) service.
 
-    def __init__(self) -> None:
+    Parameters
+    ----------
+    expire_after : int, optional
+        Expiration time for response caching in seconds, defaults to -1 (never expire).
+    disable_caching : bool, optional
+        If ``True``, disable caching requests, defaults to False.
+    """
+
+    def __init__(self, expire_after: float = EXPIRE, disable_caching: bool = False) -> None:
         self.base_url = ServiceURL().restful.nldi
+        self.expire_after = expire_after
+        self.disable_caching = disable_caching
 
-        resp = ar.retrieve(["/".join([self.base_url, "linked-data"])], "json")[0]
-        self.valid_fsources = {r["source"]: r["sourceName"] for r in resp}
+        resp = self._get_url("/".join([self.base_url, "linked-data"]))
+        self.valid_fsources = {r["source"]: r["sourceName"] for r in resp}  # type: ignore
 
-        resp = ar.retrieve(["/".join([self.base_url, "lookups"])], "json")[0]
-        self.valid_chartypes = {r["type"]: r["typeName"] for r in resp}
+        resp = self._get_url("/".join([self.base_url, "lookups"]))
+        self.valid_chartypes = {r["type"]: r["typeName"] for r in resp}  # type: ignore
 
     @staticmethod
     def _missing_warning(n_miss: int, n_tot: int) -> None:
@@ -428,7 +453,7 @@ class NLDI:
         fsource : str
             The name of feature(s) source. The valid sources are:
             comid, huc12pp, nwissite, wade, wqp
-        fid : str or list
+        fid : str or list of str
             Feature ID(s).
 
         Returns
@@ -604,10 +629,8 @@ class NLDI:
 
     def get_validchars(self, char_type: str) -> pd.DataFrame:
         """Get all the available characteristics IDs for a given characteristics type."""
-        resp = ar.retrieve(
-            ["/".join([self.base_url, "lookups", char_type, "characteristics"])], "json"
-        )
-        c_list = ogc.utils.traverse_json(resp[0], ["characteristicMetadata", "characteristic"])
+        resp = self._get_url("/".join([self.base_url, "lookups", char_type, "characteristics"]))
+        c_list = ogc.utils.traverse_json(resp, ["characteristicMetadata", "characteristic"])
         return pd.DataFrame.from_dict(
             {c.pop("characteristic_id"): c for c in c_list}, orient="index"
         )
@@ -758,8 +781,16 @@ class NLDI:
             payload.update({"f": "json"})
 
         try:
-            return ar.retrieve([url], "json", [{"params": payload}])[0]
+            resp = ar.retrieve(
+                [url],
+                "json",
+                [{"params": payload}],
+                expire_after=self.expire_after,
+                disable=self.disable_caching,
+            )
         except ar.ServiceError as ex:
             raise ZeroMatched from ex
         except ConnectionError as ex:
             raise ServiceUnavailable(self.base_url) from ex
+        else:
+            return resp[0]
