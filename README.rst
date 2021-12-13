@@ -112,7 +112,7 @@ the National Map's `NHDPlus HR <https://hydro.nationalmap.gov/arcgis/rest/servic
 `NLDI <https://labs.waterdata.usgs.gov/about-nldi/>`__,
 and `PyGeoAPI <https://labs.waterdata.usgs.gov/api/nldi/pygeoapi>`__ web services. These web services
 can be used to navigate and extract vector data from NHDPlus V2 (both medium- and
-hight-resolution) database such as catchments, HUC8, HUC12, GagesII, flowlines, and water bodies.
+high-resolution) database such as catchments, HUC8, HUC12, GagesII, flowlines, and water bodies.
 Moreover, PyNHD gives access to an item on `ScienceBase <https://sciencebase.usgs.gov>`_ called
 `Select Attributes for NHDPlus Version 2.1 Reach Catchments and Modified Network Routed Upstream Watersheds for the Conterminous United States <https://www.sciencebase.gov/catalog/item/5669a79ee4b08895842a1d47>`_.
 This item provides over 30 attributes at catchment-scale based on NHDPlus ComIDs.
@@ -144,7 +144,7 @@ Additionally, PyNHD offers some extra utilities for processing the flowlines:
 - ``topoogical_sort``: For sorting the river network topologically which is useful for routing
   and flow accumulation.
 - ``vector_accumulation``: For computing flow accumulation in a river network. This function
-  is generic and any routing method can be plugged in.
+  is generic, and any routing method can be plugged in.
 
 These utilities are developed based on an ``R`` package called
 `nhdplusTools <https://github.com/USGS-R/nhdplusTools>`__.
@@ -158,6 +158,11 @@ You can use ``disable_caching`` if you don't want to use the cached responses. T
 responses are stored in the ``./cache/aiohttp_cache.sqlite`` file.
 
 You can find some example notebooks `here <https://github.com/cheginit/HyRiver-examples>`__.
+
+Furthermore, you can try using PyNHD without even installing it on your system by
+clicking on the binder badge below the PyNHD banner. A JupyterLab instance
+with the software stack pre-installed and all example notebooks will be launched
+in your web browser, and you can start coding!
 
 Please note that since this project is in early development stages, while the provided
 functionalities should be stable, changes in APIs are possible in new releases. But we
@@ -177,7 +182,8 @@ You can install PyNHD using ``pip`` after installing ``libgdal`` on your system
     $ pip install pynhd
 
 Alternatively, PyNHD can be installed from the ``conda-forge`` repository
-using `Conda <https://docs.conda.io/en/latest/>`__ or `Mamba <https://github.com/conda-forge/miniforge>`__:
+using `Conda <https://docs.conda.io/en/latest/>`__
+or `Mamba <https://github.com/conda-forge/miniforge>`__:
 
 .. code-block:: console
 
