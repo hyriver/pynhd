@@ -769,7 +769,7 @@ class NLDI:
         if len(resp) == 0:
             raise ZeroMatched
 
-        resp_df = gpd.GeoDataFrame(pd.concat(dict(resp)))
+        resp_df = gpd.GeoDataFrame(pd.concat(dict(resp)), crs=DEF_CRS)
 
         return resp_df, not_found
 
