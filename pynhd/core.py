@@ -57,6 +57,9 @@ class AGRBase:
         Target field name(s), default to "*" i.e., all the fields.
     crs : str, optional
         Target spatial reference, default to EPSG:4326
+    outformat : str, optional
+        One of the output formats offered by the selected layer. If not correct
+        a list of available formats is shown, defaults to ``json``.
     expire_after : int, optional
         Expiration time for response caching in seconds, defaults to -1 (never expire).
     disable_caching : bool, optional
@@ -69,6 +72,7 @@ class AGRBase:
         layer: Optional[str] = None,
         outfields: Union[str, List[str]] = "*",
         crs: str = DEF_CRS,
+        outformat: str = "json",
         expire_after: float = EXPIRE,
         disable_caching: bool = False,
     ) -> None:
@@ -80,7 +84,7 @@ class AGRBase:
                 self.client = ArcGISRESTful(
                     base_url,
                     valid_layers[layer.lower()],
-                    outformat="json",
+                    outformat=outformat,
                     outfields=outfields,
                     crs=crs,
                     expire_after=expire_after,
@@ -92,7 +96,7 @@ class AGRBase:
             self.client = ArcGISRESTful(
                 base_url,
                 None,
-                outformat="json",
+                outformat=outformat,
                 outfields=outfields,
                 crs=crs,
                 expire_after=expire_after,
@@ -128,6 +132,7 @@ class AGRBase:
         sql_clause: str = "",
         distance: Optional[int] = None,
         return_m: bool = False,
+        return_geom: bool = True,
     ) -> gpd.GeoDataFrame:
         """Get feature within a geometry that can be combined with a SQL where clause.
 
@@ -143,6 +148,8 @@ class AGRBase:
             The buffer distance for the input geometries in meters, default to None.
         return_m : bool, optional
             Whether to activate the Return M (measure) in the request, defaults to False.
+        return_geom : bool, optional
+            Whether to return the geometry of the feature, defaults to ``True``.
 
         Returns
         -------
@@ -152,10 +159,14 @@ class AGRBase:
         oids = self.client.oids_bygeom(
             geom, geo_crs=geo_crs, sql_clause=sql_clause, distance=distance
         )
-        return self._getfeatures(oids, return_m)
+        return self._getfeatures(oids, return_m, return_geom)
 
     def byids(
-        self, field: str, fids: Union[str, List[str]], return_m: bool = False
+        self,
+        field: str,
+        fids: Union[str, List[str]],
+        return_m: bool = False,
+        return_geom: bool = True,
     ) -> gpd.GeoDataFrame:
         """Get features based on a list of field IDs.
 
@@ -167,6 +178,8 @@ class AGRBase:
             A list of target field ID(s).
         return_m : bool
             Whether to activate the Return M (measure) in the request, defaults to False.
+        return_geom : bool, optional
+            Whether to return the geometry of the feature, defaults to ``True``.
 
         Returns
         -------
@@ -174,9 +187,14 @@ class AGRBase:
             The requested features as a GeoDataFrame.
         """
         oids = self.client.oids_byfield(field, fids)
-        return self._getfeatures(oids, return_m)
+        return self._getfeatures(oids, return_m, return_geom)
 
-    def bysql(self, sql_clause: str, return_m: bool = False) -> gpd.GeoDataFrame:
+    def bysql(
+        self,
+        sql_clause: str,
+        return_m: bool = False,
+        return_geom: bool = True,
+    ) -> gpd.GeoDataFrame:
         """Get feature IDs using a valid SQL 92 WHERE clause.
 
         Notes
@@ -190,6 +208,8 @@ class AGRBase:
             A valid SQL 92 WHERE clause.
         return_m : bool
             Whether to activate the measure in the request, defaults to False.
+        return_geom : bool, optional
+            Whether to return the geometry of the feature, defaults to ``True``.
 
         Returns
         -------
@@ -197,22 +217,28 @@ class AGRBase:
             The requested features as a GeoDataFrame.
         """
         oids = self.client.oids_bysql(sql_clause)
-        return self._getfeatures(oids, return_m)
+        return self._getfeatures(oids, return_m, return_geom)
 
-    def _getfeatures(self, oids: List[Tuple[str, ...]], return_m: bool = False) -> gpd.GeoDataFrame:
+    def _getfeatures(
+        self, oids: List[Tuple[str, ...]], return_m: bool = False, return_geom: bool = True
+    ) -> gpd.GeoDataFrame:
         """Send a request for getting data based on object IDs.
 
         Parameters
         ----------
         return_m : bool
             Whether to activate the Return M (measure) in the request, defaults to False.
+        return_geom : bool, optional
+            Whether to return the geometry of the feature, defaults to ``True``.
 
         Returns
         -------
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        return geoutils.json2geodf(self.client.get_features(oids, return_m))
+        return geoutils.json2geodf(
+            self.client.get_features(oids, return_m, return_geom), self.client.crs
+        )
 
     def __repr__(self) -> str:
         """Print the service configuration."""
