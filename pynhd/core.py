@@ -103,7 +103,7 @@ class AGRBase:
                 disable_caching=disable_caching,
             )
 
-    def get_validlayers(self, url: str) -> Dict[str, str]:
+    def get_validlayers(self, url: str) -> Dict[str, int]:
         """Get a list of valid layers.
 
         Parameters
@@ -116,14 +116,14 @@ class AGRBase:
         dict
             A dictionary of valid layers.
         """
-        rjson = ar.retrieve(
+        rjson: List[Dict[str, Any]] = ar.retrieve(  # type: ignore
             [url],
             "json",
             [{"params": {"f": "json"}}],
             expire_after=self.expire_after,
             disable=self.disable_caching,
         )
-        return {lyr["name"].lower(): lyr["id"] for lyr in rjson[0]["layers"]}
+        return {lyr["name"].lower(): int(lyr["id"]) for lyr in rjson[0]["layers"]}
 
     def bygeom(
         self,
@@ -237,7 +237,7 @@ class AGRBase:
             The requested features as a GeoDataFrame.
         """
         return geoutils.json2geodf(
-            self.client.get_features(oids, return_m, return_geom), self.client.crs
+            self.client.get_features(oids, return_m, return_geom), self.client.client.crs
         )
 
     def __repr__(self) -> str:
@@ -268,7 +268,7 @@ class ScienceBase:
             "fields": "title,id",
             "format": "json",
         }
-        resp = ar.retrieve(
+        resp: List[Dict[str, Any]] = ar.retrieve(  # type: ignore
             [url],
             "json",
             [{"params": payload}],
@@ -281,7 +281,7 @@ class ScienceBase:
         """Get download and meta URLs of all the available files for an item."""
         url = "https://www.sciencebase.gov/catalog/item"
         payload = {"fields": "files,downloadUri", "format": "json"}
-        resp = ar.retrieve(
+        resp: List[Dict[str, Any]] = ar.retrieve(  # type: ignore
             [f"{url}/{item}"],
             "json",
             [{"params": payload}],
@@ -339,7 +339,7 @@ def stage_nhdplus_attrs(
         """Get all the available zip files in an item."""
         url = "https://www.sciencebase.gov/catalog/item"
         payload = {"fields": "files,downloadUri", "format": "json"}
-        resp = ar.retrieve(
+        resp: List[Dict[str, Any]] = ar.retrieve(  # type: ignore
             [f"{url}/{item}"],
             "json",
             [{"params": payload}],

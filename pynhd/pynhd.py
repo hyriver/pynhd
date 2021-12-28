@@ -11,7 +11,6 @@ import pygeoogc.utils as ogc_utils
 import pygeoutils as geoutils
 from pygeoogc import WFS, InvalidInputValue, ServiceUnavailable, ServiceURL, ZeroMatched
 from pygeoutils import InvalidInputType
-from requests import Response
 from shapely.geometry import MultiPolygon, Polygon
 
 from .core import ALT_CRS, DEF_CRS, EXPIRE, AGRBase, logger
@@ -37,7 +36,7 @@ class PyGeoAPI:
     def _get_url(operation: str) -> str:
         """Set the service url."""
         base_url = ServiceURL().restful.pygeoapi
-        return f"{base_url}/nldi-{operation}/jobs?response=document"
+        return f"{base_url}/nldi-{operation}/execution"
 
     @staticmethod
     def _request_body(id_value: Dict[str, Any]) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
@@ -54,7 +53,7 @@ class PyGeoAPI:
         self, url: str, payload: Dict[str, Dict[str, List[Dict[str, Any]]]]
     ) -> gpd.GeoDataFrame:
         """Post the request and return the response as GeoDataFrame."""
-        resp = ar.retrieve(
+        resp: List[Dict[str, Any]] = ar.retrieve(  # type: ignore
             [url],
             "json",
             [payload],
@@ -65,7 +64,8 @@ class PyGeoAPI:
         try:
             return geoutils.json2geodf(resp[0]["outputs"])
         except KeyError as ex:
-            raise ServiceError(resp[0]) from ex
+            msg = "Check your inpute parameters and try again."
+            raise ServiceError(msg) from ex
 
     @staticmethod
     def _check_coords(
@@ -118,8 +118,8 @@ class PyGeoAPI:
         >>> pygeoapi = PyGeoAPI()
         >>> gdf = pygeoapi.flow_trace(
         ...     (1774209.63, 856381.68), crs="ESRI:102003", raindrop=False, direction="none"
-        ... )
-        >>> print(gdf.comid.iloc[0])
+        ... )  # doctest: +SKIP
+        >>> print(gdf.comid.iloc[0])  # doctest: +SKIP
         22294818
         """
         _coord = self._check_coords(coord, crs)
@@ -155,8 +155,8 @@ class PyGeoAPI:
         --------
         >>> from pynhd import PyGeoAPI
         >>> pygeoapi = PyGeoAPI()
-        >>> gdf = pygeoapi.split_catchment((-73.82705, 43.29139), crs=DEF_CRS, upstream=False)
-        >>> print(gdf.catchmentID.iloc[0])
+        >>> gdf = pygeoapi.split_catchment((-73.82705, 43.29139), crs=DEF_CRS, upstream=False)  # doctest: +SKIP
+        >>> print(gdf.catchmentID.iloc[0])  # doctest: +SKIP
         22294818
         """
         _coord = self._check_coords(coord, crs)
@@ -195,8 +195,8 @@ class PyGeoAPI:
         >>> pygeoapi = PyGeoAPI()
         >>> gdf = pygeoapi.elevation_profile(
         ...     [(-103.801086, 40.26772), (-103.80097, 40.270568)], numpts=101, dem_res=1, crs=DEF_CRS
-        ... )
-        >>> print(gdf.iloc[-1, 1])
+        ... )  # doctest: +SKIP
+        >>> print(gdf.iloc[-1, 1])  # doctest: +SKIP
         411.5906
         """
         _coords = self._check_coords(coords, crs)
@@ -231,8 +231,8 @@ class PyGeoAPI:
         --------
         >>> from pynhd import PyGeoAPI
         >>> pygeoapi = PyGeoAPI()
-        >>> gdf = pygeoapi.cross_section((-103.80119, 40.2684), width=1000.0, numpts=101, crs=DEF_CRS)
-        >>> print(gdf.iloc[-1, 1])
+        >>> gdf = pygeoapi.cross_section((-103.80119, 40.2684), width=1000.0, numpts=101, crs=DEF_CRS)  # doctest: +SKIP
+        >>> print(gdf.iloc[-1, 1])  # doctest: +SKIP
         1000.0
         """
         _coord = self._check_coords(coord, crs)
@@ -288,7 +288,7 @@ class WaterData:
         self, bbox: Tuple[float, float, float, float], box_crs: str = DEF_CRS
     ) -> gpd.GeoDataFrame:
         """Get features within a bounding box."""
-        resp = self.wfs.getfeature_bybox(bbox, box_crs, always_xy=True)
+        resp: List[Dict[str, Any]] = self.wfs.getfeature_bybox(bbox, box_crs, always_xy=True)  # type: ignore
         return self._to_geodf(resp)
 
     def bygeom(
@@ -319,7 +319,9 @@ class WaterData:
         geopandas.GeoDataFrame
             The requested features in the given geometry.
         """
-        resp = self.wfs.getfeature_bygeom(geometry, geo_crs, always_xy=not xy, predicate=predicate)
+        resp: List[Dict[str, Any]] = self.wfs.getfeature_bygeom(  # type: ignore
+            geometry, geo_crs, always_xy=not xy, predicate=predicate
+        )
         return self._to_geodf(resp)
 
     def bydistance(
@@ -331,12 +333,12 @@ class WaterData:
 
         x, y = ogc.utils.match_crs([coords], loc_crs, ALT_CRS)[0]
         cql_filter = f"DWITHIN(the_geom,POINT({y:.6f} {x:.6f}),{distance},meters)"
-        resp = self.wfs.getfeature_byfilter(cql_filter, "GET")
+        resp: List[Dict[str, Any]] = self.wfs.getfeature_byfilter(cql_filter, "GET")  # type: ignore
         return self._to_geodf(resp)
 
     def byid(self, featurename: str, featureids: Union[List[str], str]) -> gpd.GeoDataFrame:
         """Get features based on IDs."""
-        resp = self.wfs.getfeature_byid(featurename, featureids)
+        resp: List[Dict[str, Any]] = self.wfs.getfeature_byid(featurename, featureids)  # type: ignore
         features = self._to_geodf(resp)
 
         fids = [str(f) for f in featureids] if isinstance(featureids, list) else [str(featureids)]
@@ -351,16 +353,16 @@ class WaterData:
 
     def byfilter(self, cql_filter: str, method: str = "GET") -> gpd.GeoDataFrame:
         """Get features based on a CQL filter."""
-        resp = self.wfs.getfeature_byfilter(cql_filter, method)
+        resp: List[Dict[str, Any]] = self.wfs.getfeature_byfilter(cql_filter, method)  # type: ignore
         return self._to_geodf(resp)
 
-    def _to_geodf(self, resp: Response) -> gpd.GeoDataFrame:
+    def _to_geodf(self, resp: List[Dict[str, Any]]) -> gpd.GeoDataFrame:
         """Convert a response from WaterData to a GeoDataFrame.
 
         Parameters
         ----------
-        resp : Response
-            A response from a WaterData request.
+        resp : list of dicts
+            A ``json`` response from a WaterData request.
 
         Returns
         -------
@@ -781,7 +783,7 @@ class NLDI:
             payload.update({"f": "json"})
 
         try:
-            resp = ar.retrieve(
+            resp: List[Dict[str, Any]] = ar.retrieve(  # type: ignore
                 [url],
                 "json",
                 [{"params": payload}],

@@ -101,11 +101,6 @@ class NHDTools:
             Minimum size of outlet level path of a drainage basin in km.
             Drainage basins with an outlet drainage area smaller than
             this value will be removed.
-
-        Returns
-        -------
-        geopandas.GeoDataFrame
-            Flowlines with small paths removed.
         """
         req_cols = [
             "levelpathi",
@@ -142,11 +137,6 @@ class NHDTools:
         -----
         This functions requires the following columns:
             ``comid``, ``terminalpa``, ``fromnode``, ``tonode``
-
-        Returns
-        -------
-        geopandas.GeoDataFrame
-            The input dataframe With an additional column named ``tocomid``.
         """
         req_cols = ["comid", "terminalpa", "fromnode", "tonode"]
         self.check_requirements(req_cols, self.flw)
@@ -164,7 +154,7 @@ class NHDTools:
         self.flw["tocomid"] = pd.concat(tocomid(g) for _, g in self.flw.groupby("terminalpa"))
 
     @staticmethod
-    def check_requirements(reqs: Iterable, cols: List[str]) -> None:
+    def check_requirements(reqs: Iterable[str], cols: List[str]) -> None:
         """Check for all the required data.
 
         Parameters
@@ -287,7 +277,7 @@ def topoogical_sort(
 
 def vector_accumulation(
     flowlines: pd.DataFrame,
-    func: Callable,
+    func: Callable[[float], float],
     attr_col: str,
     arg_cols: List[str],
     id_col: str = "comid",
