@@ -5,6 +5,17 @@ History
 0.12.0 (2021-12-27)
 -------------------
 
+Breaking Changes
+~~~~~~~~~~~~~~~~
+- Rewrite ``ScienceBase`` to make it generally usable for working with other ScienceBase
+  items. A new function has been added for staging the Additional NHDPlus attributes items
+  called ``stage_nhdplus_attrs``.
+- Refactor ``AGRBase`` to remove unnecessary functions and make it more general.
+- Update ``PyGeoAPI`` class to conform to the new ``pygeoapi`` API. This web service
+  is undergoing some changes at the time of this release and API is not stable,
+  might not work as expected. As soon as the web service is stable, a new version
+  will be released.
+
 New Features
 ~~~~~~~~~~~~
 - In ``WaterData.byid`` show a warning if there are any missing feature IDs that are
@@ -22,6 +33,8 @@ Internal Changes
   NHDPlus tools as a private class.
 - Modify ``AGRBase`` to reflect the latest API changes in ``pygeoogc.ArcGISRESTfull``
   class.
+- Refactor ``prepare_nhdplus`` by creating a private class that include all the previously
+  used private functions. This will make the code more readable and easier to maintain.
 - Add all the missing types so ``mypy --strict`` passes.
 
 0.11.4 (2021-11-12)
@@ -66,7 +79,7 @@ New Features
 
 New Features
 ~~~~~~~~~~~~
-- Add a function for getting all NHD FCodes as a data frame, called ``nhd_fcode``.
+- Add a function for getting all NHD ``FCodes`` as a data frame, called ``nhd_fcode``.
 - Improve ``prepare_nhdplus`` function by removing all coastlines and better detection
   of the terminal point in a network.
 
