@@ -2,13 +2,13 @@
 History
 =======
 
-0.11.5 (unreleased)
+0.12.0 (2021-12-27)
 -------------------
 
 New Features
 ~~~~~~~~~~~~
-- In ``WaterData.byid`` show a warning if there were any missing feature IDs that were
-  requested by user but are not available in the dataset.
+- In ``WaterData.byid`` show a warning if there are any missing feature IDs that are
+  requested but are not available in the dataset.
 - For all ``by*`` methods of ``WaterData`` throw a ``ZeroMatched`` exception if no
   features are found.
 - Add ``expire_after`` and ``disable_caching`` arguments to all functions that use
@@ -22,6 +22,7 @@ Internal Changes
   NHDPlus tools as a private class.
 - Modify ``AGRBase`` to reflect the latest API changes in ``pygeoogc.ArcGISRESTfull``
   class.
+- Add all the missing types so ``mypy --strict`` passes.
 
 0.11.4 (2021-11-12)
 -------------------
