@@ -17,6 +17,9 @@ testpaths = [
     "tests",
     "pynhd",
 ]
+filterwarnings =[
+    "ignore:.*distutils.*"
+]
 
 [tool.isort]
 profile = "black"
