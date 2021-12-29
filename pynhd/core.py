@@ -116,9 +116,8 @@ class AGRBase:
         dict
             A dictionary of valid layers.
         """
-        rjson: List[Dict[str, Any]] = ar.retrieve(  # type: ignore
+        rjson = ar.retrieve_json(
             [url],
-            "json",
             [{"params": {"f": "json"}}],
             expire_after=self.expire_after,
             disable=self.disable_caching,
@@ -268,9 +267,8 @@ class ScienceBase:
             "fields": "title,id",
             "format": "json",
         }
-        resp: List[Dict[str, Any]] = ar.retrieve(  # type: ignore
+        resp = ar.retrieve_json(
             [url],
-            "json",
             [{"params": payload}],
             expire_after=self.expire_after,
             disable=self.disable_caching,
@@ -281,9 +279,8 @@ class ScienceBase:
         """Get download and meta URLs of all the available files for an item."""
         url = "https://www.sciencebase.gov/catalog/item"
         payload = {"fields": "files,downloadUri", "format": "json"}
-        resp: List[Dict[str, Any]] = ar.retrieve(  # type: ignore
+        resp = ar.retrieve_json(
             [f"{url}/{item}"],
-            "json",
             [{"params": payload}],
             expire_after=self.expire_after,
             disable=self.disable_caching,
@@ -339,9 +336,8 @@ def stage_nhdplus_attrs(
         """Get all the available zip files in an item."""
         url = "https://www.sciencebase.gov/catalog/item"
         payload = {"fields": "files,downloadUri", "format": "json"}
-        resp: List[Dict[str, Any]] = ar.retrieve(  # type: ignore
+        resp = ar.retrieve_json(
             [f"{url}/{item}"],
-            "json",
             [{"params": payload}],
             expire_after=expire_after,
             disable=disable_caching,

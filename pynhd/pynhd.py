@@ -53,9 +53,8 @@ class PyGeoAPI:
         self, url: str, payload: Dict[str, Dict[str, List[Dict[str, Any]]]]
     ) -> gpd.GeoDataFrame:
         """Post the request and return the response as GeoDataFrame."""
-        resp: List[Dict[str, Any]] = ar.retrieve(  # type: ignore
+        resp = ar.retrieve_json(
             [url],
-            "json",
             [payload],
             "POST",
             expire_after=self.expire_after,
@@ -783,9 +782,8 @@ class NLDI:
             payload.update({"f": "json"})
 
         try:
-            resp: List[Dict[str, Any]] = ar.retrieve(  # type: ignore
+            resp = ar.retrieve_json(
                 [url],
-                "json",
                 [{"params": payload}],
                 expire_after=self.expire_after,
                 disable=self.disable_caching,

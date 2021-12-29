@@ -1,7 +1,7 @@
 """Access NLDI and WaterData databases."""
 import io
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import async_retriever as ar
 import pandas as pd
@@ -51,9 +51,8 @@ def enhd_attrs(
 
     sb = ScienceBase(expire_after, disable_caching)
     files = sb.get_file_urls("60c92503d34e86b9389df1c9")
-    resp: List[bytes] = ar.retrieve(  # type: ignore
+    resp = ar.retrieve_binary(
         [files.loc["enhd_nhdplusatts.parquet"].url],
-        "binary",
         expire_after=expire_after,
         disable=disable_caching,
     )
@@ -157,9 +156,7 @@ def nhdplus_vaa(
     fpath = "data/contents/nhdplusVAA.parquet"
     url = f"https://www.hydroshare.org/resource/{rid}/{fpath}"
 
-    resp: List[bytes] = ar.retrieve(  # type: ignore
-        [url], "binary", expire_after=expire_after, disable=disable_caching
-    )
+    resp = ar.retrieve_binary([url], expire_after=expire_after, disable=disable_caching)
 
     vaa = pd.read_parquet(io.BytesIO(resp[0]))
     vaa = vaa.astype(dtypes, errors="ignore")
@@ -207,9 +204,7 @@ def nhdplus_attrs(
         url = char_df[char_df.name == name].url.values[0]
     except IndexError as ex:
         raise InvalidInputValue("name", char_df.name.unique()) from ex
-    resp: List[bytes] = ar.retrieve(  # type: ignore
-        [url], "binary", expire_after=expire_after, disable=disable_caching
-    )
+    resp = ar.retrieve_binary([url], expire_after=expire_after, disable=disable_caching)
     return pd.read_csv(io.BytesIO(resp[0]), compression="zip")
 
 
