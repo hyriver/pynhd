@@ -36,7 +36,7 @@ class PyGeoAPI:
     def _get_url(operation: str) -> str:
         """Set the service url."""
         base_url = ServiceURL().restful.pygeoapi
-        return f"{base_url}/nldi-{operation}/execution"
+        return f"{base_url}/nldi-{operation}/jobs?response=document"
 
     @staticmethod
     def _request_body(id_value: Dict[str, Any]) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
