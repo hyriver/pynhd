@@ -4,14 +4,13 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 import async_retriever as ar
 import cytoolz as tlz
 import geopandas as gpd
 import pandas as pd
 import pygeoutils as geoutils
-from pydantic import AnyHttpUrl
 from pygeoogc import ArcGISRESTful
 from shapely.geometry import Polygon
 
@@ -43,7 +42,7 @@ def get_parquet(parquet_path: Union[Path, str]) -> Path:
 
 
 class AGRBase:
-    """Base class for accessing NHD(Plus) HR database through the National Map ArcGISRESTful.
+    """Base class for getting geospatial data from a ArcGISRESTful service.
 
     Parameters
     ----------
@@ -68,7 +67,7 @@ class AGRBase:
 
     def __init__(
         self,
-        base_url: AnyHttpUrl,
+        base_url: str,
         layer: Optional[str] = None,
         outfields: Union[str, List[str]] = "*",
         crs: str = DEF_CRS,
@@ -219,7 +218,7 @@ class AGRBase:
         return self._getfeatures(oids, return_m, return_geom)
 
     def _getfeatures(
-        self, oids: List[Tuple[str, ...]], return_m: bool = False, return_geom: bool = True
+        self, oids: Iterator[Tuple[str, ...]], return_m: bool = False, return_geom: bool = True
     ) -> gpd.GeoDataFrame:
         """Send a request for getting data based on object IDs.
 
