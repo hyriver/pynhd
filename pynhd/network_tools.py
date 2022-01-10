@@ -1,6 +1,5 @@
 """Access NLDI and WaterData databases."""
-import numbers
-from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Callable, Iterable, List, Optional, Tuple, Union
 
 import geopandas as gpd
 import networkx as nx
@@ -154,7 +153,7 @@ class NHDTools:
         self.flw["tocomid"] = pd.concat(tocomid(g) for _, g in self.flw.groupby("terminalpa"))
 
     @staticmethod
-    def check_requirements(reqs: Iterable[str], cols: List[str]) -> None:
+    def check_requirements(reqs: Iterable[str], cols: Iterable[str]) -> None:
         """Check for all the required data.
 
         Parameters
@@ -243,7 +242,7 @@ def prepare_nhdplus(
 
 def topoogical_sort(
     flowlines: pd.DataFrame, edge_attr: Optional[Union[str, List[str]]] = None
-) -> Tuple[List[Union[str, NAType]], Dict[Union[str, NAType], List[str]], nx.DiGraph]:
+) -> Tuple[List[Union[np.int64, NAType]], pd.Series, nx.DiGraph]:
     """Topological sorting of a river network.
 
     Parameters
@@ -261,9 +260,11 @@ def topoogical_sort(
         and the generated networkx object. Note that the
         terminal node ID is set to pd.NA.
     """
-    upstream_nodes = {i: flowlines[flowlines.toID == i].ID.tolist() for i in flowlines.ID.tolist()}
-    upstream_nodes[pd.NA] = flowlines[flowlines.toID.isna()].ID.tolist()
+    up_nodes = pd.Series(
+        {i: flowlines[flowlines.toID == i].ID.tolist() for i in list(flowlines.ID) + [pd.NA]}
+    )
 
+    flowlines[["ID", "toID"]] = flowlines[["ID", "toID"]].astype("Int64")
     network = nx.from_pandas_edgelist(
         flowlines,
         source="ID",
@@ -272,12 +273,12 @@ def topoogical_sort(
         edge_attr=edge_attr,
     )
     topo_sorted = list(nx.topological_sort(network))
-    return topo_sorted, upstream_nodes, network
+    return topo_sorted, up_nodes, network
 
 
 def vector_accumulation(
     flowlines: pd.DataFrame,
-    func: Callable[[float], float],
+    func: Callable[..., float],
     attr_col: str,
     arg_cols: List[str],
     id_col: str = "comid",
@@ -320,29 +321,19 @@ def vector_accumulation(
         condition in the ``attr_col``, the outflow for each river segment can be
         a scalar or an array.
     """
-    sorted_nodes, upstream_nodes, _ = topoogical_sort(
+    sorted_nodes, up_nodes, _ = topoogical_sort(
         flowlines[[id_col, toid_col]].rename(columns={id_col: "ID", toid_col: "toID"})
     )
     topo_sorted = sorted_nodes[:-1]
 
     outflow = flowlines.set_index(id_col)[attr_col].to_dict()
 
-    init = flowlines.iloc[0][attr_col]
-
-    if isinstance(init, numbers.Number):
-        outflow["0"] = 0.0
-    else:
-        outflow["0"] = np.zeros_like(init)
-
-    upstream_nodes.update({k: ["0"] for k, v in upstream_nodes.items() if len(v) == 0})
-
     for i in topo_sorted:
         outflow[i] = func(
-            np.sum([outflow[u] for u in upstream_nodes[i]], axis=0),
+            np.sum([outflow[u] for u in up_nodes[i]], axis=0),
             *flowlines.loc[flowlines[id_col] == i, arg_cols].to_numpy()[0],
         )
 
-    outflow.pop("0")
     acc = pd.Series(outflow).loc[sorted_nodes[:-1]]
     acc = acc.rename_axis("comid").rename(f"acc_{attr_col}")
     return acc
