@@ -287,7 +287,7 @@ class WaterData:
         self, bbox: Tuple[float, float, float, float], box_crs: str = DEF_CRS
     ) -> gpd.GeoDataFrame:
         """Get features within a bounding box."""
-        resp: List[Dict[str, Any]] = self.wfs.getfeature_bybox(bbox, box_crs, always_xy=True)  # type: ignore
+        resp: Dict[str, Any] = self.wfs.getfeature_bybox(bbox, box_crs, always_xy=True)  # type: ignore
         return self._to_geodf(resp)
 
     def bygeom(
@@ -318,7 +318,7 @@ class WaterData:
         geopandas.GeoDataFrame
             The requested features in the given geometry.
         """
-        resp: List[Dict[str, Any]] = self.wfs.getfeature_bygeom(  # type: ignore
+        resp: Dict[str, Any] = self.wfs.getfeature_bygeom(  # type: ignore
             geometry, geo_crs, always_xy=not xy, predicate=predicate
         )
         return self._to_geodf(resp)
@@ -332,12 +332,12 @@ class WaterData:
 
         x, y = ogc.utils.match_crs([coords], loc_crs, ALT_CRS)[0]
         cql_filter = f"DWITHIN(the_geom,POINT({y:.6f} {x:.6f}),{distance},meters)"
-        resp: List[Dict[str, Any]] = self.wfs.getfeature_byfilter(cql_filter, "GET")  # type: ignore
+        resp: Dict[str, Any] = self.wfs.getfeature_byfilter(cql_filter, "GET")  # type: ignore
         return self._to_geodf(resp)
 
     def byid(self, featurename: str, featureids: Union[List[str], str]) -> gpd.GeoDataFrame:
         """Get features based on IDs."""
-        resp: List[Dict[str, Any]] = self.wfs.getfeature_byid(featurename, featureids)  # type: ignore
+        resp: Dict[str, Any] = self.wfs.getfeature_byid(featurename, featureids)  # type: ignore
         features = self._to_geodf(resp)
 
         fids = [str(f) for f in featureids] if isinstance(featureids, list) else [str(featureids)]
@@ -352,10 +352,10 @@ class WaterData:
 
     def byfilter(self, cql_filter: str, method: str = "GET") -> gpd.GeoDataFrame:
         """Get features based on a CQL filter."""
-        resp: List[Dict[str, Any]] = self.wfs.getfeature_byfilter(cql_filter, method)  # type: ignore
+        resp: Dict[str, Any] = self.wfs.getfeature_byfilter(cql_filter, method)  # type: ignore
         return self._to_geodf(resp)
 
-    def _to_geodf(self, resp: List[Dict[str, Any]]) -> gpd.GeoDataFrame:
+    def _to_geodf(self, resp: Union[List[Dict[str, Any]], Dict[str, Any]]) -> gpd.GeoDataFrame:
         """Convert a response from WaterData to a GeoDataFrame.
 
         Parameters
@@ -605,7 +605,7 @@ class NLDI:
 
         for comid in comids:
             url = "/".join([self.base_url, "linked-data", "comid", f"{comid}", char_type])
-            rjson = self._get_url(url, payload)
+            rjson: Dict[str, Any] = self._get_url(url, payload)  # type: ignore
             char = pd.DataFrame.from_dict(rjson["characteristics"], orient="columns").T
             char.columns = char.iloc[0]
             char = char.drop(index="characteristic_id")
@@ -676,7 +676,7 @@ class NLDI:
 
         url = "/".join([self.base_url, "linked-data", fsource, fid, "navigation"])
 
-        valid_navigations = self._get_url(url)
+        valid_navigations: Dict[str, Any] = self._get_url(url)  # type: ignore
         if navigation not in valid_navigations.keys():
             raise InvalidInputValue("navigation", list(valid_navigations.keys()))
 
@@ -774,7 +774,9 @@ class NLDI:
 
         return resp_df, not_found
 
-    def _get_url(self, url: str, payload: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    def _get_url(
+        self, url: str, payload: Optional[Dict[str, str]] = None
+    ) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
         """Send a request to the service using GET method."""
         if payload is None:
             payload = {"f": "json"}

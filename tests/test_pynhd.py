@@ -6,7 +6,14 @@ import pytest
 from shapely.geometry import box
 
 import pynhd as nhd
-from pynhd import NLDI, AGRBase, PyGeoAPI, WaterData
+from pynhd import NLDI, PyGeoAPI, WaterData
+
+try:
+    import typeguard  # noqa: F401
+except ImportError:
+    has_typeguard = False
+else:
+    has_typeguard = True
 
 STA_ID = "01031500"
 station_id = f"USGS-{STA_ID}"
@@ -22,26 +29,6 @@ def trib():
     comids = NLDI().navigate_byid(site, station_id, UT, "flowlines")
     wd = WaterData("nhdflowline_network")
     return wd.byid("comid", comids.nhdplus_comid.tolist())
-
-
-class NHDPlusEPA(AGRBase):
-    def __init__(self, layer):
-        url = "https://watersgeo.epa.gov/arcgis/rest/services/NHDPlus/NHDPlus/MapServer"
-        super().__init__(url, layer, "*", DEF_CRS)
-
-
-def test_agr():
-    geom = [
-        (-97.06138, 32.837),
-        (-97.06133, 32.836),
-        (-97.06124, 32.834),
-        (-97.06127, 32.832),
-    ]
-    epa = NHDPlusEPA(layer="network flowline")
-    df = epa.bygeom(
-        geom, geo_crs="epsg:4269", sql_clause="FTYPE NOT IN (420,428,566)", distance=1500
-    )
-    assert abs(df.LENGTHKM.sum() - 8.917) < SMALL
 
 
 @pytest.mark.xfail(reason="PyGeoAPI is unstable.")
@@ -96,13 +83,8 @@ class TestNLDI:
         station = self.nldi.getfeature_byid(site, station_id)
         lon = round(station.geometry[0].centroid.x, 1)
         lat = round(station.geometry[0].centroid.y, 1)
-        _, missing = self.nldi.comid_byloc([(lon, lat), (lat, lon)])
         comid = self.nldi.comid_byloc((lon, lat))
-        assert (
-            station.comid.values[0] == "1722317"
-            and comid.comid.values[0] == "1722211"
-            and len(missing) == 1
-        )
+        assert station.comid.values[0] == "1722317" and comid.comid.values[0] == "1722211"
 
     def test_basin(self):
         eck4 = "+proj=eck4 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=km"
@@ -110,15 +92,21 @@ class TestNLDI:
         split = self.nldi.get_basins(STA_ID, split_catchment=True).to_crs(eck4)
         assert abs((split.area.values[0] - basin.area.values[0]) - 1.824) < SMALL
 
-    def test_basin_missing(self):
-        _, missing = self.nldi.get_basins([STA_ID, "00000000"])
-        assert len(missing) == 1
-
     def test_char(self):
         tot, prc = self.nldi.getcharacteristic_byid(
             "6710923", "local", char_ids="all", values_only=False
         )
         assert abs(tot.CAT_BFI.values[0] - 57) < SMALL and prc.CAT_BFI.values[0] == 0
+
+    @pytest.mark.skipif(has_typeguard, reason="Broken if Typeguard is enabled")
+    def test_feature_missing(self):
+        _, missing = self.nldi.comid_byloc([(45.2, -69.3), (-69.3, 45.2)])
+        assert len(missing) == 1
+
+    @pytest.mark.skipif(has_typeguard, reason="Broken if Typeguard is enabled")
+    def test_basin_missing(self):
+        _, missing = self.nldi.get_basins([STA_ID, "00000000"])
+        assert len(missing) == 1
 
 
 @pytest.mark.xfail(reason="ScienceBase is unstable.")
@@ -136,7 +124,7 @@ class TestWaterData:
 
     def test_byid(self, trib):
         wd = WaterData("catchmentsp")
-        ct = wd.byid("featureid", trib.comid.tolist())
+        ct = wd.byid("featureid", trib.comid.astype(str).to_list())
         assert abs(ct.areasqkm.sum() - 773.954) < SMALL
 
     def test_bybox(self):
