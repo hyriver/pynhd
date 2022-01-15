@@ -453,7 +453,7 @@ def flowline_xsection(flw: gpd.GeoDataFrame, distance: float, width: float) -> g
         lines = [merged]
     else:
         lines = list(merged.geoms)
-    n_segments = (np.ceil(ln.length / distance).astype("int") * 100 for ln in lines)
+    n_segments = (int(np.ceil(ln.length / distance)) * 100 for ln in lines)
     main_split = tlz.concat(
         get_perpendicular(ln, n_seg, distance, half_width, flw.crs)
         for ln, n_seg in zip(lines, n_segments)
