@@ -60,3 +60,14 @@ class InvalidInputRange(Exception):
 
     def __str__(self) -> str:
         return self.message
+
+
+class MissingCRS(Exception):
+    """Exception raised when CRS is not given."""
+
+    def __init__(self) -> None:
+        self.message = "CRS of the input geometry is missing."
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return self.message
