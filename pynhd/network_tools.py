@@ -1,18 +1,30 @@
 """Access NLDI and WaterData databases."""
 from typing import Callable, Iterable, List, Optional, Tuple, Union
 
+import cytoolz as tlz
 import geopandas as gpd
 import networkx as nx
 import numpy as np
 import pandas as pd
+import pyproj
 from pandas._libs.missing import NAType
-from pygeoutils import InvalidInputType
+from pygeoutils import GeoBSpline, InvalidInputType
+from pygeoutils.pygeoutils import Spline
+from shapely import ops
+from shapely.geometry import LineString
 
 from . import nhdplus_derived as derived
 from .core import logger
-from .exceptions import MissingItems
+from .exceptions import MissingCRS, MissingItems
 
-__all__ = ["prepare_nhdplus", "topoogical_sort", "vector_accumulation"]
+__all__ = [
+    "prepare_nhdplus",
+    "topoogical_sort",
+    "vector_accumulation",
+    "flowline_xsection",
+    "network_xsection",
+    "nhdflw2nx",
+]
 
 
 class NHDTools:
@@ -140,17 +152,23 @@ class NHDTools:
         req_cols = ["comid", "terminalpa", "fromnode", "tonode"]
         self.check_requirements(req_cols, self.flw)
         self.flw[req_cols] = self.flw[req_cols].astype("Int64")
+        if "tocomid" in self.flw:
+            self.flw = self.flw.drop(columns="tocomid")
 
-        def tocomid(group: pd.core.groupby.generic.DataFrameGroupBy) -> pd.DataFrame:
-            def toid(row: pd.DataFrame) -> pd.Int64Dtype:
+        def tocomid(grp: pd.core.groupby.generic.DataFrameGroupBy) -> pd.DataFrame:
+            def toid(tonode: pd.DataFrame) -> pd.Int64Dtype:
                 try:
-                    return group[group.fromnode == row.tonode].comid.to_numpy()[0]
+                    return grp[grp.fromnode == tonode].comid.iloc[0]
                 except IndexError:
                     return pd.NA
 
-            return group.apply(toid, axis=1)
+            return pd.Series(
+                {i: toid(n) for i, n in grp[["comid", "tonode"]].itertuples(index=False, name=None)}
+            )
 
-        self.flw["tocomid"] = pd.concat(tocomid(g) for _, g in self.flw.groupby("terminalpa"))
+        toid = pd.concat(tocomid(g) for _, g in self.flw[req_cols].groupby("terminalpa"))
+        toid = toid.reset_index().rename(columns={"index": "comid", 0: "tocomid"})
+        self.flw = self.flw.merge(toid, on="comid")
 
     @staticmethod
     def check_requirements(reqs: Iterable[str], cols: Iterable[str]) -> None:
@@ -240,6 +258,39 @@ def prepare_nhdplus(
     return nhd.flw
 
 
+def nhdflw2nx(
+    flowlines: pd.DataFrame,
+    id_col: str = "comid",
+    toid_col: str = "tocomid",
+    edge_attr: Optional[Union[str, List[str]]] = None,
+) -> nx.DiGraph:
+    """Convert NHDPlus flowline database to networkx graph.
+
+    Parameters
+    ----------
+    flowlines : geopandas.GeoDataFrame
+        NHDPlus flowlines.
+    id_col : str, optional
+        Name of the column containing the node ID, defaults to "comid".
+    toid_col : str, optional
+        Name of the column containing the downstream node ID, defaults to "tocomid".
+    edge_attr : str, optional
+        Name of the column containing the edge attributes, defaults to ``None``.
+
+    Returns
+    -------
+    nx.DiGraph
+        Networkx directed graph of the NHDPlus flowlines.
+    """
+    return nx.from_pandas_edgelist(
+        flowlines,
+        source=id_col,
+        target=toid_col,
+        create_using=nx.DiGraph,
+        edge_attr=edge_attr,
+    )
+
+
 def topoogical_sort(
     flowlines: pd.DataFrame, edge_attr: Optional[Union[str, List[str]]] = None
 ) -> Tuple[List[Union[np.int64, NAType]], pd.Series, nx.DiGraph]:
@@ -265,13 +316,7 @@ def topoogical_sort(
     )
 
     flowlines[["ID", "toID"]] = flowlines[["ID", "toID"]].astype("Int64")
-    network = nx.from_pandas_edgelist(
-        flowlines,
-        source="ID",
-        target="toID",
-        create_using=nx.DiGraph,
-        edge_attr=edge_attr,
-    )
+    network = nhdflw2nx(flowlines, "ID", "toID", edge_attr)
     topo_sorted = list(nx.topological_sort(network))
     return topo_sorted, up_nodes, network
 
@@ -337,3 +382,122 @@ def vector_accumulation(
     acc = pd.Series(outflow).loc[sorted_nodes[:-1]]
     acc = acc.rename_axis("comid").rename(f"acc_{attr_col}")
     return acc
+
+
+def get_spline(line: LineString, ns_pts: int, crs: Union[str, pyproj.CRS]) -> Spline:
+    """Get a B-spline from a line."""
+    x, y = line.xy
+    pts = gpd.GeoSeries(gpd.points_from_xy(x, y, crs=crs))
+    return GeoBSpline(pts, ns_pts).spline
+
+
+def get_idx(d_sp: np.ndarray, distance: float) -> np.ndarray:  # type: ignore
+    """Get the index of the closest point to a given distance."""
+    dis = pd.DataFrame(d_sp, columns=["distance"]).reset_index()
+    grouper = pd.cut(dis.distance, np.arange(0, dis.distance.max() + distance, distance))
+    return dis.groupby(grouper).last()["index"].values  # type: ignore
+
+
+def get_perpendicular(
+    line: LineString, n_seg: int, distance: float, half_width: float, crs: Union[str, pyproj.CRS]
+) -> List[LineString]:
+    """Get perpendiculars to a line."""
+    _n_seg = n_seg
+    spline = get_spline(line, _n_seg, crs)
+    idx = get_idx(spline.distance, distance)
+    while np.isnan(idx).any():
+        _n_seg *= 2
+        spline = get_spline(line, _n_seg, crs)
+        idx = get_idx(spline.distance, distance)
+    x_l = spline.x[idx] - half_width * np.sin(spline.phi[idx])
+    x_r = spline.x[idx] + half_width * np.sin(spline.phi[idx])
+    y_l = spline.y[idx] - half_width * np.cos(spline.phi[idx])
+    y_r = spline.y[idx] + half_width * np.cos(spline.phi[idx])
+    return [LineString([(x1, y1), (x2, y2)]) for x1, y1, x2, y2 in zip(x_l, y_l, x_r, y_r)]
+
+
+def flowline_xsection(flw: gpd.GeoDataFrame, distance: float, width: float) -> gpd.GeoDataFrame:
+    """Get cross-section of a river network at a given spacing.
+
+    Parameters
+    ----------
+    flw : geopandas.GeoDataFrame
+        A dataframe with ``geometry`` and ``comid`` columns and CRS attribute.
+    distance : float
+        The distance between two consecutive cross-sections.
+    width : float
+        The width of the cross-section.
+
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        A dataframe with two columns: ``geometry`` and ``comid``. The ``geometry``
+        column contains the cross-section of the river network and the ``comid``
+        column contains the corresponding ``comid`` from the input dataframe.
+        Note that each ``comid`` can have multiple cross-sections depending on
+        the given spacing distance.
+    """
+    if flw.crs is None:
+        raise MissingCRS
+
+    if not flw.crs.is_projected:
+        raise InvalidInputType("points.crs", "projected CRS")
+
+    req_cols = ["comid", "geometry"]
+    if any(col not in flw for col in req_cols):
+        raise MissingItems(req_cols)
+
+    half_width = width * 0.5
+    merged = ops.linemerge(flw.geometry.to_list())
+    if isinstance(merged, LineString):
+        lines = [merged]
+    else:
+        lines = list(merged.geoms)
+    n_segments = (np.ceil(ln.length / distance).astype("int") * 100 for ln in lines)
+    main_split = tlz.concat(
+        get_perpendicular(ln, n_seg, distance, half_width, flw.crs)
+        for ln, n_seg in zip(lines, n_segments)
+    )
+
+    cs = gpd.GeoDataFrame(geometry=list(main_split), crs=flw.crs)
+    cs_idx, flw_idx = flw.sindex.query_bulk(cs.geometry)
+    merged_idx = tlz.merge_with(list, ({t: i} for t, i in zip(flw_idx, cs_idx)))
+
+    cs["comid"] = 0
+    for fi, ci in merged_idx.items():
+        cs.loc[ci, "comid"] = flw.iloc[fi].comid
+    return cs.drop_duplicates()
+
+
+def network_xsection(flw: gpd.GeoDataFrame, distance: float, width: float) -> gpd.GeoDataFrame:
+    """Get cross-section of a river network at a given spacing.
+
+    Parameters
+    ----------
+    flw : geopandas.GeoDataFrame
+        A dataframe with ``geometry`` and ``comid`` columns and CRS attribute.
+    distance : float
+        The distance between two consecutive cross-sections.
+    width : float
+        The width of the cross-section.
+
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        A dataframe with two columns: ``geometry`` and ``comid``. The ``geometry``
+        column contains the cross-section of the river network and the ``comid``
+        column contains the corresponding ``comid`` from the input dataframe.
+        Note that each ``comid`` can have multiple cross-sections depending on
+        the given spacing distance.
+    """
+    if flw.crs is None:
+        raise MissingCRS
+
+    if not flw.crs.is_projected:
+        raise InvalidInputType("points.crs", "projected CRS")
+
+    req_cols = ["comid", "streamleve", "geometry"]
+    if any(col not in flw for col in req_cols):
+        raise MissingItems(req_cols)
+    cs = pd.concat(flowline_xsection(f, distance, width) for _, f in flw.groupby("streamleve"))
+    return gpd.GeoDataFrame(cs, crs=flw.crs).drop_duplicates()
