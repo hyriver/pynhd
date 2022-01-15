@@ -6,7 +6,7 @@ import pytest
 from shapely.geometry import box
 
 import pynhd as nhd
-from pynhd import NLDI, PyGeoAPI, WaterData
+from pynhd import NHD, NLDI, PyGeoAPI, WaterData
 
 try:
     import typeguard  # noqa: F401
@@ -29,6 +29,14 @@ def trib():
     comids = NLDI().navigate_byid(site, station_id, UT, "flowlines")
     wd = WaterData("nhdflowline_network")
     return wd.byid("comid", comids.nhdplus_comid.tolist())
+
+
+def test_nhd_xs():
+    main = NLDI().navigate_byid(site, station_id, UM, "flowlines")
+    flw = NHD("flowline_mr").byids("COMID", main.nhdplus_comid.tolist()).to_crs("epsg:3857")
+    main_nhd = nhd.prepare_nhdplus(flw, 0, 0, 0, purge_non_dendritic=True)
+    cs = nhd.network_xsection(main_nhd, 2000, 1000)
+    assert len(cs) == 45
 
 
 @pytest.mark.xfail(reason="PyGeoAPI is unstable.")
