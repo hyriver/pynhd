@@ -17,6 +17,81 @@ from .core import ALT_CRS, DEF_CRS, EXPIRE, AGRBase, logger
 from .exceptions import InvalidInputRange, MissingItems, ServiceError
 
 
+class NHD(AGRBase):
+    """Access National Hydrography Dataset (NHD), both meduim and high resolution.
+
+    Notes
+    -----
+    For more info visit: https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer
+
+    Parameters
+    ----------
+    layer : str, optional
+        A valid service layer. Layer names with ``_hr`` are high resolution and
+        ``_mr`` are medium resolution. Also, layer names with ``_nonconus`` are for
+        non-conus areas, i.e., Alaska, Hawaii, Puerto Rico, the Virgin Islands , and
+        the Pacific Islands. Valid layers are:
+
+        - ``point``
+        - ``point_event``
+        - ``line_hr``
+        - ``flow_direction``
+        - ``flowline_mr``
+        - ``flowline_hr_nonconus``
+        - ``flowline_hr``
+        - ``area_mr``
+        - ``area_hr_nonconus``
+        - ``area_hr``
+        - ``waterbody_mr``
+        - ``waterbody_hr_nonconus``
+        - ``waterbody_hr``
+
+    outfields : str or list, optional
+        Target field name(s), default to "*" i.e., all the fields.
+    crs : str, optional
+        Target spatial reference, default to ``EPSG:4326``
+    expire_after : int, optional
+        Expiration time for response caching in seconds, defaults to -1 (never expire).
+    disable_caching : bool, optional
+        If ``True``, disable caching requests, defaults to False.
+    """
+
+    def __init__(
+        self,
+        layer: str,
+        outfields: Union[str, List[str]] = "*",
+        crs: str = DEF_CRS,
+        expire_after: float = EXPIRE,
+        disable_caching: bool = False,
+    ):
+        self.valid_layers = {
+            "point": "point",
+            "point_event": "point event",
+            "line_hr": "line - large scale ",
+            "flow_direction": "flow direction",
+            "flowline_mr": "flowline - small scale",
+            "flowline_hr_nonconus": "flowline - small scale (hi, pr, vi, pacific territories)",
+            "flowline_hr": "flowline - large scale",
+            "area_mr": "area - small scale",
+            "area_hr_nonconus": "area - small scale (hi, pr, vi, pacific territories)",
+            "area_hr": "area - large scale",
+            "waterbody_mr": "waterbody - small scale",
+            "waterbody_hr_nonconus": "waterbody - small scale (hi, pr, vi, pacific territories)",
+            "waterbody_hr": "waterbody - large scale",
+        }
+        _layer = self.valid_layers.get(layer)
+        if _layer is None:
+            raise InvalidInputValue("layer", list(self.valid_layers))
+        super().__init__(
+            ServiceURL().restful.nhd,
+            _layer,
+            outfields,
+            crs,
+            expire_after=expire_after,
+            disable_caching=disable_caching,
+        )
+
+
 @dataclass
 class PyGeoAPI:
     """Access `PyGeoAPI <https://labs.waterdata.usgs.gov/api/nldi/pygeoapi>`__ service.
