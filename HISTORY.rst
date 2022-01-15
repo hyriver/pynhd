@@ -2,6 +2,24 @@
 History
 =======
 
+0.12.2 (unreleased)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Add a new class called ``NHD`` for accessing the latest National Hydrography Dataset.
+  More info regarding this data can be found
+  `here <https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer>`__.
+- Add two new functions for getting cross-sections along a single flowline via
+  ``flowline_xsection`` or throughout a network of flowlines via ``network_xsection``.
+  You can specify spacing and width parameters to control their location. For more
+  information and example please consult the documentations.
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Refactor ``prepare_nhdplus`` for improving the performance and robustness of determining
+  ``tocomid`` within a network of NHD flowlines.
+
 0.12.1 (2021-12-31)
 -------------------
 
