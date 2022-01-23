@@ -494,10 +494,10 @@ def network_xsection(flw: gpd.GeoDataFrame, distance: float, width: float) -> gp
         raise MissingCRS
 
     if not flw.crs.is_projected:
-        raise InvalidInputType("points.crs", "projected CRS")
+        raise InvalidInputType("flw.crs", "projected CRS")
 
-    req_cols = ["comid", "streamleve", "geometry"]
+    req_cols = ["comid", "levelpathi", "geometry"]
     if any(col not in flw for col in req_cols):
         raise MissingItems(req_cols)
-    cs = pd.concat(flowline_xsection(f, distance, width) for _, f in flw.groupby("streamleve"))
+    cs = pd.concat(flowline_xsection(f, distance, width) for _, f in flw.groupby("levelpathi"))
     return gpd.GeoDataFrame(cs, crs=flw.crs).drop_duplicates()
