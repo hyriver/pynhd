@@ -26,6 +26,13 @@ repos:
     - id: isort
       name: Sort imports with isort
 
+  - repo: https://github.com/hadialqattan/pycln
+    rev: v1.1.0
+    hooks:
+      - id: pycln
+        name: Find and remove unused import statements
+        args: [--config=pyproject.toml]
+
   - repo: https://github.com/psf/black
     rev: 21.12b0
     hooks:
