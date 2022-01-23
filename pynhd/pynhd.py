@@ -718,6 +718,7 @@ class NLDI:
         navigation: str,
         source: str,
         distance: int = 500,
+        trim_start: bool = False,
     ) -> gpd.GeoDataFrame:
         """Navigate the NHDPlus database from a single feature id up to a distance.
 
@@ -738,6 +739,9 @@ class NLDI:
             defaults is 500 km. Note that this is an expensive request so you
             have be mindful of the value that you provide. The value must be
             between 1 to 9999 km.
+        trim_start : bool, optional
+            If ``True``, trim the starting flowline at the source feature,
+            defaults to ``False``.
 
         Returns
         -------
@@ -763,7 +767,7 @@ class NLDI:
             raise InvalidInputValue("source", list(valid_sources.keys()))
 
         url = valid_sources[source]
-        payload = {"distance": f"{int(distance)}"}
+        payload = {"distance": f"{int(distance)}", "trimStart": f"{trim_start}".lower()}
 
         return geoutils.json2geodf(self._get_url(url, payload), ALT_CRS, DEF_CRS)
 
@@ -774,6 +778,7 @@ class NLDI:
         source: Optional[str] = None,
         loc_crs: str = DEF_CRS,
         distance: int = 500,
+        trim_start: bool = False,
     ) -> gpd.GeoDataFrame:
         """Navigate the NHDPlus database from a coordinate.
 
@@ -795,6 +800,9 @@ class NLDI:
             defaults to 500 km. Note that this is an expensive request so you
             have be mindful of the value that you provide. If you want to get
             all the available features you can pass a large distance like 9999999.
+        trim_start : bool, optional
+            If ``True``, trim the starting flowline at the source feature,
+            defaults to ``False``.
 
         Returns
         -------
@@ -810,7 +818,7 @@ class NLDI:
         if navigation is None or source is None:
             raise MissingItems(["navigation", "source"])
 
-        return self.navigate_byid("comid", comid, navigation, source, distance)
+        return self.navigate_byid("comid", comid, navigation, source, distance, trim_start)
 
     def _validate_fsource(self, fsource: str) -> None:
         """Check if the given feature source is valid."""
