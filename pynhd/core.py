@@ -4,7 +4,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union
 
 import async_retriever as ar
 import cytoolz as tlz
@@ -39,6 +39,15 @@ def get_parquet(parquet_path: Union[Path, str]) -> Path:
     output.parent.mkdir(parents=True, exist_ok=True)
 
     return output
+
+
+class ServiceInfo(NamedTuple):
+    """Information about a web service."""
+
+    url: str
+    layer: str
+    extent: Tuple[float, float, float, float]
+    feature_types: Optional[Dict[int, str]]
 
 
 class AGRBase:
@@ -101,6 +110,19 @@ class AGRBase:
                 expire_after=expire_after,
                 disable_caching=disable_caching,
             )
+
+        full_layer = self.client.client.valid_layers[str(self.client.client.layer)]
+        self._service_info = ServiceInfo(
+            self.client.client.base_url,
+            f"{full_layer} ({self.client.client.layer})",
+            self.client.client.extent,
+            self.client.client.feature_types,
+        )
+
+    @property
+    def service_info(self) -> ServiceInfo:
+        """Get the service information."""
+        return self._service_info
 
     def get_validlayers(self, url: str) -> Dict[str, int]:
         """Get a list of valid layers.
