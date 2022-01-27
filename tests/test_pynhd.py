@@ -39,14 +39,11 @@ def test_nhd_xs():
     assert len(cs) == 45
 
 
-@pytest.mark.xfail(reason="PyGeoAPI is unstable.")
 class TestPyGeoAPI:
     pygeoapi = PyGeoAPI()
 
     def test_flowtrace(self):
-        gdf = self.pygeoapi.flow_trace(
-            (1774209.63, 856381.68), crs="ESRI:102003", raindrop=False, direction="none"
-        )
+        gdf = self.pygeoapi.flow_trace((1774209.63, 856381.68), crs="ESRI:102003", direction="none")
         assert gdf.comid.iloc[0] == 22294818
 
     def test_splitcatchment(self):
@@ -57,13 +54,13 @@ class TestPyGeoAPI:
         gdf = self.pygeoapi.elevation_profile(
             [(-103.801086, 40.26772), (-103.80097, 40.270568)], numpts=101, dem_res=1, crs=DEF_CRS
         )
-        assert abs(gdf.iloc[-1, 1] - 411.5906) < SMALL
+        assert abs(gdf.iloc[-1, 1] - 316.053) < SMALL
 
     def test_cross_section(self):
         gdf = self.pygeoapi.cross_section(
             (-103.80119, 40.2684), width=1000.0, numpts=101, crs=DEF_CRS
         )
-        assert abs(gdf.iloc[-1, 1] - 1000.0) < SMALL
+        assert abs(gdf.iloc[-1, 1] - 767.870) < SMALL
 
 
 class TestNLDI:
