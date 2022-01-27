@@ -111,7 +111,7 @@ class PyGeoAPI:
     def _get_url(operation: str) -> str:
         """Set the service url."""
         base_url = ServiceURL().restful.pygeoapi
-        return f"{base_url}/nldi-{operation}/jobs?response=document"
+        return f"{base_url}/nldi-{operation}/execution"
 
     @staticmethod
     def _request_body(id_value: Dict[str, Any]) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
@@ -135,11 +135,10 @@ class PyGeoAPI:
             expire_after=self.expire_after,
             disable=self.disable_caching,
         )
-        try:
-            return geoutils.json2geodf(resp[0]["outputs"])
-        except KeyError as ex:
-            msg = "Check your inpute parameters and try again."
-            raise ServiceError(msg) from ex
+        if "code" in resp[0]:
+            msg = "Invalid inpute parameters, check them and try again."
+            raise ServiceError(msg)
+        return geoutils.json2geodf(resp[0])
 
     @staticmethod
     def _check_coords(
@@ -164,7 +163,6 @@ class PyGeoAPI:
         self,
         coord: Tuple[float, float],
         crs: str = DEF_CRS,
-        raindrop: bool = False,
         direction: str = "down",
     ) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame from the flowtrace service.
@@ -175,9 +173,6 @@ class PyGeoAPI:
             The coordinate of the point to trace as a tuple,e.g., (lon, lat).
         crs : str
             The coordinate reference system of the coordinates, defaults to EPSG:4326.
-        raindrop : bool, optional
-            If True, use raindrop-based flowpaths, i.e. use raindrop trace web service
-            with direction set to "none", defaults to False.
         direction : str, optional
             The direction of flowpaths, either "down", "up", or "none". Defaults to "down".
 
@@ -198,11 +193,7 @@ class PyGeoAPI:
         """
         _coord = self._check_coords(coord, crs)
         url = self._get_url("flowtrace")
-        if raindrop:
-            direction = "none"
-        payload = self._request_body(
-            {"lat": _coord[1], "lon": _coord[0], "raindroptrace": raindrop, "direction": direction}
-        )
+        payload = self._request_body({"lat": _coord[1], "lon": _coord[0], "direction": direction})
         return self._get_response(url, payload)
 
     def split_catchment(
