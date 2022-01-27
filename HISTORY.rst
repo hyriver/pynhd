@@ -14,9 +14,13 @@ New Features
   ``flowline_xsection`` or throughout a network of flowlines via ``network_xsection``.
   You can specify spacing and width parameters to control their location. For more
   information and example please consult the documentations.
+- Add a new property to ``AGRBase`` called ``service_info`` to include some useful info
+  about the service including ``feature_types`` which can be handy for converting
+  numeric values of types to their string equivalent.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
+- Use the new PyGeoAPI API.
 - Refactor ``prepare_nhdplus`` for improving the performance and robustness of determining
   ``tocomid`` within a network of NHD flowlines.
 
