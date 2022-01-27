@@ -46,7 +46,7 @@ class ServiceInfo(NamedTuple):
 
     url: str
     layer: str
-    extent: Tuple[float, float, float, float]
+    extent: Optional[Tuple[float, float, float, float]]
     feature_types: Optional[Dict[int, str]]
 
 
