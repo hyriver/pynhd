@@ -613,6 +613,9 @@ class NLDI:
         basins, not_found = self._get_urls(urls)
         basins = basins.reset_index(level=1, drop=True)
         basins.index.rename("identifier", inplace=True)
+        nulls = basins.geometry.isnull()
+        not_found += basins[nulls].index.to_list()
+        basins = basins[~nulls].copy()
 
         if len(not_found) > 0:
             self._missing_warning(len(not_found), len(station_ids))
