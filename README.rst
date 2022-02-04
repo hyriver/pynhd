@@ -159,10 +159,15 @@ responses are stored in the ``./cache/aiohttp_cache.sqlite`` file.
 
 You can find some example notebooks `here <https://github.com/cheginit/HyRiver-examples>`__.
 
-Furthermore, you can try using PyNHD without even installing it on your system by
-clicking on the binder badge below the PyNHD banner. A JupyterLab instance
-with the software stack pre-installed and all example notebooks will be launched
-in your web browser, and you can start coding!
+Moreover, to fully utilize the capabilities of these web services, under-the-hood, PyNHD uses
+`AsyncRetriever <https://github.com/cheginit/async_retriever>`__
+for retrieving topographic data asynchronously with persistent caching. This improves the
+reliability and speed of data retrieval significantly.
+
+You can also try using PyNHD without installing
+it on your system by clicking on the binder badge. A Jupyter Lab
+instance with the HyRiver stack pre-installed will be launched in your web browser, and you
+can start coding!
 
 Please note that since this project is in early development stages, while the provided
 functionalities should be stable, changes in APIs are possible in new releases. But we
@@ -199,7 +204,7 @@ Let's explore the capabilities of ``NLDI``. We need to instantiate the class fir
     from pynhd import NLDI, WaterData, NHDPlusHR
     import pynhd as nhd
 
-First, let’s get the watershed geometry of the contributing basin of a
+First, let's get the watershed geometry of the contributing basin of a
 USGS station using ``NLDI``:
 
 .. code:: python
@@ -210,7 +215,7 @@ USGS station using ``NLDI``:
     basin = nldi.get_basins(station_id)
 
 The ``navigate_byid`` class method can be used to navigate NHDPlus in
-both upstream and downstream of any point in the database. Let’s get ComIDs and flowlines
+both upstream and downstream of any point in the database. Let's get ComIDs and flowlines
 of the tributaries and the main river channel in the upstream of the station.
 
 .. code:: python
@@ -252,7 +257,7 @@ and even set a distance limit (in km):
         distance=20,
     )
 
-Now, let’s get the
+Now, let's get the
 `HUC12 pour points <https://www.sciencebase.gov/catalog/item/5762b664e4b07657d19a71ea>`__:
 
 .. code:: python
@@ -354,9 +359,9 @@ shows the accumulated flow in each node.
 PyNHD has a utility called ``prepare_nhdplus`` that identifies such
 relationship among other things such as fixing some common issues with
 NHDPlus flowlines. But first we need to get all the NHDPlus attributes
-for each ComID since ``NLDI`` only provides the flowlines’ geometries
+for each ComID since ``NLDI`` only provides the flowlines' geometries
 and ComIDs which is useful for navigating the vector river network data.
-For getting the NHDPlus database we use ``WaterData``. Let’s use the
+For getting the NHDPlus database we use ``WaterData``. Let's use the
 ``nhdflowline_network`` layer to get required info.
 
 .. code:: python
@@ -396,7 +401,7 @@ NHDPlus attributes
 
     runoff /= areasqkm
 
-Since these are catchment-scale characteristic, let’s get the catchments
+Since these are catchment-scale characteristic, let's get the catchments
 then add the accumulated characteristic as a new column and plot the
 results.
 
