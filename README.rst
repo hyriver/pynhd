@@ -295,7 +295,7 @@ and width of 2 km using ``network_xsection`` as follows:
 .. code:: python
 
     from pynhd import NHD
-    
+
     distance = 4000  # in meters
     width = 2000  # in meters
     nhd = NHD("flowline_mr")
