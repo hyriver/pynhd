@@ -2,7 +2,7 @@
 History
 =======
 
-0.12.2 (2022-01-29)
+0.12.2 (2022-02-04)
 -------------------
 
 New Features
@@ -13,7 +13,7 @@ New Features
 - Add two new functions for getting cross-sections along a single flowline via
   ``flowline_xsection`` or throughout a network of flowlines via ``network_xsection``.
   You can specify spacing and width parameters to control their location. For more
-  information and example please consult the documentations.
+  information and examples please consult the documentations.
 - Add a new property to ``AGRBase`` called ``service_info`` to include some useful info
   about the service including ``feature_types`` which can be handy for converting
   numeric values of types to their string equivalent.
@@ -23,6 +23,9 @@ Internal Changes
 - Use the new PyGeoAPI API.
 - Refactor ``prepare_nhdplus`` for improving the performance and robustness of determining
   ``tocomid`` within a network of NHD flowlines.
+- Add empty geometries that ``NLDI.getbasins`` returns to the list of ``not found`` IDs.
+  This is because the NLDI service does not include non-network flowlines and instead returns
+  an empty geometry for these flowlines. (:issue_nhd:`#48`)
 
 0.12.1 (2021-12-31)
 -------------------
