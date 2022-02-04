@@ -139,6 +139,8 @@ function to get this dataset.
 
 Additionally, PyNHD offers some extra utilities for processing the flowlines:
 
+- ``flowline_xsection``: Get cross-section lines along a flowline at a given spacing.
+- ``network_xsection``: Get cross-section lines along a network of flowlines at a given spacing.
 - ``prepare_nhdplus``: For cleaning up the dataframe by, for example, removing tiny networks,
   adding a ``to_comid`` column, and finding a terminal flowlines if it doesn't exist.
 - ``topoogical_sort``: For sorting the river network topologically which is useful for routing
@@ -286,6 +288,24 @@ Also, we can get the slope data for each river segment from NHDPlus VAA database
         crs=flw_trib.crs,
     )
     slope[slope.slope < 0] = np.nan
+
+Additionally, we can obtain cross-section lines along the main river channel with 4 km spacing
+and width of 2 km using ``network_xsection`` as follows:
+
+.. code:: python
+
+    from pynhd import NHD
+    
+    distance = 4000  # in meters
+    width = 2000  # in meters
+    nhd = NHD("flowline_mr")
+    main_nhd = nhd.byids("COMID", flw_main.index)
+    main_nhd = pynhd.prepare_nhdplus(main_nhd, 0, 0, 0, purge_non_dendritic=True)
+    main_nhd = main_nhd.to_crs("ESRI:102003")
+    cs = pynhd.network_xsection(main_nhd, distance, width)
+
+Then, we can use `Py3DEP <https://github.com/cheginit/py3dep>`__
+to obtain the elevation profile along the cross-section lines.
 
 Now, let's explore the PyGeoAPI capabilities:
 
