@@ -50,6 +50,7 @@ class NHDTools:
     ):
         self.flw: gpd.GeoDataFrame = flowlines.copy()
         self.nrows: int = flowlines.shape[0]
+        self.crs = flowlines.crs
 
     def clean_flowlines(self, use_enhd_attrs: bool, terminal2nan: bool) -> None:
         """Clean up flowlines."""
@@ -87,6 +88,11 @@ class NHDTools:
 
         self.check_requirements(req_cols, self.flw)
         self.flw[req_cols] = self.flw[req_cols].astype("Int64")
+
+    def to_linestring(self) -> None:
+        """Convert flowlines to shapely LineString objects."""
+        self.flw["geometry"] = self.flw.geometry.apply(ops.linemerge)
+        self.flw = self.flw.set_crs(self.flw.crs)
 
     def remove_tinynetworks(
         self,
@@ -234,6 +240,10 @@ def prepare_nhdplus(
         Cleaned up flowlines. Note that all column names are converted to lower case.
     """
     nhd = NHDTools(flowlines)
+
+    if not nhd.flw.geom_type.eq("LineString").all():
+        nhd.to_linestring()
+
     nhd.clean_flowlines(use_enhd_attrs, terminal2nan)
 
     if not any(nhd.flw.terminalfl == 1):
