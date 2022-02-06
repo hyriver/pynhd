@@ -2,6 +2,13 @@
 History
 =======
 
+0.12.3 (unreleased)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Add a new step to ``prepare_nhdplus`` to convert ``MultiLineString`` to ``LineString``.
+
 0.12.2 (2022-02-04)
 -------------------
 
