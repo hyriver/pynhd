@@ -588,6 +588,7 @@ class NLDI:
         self,
         station_ids: Union[str, List[str]],
         split_catchment: bool = False,
+        simplified: bool = True,
     ) -> Union[gpd.GeoDataFrame, Tuple[gpd.GeoDataFrame, List[str]]]:
         """Get basins for a list of station IDs.
 
@@ -596,7 +597,9 @@ class NLDI:
         station_ids : str or list
             USGS station ID(s).
         split_catchment : bool, optional
-            If True, split the basin at the watershed outlet location. Default to False.
+            If ``True``, split basins at their outlet locations. Default to ``False``.
+        simplified : bool, optional
+            If ``True``, return a simplified version of basin geometries. Default to ``True``.
 
         Returns
         -------
@@ -605,7 +608,10 @@ class NLDI:
             a list of missing ID(s) are returned as well.
         """
         station_ids = station_ids if isinstance(station_ids, list) else [station_ids]
-        payload = {"splitCatchment": "true"} if split_catchment else None
+        payload = {
+            "splitCatchment": str(split_catchment).lower(),
+            "simplified": str(simplified).lower(),
+        }
         urls = {
             s: (f"{self.base_url}/linked-data/nwissite/USGS-{s}/basin", payload)
             for s in station_ids
