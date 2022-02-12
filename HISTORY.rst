@@ -8,6 +8,8 @@ History
 New Features
 ~~~~~~~~~~~~
 - Add a new step to ``prepare_nhdplus`` to convert ``MultiLineString`` to ``LineString``.
+- Add support for the ``simplified`` flag of NLDI's ``get_basins`` function.
+  The default value is ``True`` to retain the old behavior.
 
 0.12.2 (2022-02-04)
 -------------------
