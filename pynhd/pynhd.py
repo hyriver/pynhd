@@ -1,5 +1,4 @@
 """Access NLDI and WaterData databases."""
-from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 import async_retriever as ar
@@ -7,14 +6,13 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pygeoogc as ogc
-import pygeoogc.utils as ogc_utils
 import pygeoutils as geoutils
 from pygeoogc import WFS, InvalidInputValue, ServiceUnavailable, ServiceURL, ZeroMatched
 from pygeoutils import InvalidInputType
 from shapely.geometry import MultiPolygon, Polygon
 
-from .core import ALT_CRS, DEF_CRS, EXPIRE, AGRBase, logger
-from .exceptions import InvalidInputRange, MissingItems, ServiceError
+from .core import ALT_CRS, DEF_CRS, AGRBase, PyGeoAPIBase, PyGeoAPIBatch, logger
+from .exceptions import InvalidInputRange, MissingItems
 
 
 class NHD(AGRBase):
@@ -50,10 +48,6 @@ class NHD(AGRBase):
         Target field name(s), default to "*" i.e., all the fields.
     crs : str, optional
         Target spatial reference, default to ``EPSG:4326``
-    expire_after : int, optional
-        Expiration time for response caching in seconds, defaults to -1 (never expire).
-    disable_caching : bool, optional
-        If ``True``, disable caching requests, defaults to False.
     """
 
     def __init__(
@@ -61,8 +55,6 @@ class NHD(AGRBase):
         layer: str,
         outfields: Union[str, List[str]] = "*",
         crs: str = DEF_CRS,
-        expire_after: float = EXPIRE,
-        disable_caching: bool = False,
     ):
         self.valid_layers = {
             "point": "point",
@@ -87,83 +79,17 @@ class NHD(AGRBase):
             _layer,
             outfields,
             crs,
-            expire_after=expire_after,
-            disable_caching=disable_caching,
         )
 
 
-@dataclass
-class PyGeoAPI:
-    """Access `PyGeoAPI <https://labs.waterdata.usgs.gov/api/nldi/pygeoapi>`__ service.
-
-    Parameters
-    ----------
-    expire_after : int, optional
-        Expiration time for response caching in seconds, defaults to -1 (never expire).
-    disable_caching : bool, optional
-        If ``True``, disable caching requests, defaults to False.
-    """
-
-    expire_after: float = EXPIRE
-    disable_caching: bool = False
-
-    @staticmethod
-    def _get_url(operation: str) -> str:
-        """Set the service url."""
-        base_url = ServiceURL().restful.pygeoapi
-        return f"{base_url}/nldi-{operation}/execution"
-
-    @staticmethod
-    def _request_body(id_value: Dict[str, Any]) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
-        """Return a valid request body."""
-        data = {
-            "inputs": [
-                {"id": f"{i}", "type": "text/plain", "value": v if isinstance(v, list) else f"{v}"}
-                for i, v in id_value.items()
-            ]
-        }
-        return {"json": data}
-
-    def _get_response(
-        self, url: str, payload: Dict[str, Dict[str, List[Dict[str, Any]]]]
-    ) -> gpd.GeoDataFrame:
-        """Post the request and return the response as GeoDataFrame."""
-        resp = ar.retrieve_json(
-            [url],
-            [payload],
-            "POST",
-            expire_after=self.expire_after,
-            disable=self.disable_caching,
-        )
-        if "code" in resp[0]:
-            msg = "Invalid inpute parameters, check them and try again."
-            raise ServiceError(msg)
-        return geoutils.json2geodf(resp[0])
-
-    @staticmethod
-    def _check_coords(
-        coords: Union[Tuple[float, float], List[Tuple[float, float]]],
-        crs: str,
-    ) -> Union[Tuple[float, float], List[List[float]]]:
-        """Check the coordinates."""
-        if isinstance(coords, tuple):
-            if len(coords) != 2:
-                raise InvalidInputType("coords", "tuple", "(lon, lat)")
-            return ogc_utils.match_crs([coords], crs, DEF_CRS)[0]
-
-        if isinstance(coords, list):
-            if len(coords) != 2:
-                raise InvalidInputType("coords", "list", "[(lon, lat), (lon, lat)]")
-            _coords = ogc_utils.match_crs(coords, crs, DEF_CRS)
-            return [[_coords[0][0], _coords[1][0]], [_coords[0][1], _coords[1][1]]]
-
-        raise InvalidInputType("coords", "list or tuple")
+class PyGeoAPI(PyGeoAPIBase):
+    """Access `PyGeoAPI <https://labs.waterdata.usgs.gov/api/nldi/pygeoapi>`__ service."""
 
     def flow_trace(
         self,
         coord: Tuple[float, float],
         crs: str = DEF_CRS,
-        direction: str = "down",
+        direction: str = "none",
     ) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame from the flowtrace service.
 
@@ -174,7 +100,8 @@ class PyGeoAPI:
         crs : str
             The coordinate reference system of the coordinates, defaults to EPSG:4326.
         direction : str, optional
-            The direction of flowpaths, either "down", "up", or "none". Defaults to "down".
+            The direction of flowpaths, either ``down``, ``up``, or ``none``.
+            Defaults to ``none``.
 
         Returns
         -------
@@ -186,14 +113,14 @@ class PyGeoAPI:
         >>> from pynhd import PyGeoAPI
         >>> pygeoapi = PyGeoAPI()
         >>> gdf = pygeoapi.flow_trace(
-        ...     (1774209.63, 856381.68), crs="ESRI:102003", raindrop=False, direction="none"
+        ...     (1774209.63, 856381.68), crs="ESRI:102003", direction="none"
         ... )  # doctest: +SKIP
         >>> print(gdf.comid.iloc[0])  # doctest: +SKIP
         22294818
         """
-        _coord = self._check_coords(coord, crs)
+        lon, lat = self._check_coords(coord, crs)[0]
         url = self._get_url("flowtrace")
-        payload = self._request_body({"lat": _coord[1], "lon": _coord[0], "direction": direction})
+        payload = self._request_body([{"lat": lat, "lon": lon, "direction": direction}])
         return self._get_response(url, payload)
 
     def split_catchment(
@@ -224,9 +151,9 @@ class PyGeoAPI:
         >>> print(gdf.catchmentID.iloc[0])  # doctest: +SKIP
         22294818
         """
-        _coord = self._check_coords(coord, crs)
+        lon, lat = self._check_coords(coord, crs)[0]
         url = self._get_url("splitcatchment")
-        payload = self._request_body({"lat": _coord[1], "lon": _coord[0], "upstream": upstream})
+        payload = self._request_body([{"lat": lat, "lon": lon, "upstream": upstream}])
         return self._get_response(url, payload)
 
     def elevation_profile(
@@ -241,7 +168,8 @@ class PyGeoAPI:
         Parameters
         ----------
         coords : list
-            A list of two coordinates to trace as a list of tuples,e.g., [(lon, lat), (lon, lat)].
+            A list of two coordinates to trace as a list of tuples, e.g.,
+            [(lon1, lat1), (lon2, lat2)].
         numpts : int
             The number of points to extract the elevation profile from the DEM.
         dem_res : int
@@ -264,10 +192,14 @@ class PyGeoAPI:
         >>> print(gdf.iloc[-1, 1])  # doctest: +SKIP
         411.5906
         """
-        _coords = self._check_coords(coords, crs)
+        if not isinstance(coords, list) or any(len(c) != 2 for c in coords):
+            raise InvalidInputType("coords", "list", "[(lon1, lat1), (lon2, lat2)]")
+
+        lons, lats = zip(*self._check_coords(coords, crs))
+
         url = self._get_url("xsatendpts")
         payload = self._request_body(
-            {"lat": _coords[1], "lon": _coords[0], "numpts": numpts, "3dep_res": dem_res}
+            [{"lat": list(lats), "lon": list(lons), "numpts": numpts, "3dep_res": dem_res}]
         )
         return self._get_response(url, payload)
 
@@ -300,12 +232,54 @@ class PyGeoAPI:
         >>> print(gdf.iloc[-1, 1])  # doctest: +SKIP
         1000.0
         """
-        _coord = self._check_coords(coord, crs)
+        lon, lat = self._check_coords(coord, crs)[0]
         url = self._get_url("xsatpoint")
-        payload = self._request_body(
-            {"lat": _coord[1], "lon": _coord[0], "width": width, "numpts": numpts}
-        )
+        payload = self._request_body([{"lat": lat, "lon": lon, "width": width, "numpts": numpts}])
         return self._get_response(url, payload)
+
+
+def pygeoapi(coords: gpd.GeoDataFrame, service: str) -> gpd.GeoDataFrame:
+    """Return a GeoDataFrame from the flowtrace service.
+
+    Parameters
+    ----------
+    coords : geopandas.GeoDataFrame
+        A GeoDataFrame containing the coordinates to query.
+        The required columns services are:
+
+        * ``flow_trace``: ``direction`` that indicates the direction of the flow trace.
+          It can be ``up``, ``down``, or ``none``.
+        * ``split_catchment``: ``upstream`` that indicates whether to return all upstream
+          catchments or just the local catchment.
+        * ``elevation_profile``: ``numpts`` that indicates the number of points to extract
+          along the flowpath and ``3dep_res`` that indicates the target resolution for
+          requesting the DEM from 3DEP service.
+        * ``cross_section``: ``numpts`` that indicates the number of points to extract
+          along the flowpath and ``width`` that indicates the width of the cross-section
+          in meters.
+    service : str
+        The service to query, can be ``flow_trace``, ``split_catchment``, ``elevation_profile``,
+        or ``cross_section``.
+
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        A GeoDataFrame containing the results of requested service.
+
+    Examples
+    --------
+    >>> from pynhd import PyGeoAPI
+    >>> pygeoapi = PyGeoAPI()
+    >>> gdf = pygeoapi.flow_trace(
+    ...     (1774209.63, 856381.68), crs="ESRI:102003", direction="none"
+    ... )  # doctest: +SKIP
+    >>> print(gdf.comid.iloc[0])  # doctest: +SKIP
+    22294818
+    """
+    pgab = PyGeoAPIBatch(coords)
+    url = pgab._get_url(pgab.service[service])
+    payload = pgab.get_payload(service)
+    return pgab._get_response(url, payload)
 
 
 class WaterData:
@@ -338,16 +312,23 @@ class WaterData:
             crs=ALT_CRS,
         )
 
-    def __repr__(self) -> str:
-        """Print the services properties."""
-        return (
-            "Connected to the WaterData web service on GeoServer:\n"
-            + f"URL: {self.wfs.url}\n"
-            + f"Version: {self.wfs.version}\n"
-            + f"Layer: {self.layer}\n"
-            + f"Output Format: {self.wfs.outformat}\n"
-            + f"Output CRS: {self.crs}"
-        )
+    def _to_geodf(self, resp: Union[List[Dict[str, Any]], Dict[str, Any]]) -> gpd.GeoDataFrame:
+        """Convert a response from WaterData to a GeoDataFrame.
+
+        Parameters
+        ----------
+        resp : list of dicts
+            A ``json`` response from a WaterData request.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            The requested features in a GeoDataFrames.
+        """
+        features = geoutils.json2geodf(resp, ALT_CRS, self.crs)
+        if features.empty:
+            raise ZeroMatched
+        return features
 
     def bybox(
         self, bbox: Tuple[float, float, float, float], box_crs: str = DEF_CRS
@@ -421,42 +402,48 @@ class WaterData:
         resp: Dict[str, Any] = self.wfs.getfeature_byfilter(cql_filter, method)  # type: ignore
         return self._to_geodf(resp)
 
-    def _to_geodf(self, resp: Union[List[Dict[str, Any]], Dict[str, Any]]) -> gpd.GeoDataFrame:
-        """Convert a response from WaterData to a GeoDataFrame.
-
-        Parameters
-        ----------
-        resp : list of dicts
-            A ``json`` response from a WaterData request.
-
-        Returns
-        -------
-        geopandas.GeoDataFrame
-            The requested features in a GeoDataFrames.
-        """
-        features = geoutils.json2geodf(resp, ALT_CRS, self.crs)
-        if features.empty:
-            raise ZeroMatched
-        return features
+    def __repr__(self) -> str:
+        """Print the services properties."""
+        return (
+            "Connected to the WaterData web service on GeoServer:\n"
+            + f"URL: {self.wfs.url}\n"
+            + f"Version: {self.wfs.version}\n"
+            + f"Layer: {self.layer}\n"
+            + f"Output Format: {self.wfs.outformat}\n"
+            + f"Output CRS: {self.crs}"
+        )
 
 
 class NHDPlusHR(AGRBase):
-    """Access NHDPlus HR database through the National Map ArcGISRESTful.
+    """Access National Hydrography Dataset (NHD) high resolution.
+
+    Notes
+    -----
+    For more info visit: https://edits.nationalmap.gov/arcgis/rest/services/nhd/MapServer
 
     Parameters
     ----------
-    layer : str
-        A valid service layer. To see a list of available layers instantiate the class
-        with passing an empty string like so ``NHDPlusHR("")``.
+    layer : str, optional
+        A valid service layer. Valid layers are:
+
+        - ``point``
+        - ``sink``
+        - ``flowline``
+        - ``non_network_flowline``
+        - ``flow_direction``
+        - ``line``
+        - ``wall``
+        - ``burn_line``
+        - ``burn_waterbody``
+        - ``area``
+        - ``waterbody``
+        - ``huc12``
+        - ``catchment``
+
     outfields : str or list, optional
         Target field name(s), default to "*" i.e., all the fields.
     crs : str, optional
-        Target spatial reference, default to EPSG:4326
-    service : str, optional
-        Name of the web service to use, defaults to hydro. Supported web services are:
-
-        * hydro: https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer
-        * edits: https://edits.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/NHDPlus_HR/MapServer
+        Target spatial reference, default to ``EPSG:4326``
     """
 
     def __init__(
@@ -464,33 +451,56 @@ class NHDPlusHR(AGRBase):
         layer: str,
         outfields: Union[str, List[str]] = "*",
         crs: str = DEF_CRS,
-        service: str = "hydro",
     ):
-        valid_services = {
-            "hydro": ServiceURL().restful.nhdplushr,
-            "edits": ServiceURL().restful.nhdplushr_edits,
+        self.valid_layers = {
+            "point": "NHDPoint",
+            "sink": "NHDPlusSink",
+            "flowline": "NetworkNHDFlowline",
+            "non_network_flowline": "NonNetworkNHDFlowline",
+            "flow_direction": "FlowDirection",
+            "line": "NHDLine",
+            "wall": "NHDPlusWall",
+            "burn_line": "NHDPlusBurnLineEvent",
+            "burn_waterbody": "NHDPlusBurnWaterbody",
+            "area": "NHDArea",
+            "waterbody": "NHDWaterbody",
+            "huc12": "WBDHU12",
+            "catchment": "NHDPlusCatchment",
         }
-        if service not in valid_services:
-            raise InvalidInputValue("service", list(valid_services))
-
-        super().__init__(valid_services[service], layer, outfields, crs)
+        _layer = self.valid_layers.get(layer)
+        if _layer is None:
+            raise InvalidInputValue("layer", list(self.valid_layers))
+        super().__init__(
+            ServiceURL().restful.nhdplushr_edits,
+            _layer,
+            outfields,
+            crs,
+        )
 
 
 class NLDI:
-    """Access the Hydro Network-Linked Data Index (NLDI) service.
+    """Access the Hydro Network-Linked Data Index (NLDI) service."""
 
-    Parameters
-    ----------
-    expire_after : int, optional
-        Expiration time for response caching in seconds, defaults to -1 (never expire).
-    disable_caching : bool, optional
-        If ``True``, disable caching requests, defaults to False.
-    """
+    def _get_url(
+        self, url: str, payload: Optional[Dict[str, str]] = None
+    ) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
+        """Send a request to the service using GET method."""
+        if payload is None:
+            payload = {"f": "json"}
+        else:
+            payload.update({"f": "json"})
 
-    def __init__(self, expire_after: float = EXPIRE, disable_caching: bool = False) -> None:
+        try:
+            resp = ar.retrieve_json([url], [{"params": payload}])
+        except ar.ServiceError as ex:
+            raise ZeroMatched from ex
+        except ConnectionError as ex:
+            raise ServiceUnavailable(self.base_url) from ex
+        else:
+            return resp[0]
+
+    def __init__(self) -> None:
         self.base_url = ServiceURL().restful.nldi
-        self.expire_after = expire_after
-        self.disable_caching = disable_caching
 
         resp = self._get_url("/".join([self.base_url, "linked-data"]))
         self.valid_fsources = {r["source"]: r["sourceName"] for r in resp}  # type: ignore
@@ -509,6 +519,43 @@ class NLDI:
                 ]
             )
         )
+
+    def _validate_fsource(self, fsource: str) -> None:
+        """Check if the given feature source is valid."""
+        if fsource not in self.valid_fsources:
+            valids = [f'"{s}" for {d}' for s, d in self.valid_fsources.items()]
+            raise InvalidInputValue("fsource", valids)
+
+    def _get_urls(
+        self, urls: Mapping[Any, Tuple[str, Optional[Dict[str, str]]]]
+    ) -> Tuple[gpd.GeoDataFrame, List[str]]:
+        """Get basins for a list of station IDs.
+
+        Parameters
+        ----------
+        urls : dict
+            A dict with keys as feature ids and values as corresponding url and payload.
+
+        Returns
+        -------
+        (geopandas.GeoDataFrame, list)
+            NLDI indexed features in EPSG:4326 and list of ID(s) that no feature was found.
+        """
+        not_found = []
+        resp = []
+        for f, (u, p) in urls.items():
+            try:
+                rjson = self._get_url(u, p)
+                resp.append((f, geoutils.json2geodf(rjson, ALT_CRS, DEF_CRS)))
+            except (ZeroMatched, InvalidInputType, ar.ServiceError):
+                not_found.append(f)
+
+        if len(resp) == 0:
+            raise ZeroMatched
+
+        resp_df = gpd.GeoDataFrame(pd.concat(dict(resp)), crs=DEF_CRS)
+
+        return resp_df, not_found
 
     def getfeature_byid(
         self, fsource: str, fid: Union[str, List[str]]
@@ -545,7 +592,7 @@ class NLDI:
         coords: Union[Tuple[float, float], List[Tuple[float, float]]],
         loc_crs: str = DEF_CRS,
     ) -> Union[gpd.GeoDataFrame, Tuple[gpd.GeoDataFrame, List[Tuple[float, float]]]]:
-        """Get the closest ComID(s) based on coordinates.
+        """Get the closest feature ID(s) based on coordinates.
 
         Parameters
         ----------
@@ -819,63 +866,3 @@ class NLDI:
             raise MissingItems(["navigation", "source"])
 
         return self.navigate_byid("comid", comid, navigation, source, distance, trim_start)
-
-    def _validate_fsource(self, fsource: str) -> None:
-        """Check if the given feature source is valid."""
-        if fsource not in self.valid_fsources:
-            valids = [f'"{s}" for {d}' for s, d in self.valid_fsources.items()]
-            raise InvalidInputValue("fsource", valids)
-
-    def _get_urls(
-        self, urls: Mapping[Any, Tuple[str, Optional[Dict[str, str]]]]
-    ) -> Tuple[gpd.GeoDataFrame, List[str]]:
-        """Get basins for a list of station IDs.
-
-        Parameters
-        ----------
-        urls : dict
-            A dict with keys as feature ids and values as corresponding url and payload.
-
-        Returns
-        -------
-        (geopandas.GeoDataFrame, list)
-            NLDI indexed features in EPSG:4326 and list of ID(s) that no feature was found.
-        """
-        not_found = []
-        resp = []
-        for f, (u, p) in urls.items():
-            try:
-                rjson = self._get_url(u, p)
-                resp.append((f, geoutils.json2geodf(rjson, ALT_CRS, DEF_CRS)))
-            except (ZeroMatched, InvalidInputType, ar.ServiceError):
-                not_found.append(f)
-
-        if len(resp) == 0:
-            raise ZeroMatched
-
-        resp_df = gpd.GeoDataFrame(pd.concat(dict(resp)), crs=DEF_CRS)
-
-        return resp_df, not_found
-
-    def _get_url(
-        self, url: str, payload: Optional[Dict[str, str]] = None
-    ) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
-        """Send a request to the service using GET method."""
-        if payload is None:
-            payload = {"f": "json"}
-        else:
-            payload.update({"f": "json"})
-
-        try:
-            resp = ar.retrieve_json(
-                [url],
-                [{"params": payload}],
-                expire_after=self.expire_after,
-                disable=self.disable_caching,
-            )
-        except ar.ServiceError as ex:
-            raise ZeroMatched from ex
-        except ConnectionError as ex:
-            raise ServiceUnavailable(self.base_url) from ex
-        else:
-            return resp[0]

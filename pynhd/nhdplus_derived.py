@@ -7,15 +7,13 @@ import async_retriever as ar
 import pandas as pd
 from pygeoogc import InvalidInputValue
 
-from .core import EXPIRE, ScienceBase, get_parquet, stage_nhdplus_attrs
+from .core import ScienceBase, get_parquet, stage_nhdplus_attrs
 
 __all__ = ["enhd_attrs", "nhdplus_vaa", "nhdplus_attrs", "nhd_fcode"]
 
 
 def enhd_attrs(
     parquet_path: Optional[Union[Path, str]] = None,
-    expire_after: float = EXPIRE,
-    disable_caching: bool = False,
 ) -> pd.DataFrame:
     """Get updated NHDPlus attributes from ENHD.
 
@@ -31,10 +29,6 @@ def enhd_attrs(
     parquet_path : str or Path, optional
         Path to a file with ``.parquet`` extension for storing the file, defaults to
         ``./cache/enhd_attrs.parquet``.
-    expire_after : int, optional
-        Expiration time for response caching in seconds, defaults to -1 (never expire).
-    disable_caching : bool, optional
-        If ``True``, disable caching requests, defaults to False.
 
     Returns
     -------
@@ -49,12 +43,10 @@ def enhd_attrs(
     if output.exists():
         return pd.read_parquet(output)
 
-    sb = ScienceBase(expire_after, disable_caching)
+    sb = ScienceBase()
     files = sb.get_file_urls("60c92503d34e86b9389df1c9")
     resp = ar.retrieve_binary(
         [files.loc["enhd_nhdplusatts.parquet"].url],
-        expire_after=expire_after,
-        disable=disable_caching,
     )
     attrs = pd.read_parquet(io.BytesIO(resp[0]))
     attrs.to_parquet(output)
@@ -63,8 +55,6 @@ def enhd_attrs(
 
 def nhdplus_vaa(
     parquet_path: Optional[Union[Path, str]] = None,
-    expire_after: float = EXPIRE,
-    disable_caching: bool = False,
 ) -> pd.DataFrame:
     """Get NHDPlus Value Added Attributes with ComID-level roughness and slope values.
 
@@ -80,10 +70,6 @@ def nhdplus_vaa(
     parquet_path : str or Path, optional
         Path to a file with ``.parquet`` extension for storing the file, defaults to
         ``./cache/nldplus_vaa.parquet``.
-    expire_after : int, optional
-        Expiration time for response caching in seconds, defaults to -1 (never expire).
-    disable_caching : bool, optional
-        If ``True``, disable caching requests, defaults to False.
 
     Returns
     -------
@@ -156,7 +142,7 @@ def nhdplus_vaa(
     fpath = "data/contents/nhdplusVAA.parquet"
     url = f"https://www.hydroshare.org/resource/{rid}/{fpath}"
 
-    resp = ar.retrieve_binary([url], expire_after=expire_after, disable=disable_caching)
+    resp = ar.retrieve_binary([url])
 
     vaa = pd.read_parquet(io.BytesIO(resp[0]))
     vaa = vaa.astype(dtypes, errors="ignore")
@@ -167,8 +153,6 @@ def nhdplus_vaa(
 def nhdplus_attrs(
     name: Optional[str] = None,
     parquet_path: Optional[Union[Path, str]] = None,
-    expire_after: float = EXPIRE,
-    disable_caching: bool = False,
 ) -> pd.DataFrame:
     """Access NHDPlus V2.1 Attributes from ScienceBase over CONUS.
 
@@ -182,10 +166,6 @@ def nhdplus_attrs(
     parquet_path : str or Path, optional
         Path to a file with ``.parquet`` extension for saving the processed to disk for
         later use. Defaults to ``./cache/nhdplus_attrs.parquet``.
-    expire_after : int, optional
-        Expiration time for response caching in seconds, defaults to -1 (never expire).
-    disable_caching : bool, optional
-        If ``True``, disable caching requests, defaults to False.
 
     Returns
     -------
@@ -204,7 +184,7 @@ def nhdplus_attrs(
         url = char_df[char_df.name == name].url.values[0]
     except IndexError as ex:
         raise InvalidInputValue("name", char_df.name.unique()) from ex
-    resp = ar.retrieve_binary([url], expire_after=expire_after, disable=disable_caching)
+    resp = ar.retrieve_binary([url])
     return pd.read_csv(io.BytesIO(resp[0]), compression="zip")
 
 

@@ -2,6 +2,17 @@
 from typing import List
 
 import async_retriever as ar
+import pygeoutils as pgu
+
+
+class MissingColumns(pgu.MissingColumns):
+    """Exception raised when a required column is missing from a dataframe.
+
+    Parameters
+    ----------
+    missing : list
+        List of missing columns.
+    """
 
 
 class ServiceError(ar.ServiceError):
@@ -23,6 +34,20 @@ class InvalidInputValue(ar.InvalidInputValue):
         Name of the input parameter
     valid_inputs : tuple
         List of valid inputs
+    """
+
+
+class InvalidInputType(ar.InvalidInputType):
+    """Exception raised when a function argument type is invalid.
+
+    Parameters
+    ----------
+    arg : str
+        Name of the function argument
+    valid_type : str
+        The valid type of the argument
+    example : str, optional
+        An example of a valid form of the argument, defaults to None.
     """
 
 
