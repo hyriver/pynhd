@@ -7,6 +7,12 @@ History
 
 New Features
 ~~~~~~~~~~~~
+- Add a new function called ``pygeoapi`` for calling the API in batch mode.
+  This function accepts the input coordinates as a ``geopandas.GeoDataFrame``.
+  It is more performant than calling its counteract ``PyGeoAPI`` multiple times.
+  It's recommended to switch to using this new batch function instead of the
+  ``PyGeoAPI`` class. Users just need to prepare an input data frame that has
+  all the required service parameters as columns.
 - Add a new step to ``prepare_nhdplus`` to convert ``MultiLineString`` to ``LineString``.
 - Add support for the ``simplified`` flag of NLDI's ``get_basins`` function.
   The default value is ``True`` to retain the old behavior.
@@ -22,7 +28,7 @@ New Features
 - Add two new functions for getting cross-sections along a single flowline via
   ``flowline_xsection`` or throughout a network of flowlines via ``network_xsection``.
   You can specify spacing and width parameters to control their location. For more
-  information and examples please consult the documentations.
+  information and examples please consult the documentation.
 - Add a new property to ``AGRBase`` called ``service_info`` to include some useful info
   about the service including ``feature_types`` which can be handy for converting
   numeric values of types to their string equivalent.
@@ -50,12 +56,12 @@ Internal Changes
 
 Breaking Changes
 ~~~~~~~~~~~~~~~~
-- Rewrite ``ScienceBase`` to make it generally usable for working with other ScienceBase
+- Rewrite ``ScienceBase`` to make it applicable for working with other ScienceBase
   items. A new function has been added for staging the Additional NHDPlus attributes items
   called ``stage_nhdplus_attrs``.
-- Refactor ``AGRBase`` to remove unnecessary functions and make it more general.
+- Refactor ``AGRBase`` to remove unnecessary functions and make them more general.
 - Update ``PyGeoAPI`` class to conform to the new ``pygeoapi`` API. This web service
-  is undergoing some changes at the time of this release and API is not stable,
+  is undergoing some changes at the time of this release and the API is not stable,
   might not work as expected. As soon as the web service is stable, a new version
   will be released.
 
@@ -68,7 +74,7 @@ New Features
 - Add ``expire_after`` and ``disable_caching`` arguments to all functions that use
   ``async_retriever``. Set the default request caching expiration time to never expire.
   You can use ``disable_caching`` if you don't want to use the cached responses. Please
-  refer to documentations of the functions for more details.
+  refer to documentation of the functions for more details.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
@@ -76,7 +82,7 @@ Internal Changes
   NHDPlus tools as a private class.
 - Modify ``AGRBase`` to reflect the latest API changes in ``pygeoogc.ArcGISRESTfull``
   class.
-- Refactor ``prepare_nhdplus`` by creating a private class that include all the previously
+- Refactor ``prepare_nhdplus`` by creating a private class that includes all the previously
   used private functions. This will make the code more readable and easier to maintain.
 - Add all the missing types so ``mypy --strict`` passes.
 
@@ -102,7 +108,7 @@ Internal Changes
 ~~~~~~~~~~~~~~~~
 - More robust handling of inputs and outputs of ``NLDI``'s methods.
 - Use an alternative download link for NHDPlus VAA file on Hydroshare.
-- Restructure the code base to reduce the complexity of ``pynhd.py`` file
+- Restructure the codebase to reduce the complexity of ``pynhd.py`` file
   by dividing it into three files: ``pynhd`` all classes that provide access
   to the supported web services, ``core`` that includes base classes, and
   ``nhdplus_derived`` that has functions for getting databases that provided
@@ -155,7 +161,7 @@ Internal Changes
 0.10.1 (2021-03-27)
 -------------------
 
-- Add announcement regarding the new name for the software stack, HyRiver.
+- Add an announcement regarding the new name for the software stack, HyRiver.
 - Improve ``pip`` installation and release workflow.
 
 0.10.0 (2021-03-06)
@@ -177,7 +183,7 @@ Breaking Changes
   The function is a method of ``NLDI`` class called ``get_basins``. So, now
   ``NLDI.getfeature_byid`` function does not have a basin flag. This change
   makes getting geometries easier and faster.
-- Remove ``characteristics_dataframe`` method from ``NLDI`` and made a standalone function
+- Remove ``characteristics_dataframe`` method from ``NLDI`` and make a standalone function
   called ``nhdplus_attrs`` for accessing NHDPlus attributes directly from ScienceBase.
 - Add support for using `hydro <https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer>`_
   or `edits <https://edits.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/NHDPlus_HR/MapServer>`_
@@ -187,8 +193,8 @@ Breaking Changes
 
 New Features
 ~~~~~~~~~~~~
-- Add a new argument to ``topoogical_sort`` called ``edge_attr`` that allows to
-  add attribute(s) to the returned Networkx Graph. By default, it is ``None``.
+- Add a new argument to ``topoogical_sort`` called ``edge_attr`` that allows adding attribute(s) to
+  the returned Networkx Graph. By default, it is ``None``.
 - A new base class, ``AGRBase`` for connecting to ArcGISRESTful-based services such as National Map
   and EPA's WaterGEOS.
 - Add support for setting the buffer distance for the input geometries to ``AGRBase.bygeom``.
@@ -212,17 +218,17 @@ New Features
   SQL where clause.
 - The following functions are added to ``NLDI``:
 
-* ``getcharacteristic_byid``: For getting characteristics of NHDPlus catchments.
-* ``navigate_byloc``: For getting the nearest ComID to a coordinate and perform a navigation.
-* ``characteristics_dataframe``: For getting all the available catchment-scale characteristics
-  as a dataframe.
-* ``get_validchars``: For getting a list of available characteristic IDs for a specified
+* ``getcharacteristic_byid``: Getting characteristics of NHDPlus catchments.
+* ``navigate_byloc``: Getting the nearest ComID to a coordinate and performing navigation.
+* ``characteristics_dataframe``: Getting all the available catchment-scale characteristics
+  as a data frame.
+* ``get_validchars``: Getting a list of available characteristic IDs for a specified
   characteristic type.
 
 - The following function is added to ``WaterData``:
 
-* ``byfilter``: For getting data based on any valid CQL filter.
-* ``bygeom``: For getting data within a geometry (polygon and multipolygon).
+* ``byfilter``: Getting data based on any valid CQL filter.
+* ``bygeom``: Getting data within a geometry (polygon and multipolygon).
 
 - Add support for Python 3.9 and tests for Windows.
 
@@ -239,7 +245,7 @@ Bug Fixes
 ------------------
 
 - Add ``show_versions`` function for showing versions of the installed deps.
-- Improve documentations
+- Improve documentation
 
 0.1.1 (2020-08-03)
 ------------------
