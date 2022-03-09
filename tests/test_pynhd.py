@@ -2,11 +2,12 @@
 import io
 from pathlib import Path
 
+import geopandas as gpd
 import pytest
-from shapely.geometry import box
+from shapely.geometry import MultiPoint, Point, box
 
 import pynhd as nhd
-from pynhd import NHD, NLDI, PyGeoAPI, WaterData
+from pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData
 
 try:
     import typeguard  # noqa: F401
@@ -43,24 +44,70 @@ class TestPyGeoAPI:
     pygeoapi = PyGeoAPI()
 
     def test_flowtrace(self):
-        gdf = self.pygeoapi.flow_trace((1774209.63, 856381.68), crs="ESRI:102003", direction="none")
-        assert gdf.comid.iloc[0] == 22294818
+        coords = (1774209.63, 856381.68)
+        gs = gpd.GeoDataFrame(
+            {
+                "direction": [
+                    "none",
+                ]
+            },
+            geometry=[Point(coords)],
+            crs="ESRI:102003",
+        )
+        gdf = self.pygeoapi.flow_trace(coords, crs="ESRI:102003", direction="none")
+        gdfb = nhd.pygeoapi(gs, "flow_trace")
+        assert gdf.comid.iloc[0] == gdfb.comid.iloc[0] == 22294818
 
     def test_splitcatchment(self):
-        gdf = self.pygeoapi.split_catchment((-73.82705, 43.29139), crs=DEF_CRS, upstream=False)
-        assert gdf.catchmentID.iloc[0] == "22294818"
+        coords = (-73.82705, 43.29139)
+        gs = gpd.GeoDataFrame(
+            {
+                "upstream": [
+                    False,
+                ]
+            },
+            geometry=[Point(coords)],
+            crs=DEF_CRS,
+        )
+        gdf = self.pygeoapi.split_catchment(coords, crs=DEF_CRS, upstream=False)
+        gdfb = nhd.pygeoapi(gs, "split_catchment")
+        assert gdf.catchmentID.iloc[0] == gdfb.catchmentID.iloc[0] == "22294818"
 
     def test_elevation_profile(self):
-        gdf = self.pygeoapi.elevation_profile(
-            [(-103.801086, 40.26772), (-103.80097, 40.270568)], numpts=101, dem_res=1, crs=DEF_CRS
+        coords = [(-103.801086, 40.26772), (-103.80097, 40.270568)]
+        gs = gpd.GeoDataFrame(
+            {
+                "numpts": [
+                    101,
+                ],
+                "dem_res": [
+                    1,
+                ],
+            },
+            geometry=[MultiPoint(coords)],
+            crs=DEF_CRS,
         )
-        assert abs(gdf.iloc[-1, 1] - 316.053) < SMALL
+        gdf = self.pygeoapi.elevation_profile(coords, numpts=101, dem_res=1, crs=DEF_CRS)
+        gdfb = nhd.pygeoapi(gs, "elevation_profile")
+        assert abs(gdf.iloc[-1, 1] - 316.053) < SMALL and abs(gdfb.iloc[-1, 1] - 316.053) < SMALL
 
     def test_cross_section(self):
-        gdf = self.pygeoapi.cross_section(
-            (-103.80119, 40.2684), width=1000.0, numpts=101, crs=DEF_CRS
+        coords = (-103.80119, 40.2684)
+        gs = gpd.GeoDataFrame(
+            {
+                "width": [
+                    1000.0,
+                ],
+                "numpts": [
+                    101,
+                ],
+            },
+            geometry=[Point(coords)],
+            crs=DEF_CRS,
         )
-        assert abs(gdf.iloc[-1, 1] - 767.870) < SMALL
+        gdf = self.pygeoapi.cross_section(coords, width=1000.0, numpts=101, crs=DEF_CRS)
+        gdfb = nhd.pygeoapi(gs, "cross_section")
+        assert abs(gdf.iloc[-1, 1] - 767.870) < SMALL and abs(gdfb.iloc[-1, 1] - 767.870) < SMALL
 
 
 class TestNLDI:
@@ -155,11 +202,14 @@ class TestWaterData:
 
 
 def test_nhdphr():
-    hr = nhd.NHDPlusHR("networknhdflowline")
+    hr = NHDPlusHR("flowline")
     flwb = hr.bygeom((-69.77, 45.07, -69.31, 45.45))
-    flwi = hr.byids("PERMANENT_IDENTIFIER", ["103455178", "103454362", "103453218"])
-    flwf = hr.bysql("PERMANENT_IDENTIFIER IN ('103455178', '103454362', '103453218')")
-    assert flwb.shape[0] == 3887 and flwi["OBJECTID"].tolist() == flwf["OBJECTID"].tolist()
+    flwi = hr.byids("NHDFlowline.PERMANENT_IDENTIFIER", ["103455178", "103454362", "103453218"])
+    flwf = hr.bysql("NHDFlowline.PERMANENT_IDENTIFIER IN ('103455178', '103454362', '103453218')")
+    assert (
+        flwb.shape[0] == 3892
+        and flwi["NHDFlowline.OBJECTID"].tolist() == flwf["NHDFlowline.OBJECTID"].tolist()
+    )
 
 
 @pytest.mark.xfail(reason="Hydroshare is unstable.")
