@@ -89,7 +89,7 @@ class TestPyGeoAPI:
         )
         gdf = self.pygeoapi.elevation_profile(coords, numpts=101, dem_res=1, crs=DEF_CRS)
         gdfb = nhd.pygeoapi(gs, "elevation_profile")
-        assert abs(gdf.iloc[-1, 1] - 316.053) < SMALL and abs(gdfb.iloc[-1, 1] - 316.053) < SMALL
+        assert abs(gdf.iloc[-1, 2] - 316.053) < SMALL and abs(gdfb.iloc[-1, 2] - 316.053) < SMALL
 
     def test_cross_section(self):
         coords = (-103.80119, 40.2684)
@@ -107,7 +107,7 @@ class TestPyGeoAPI:
         )
         gdf = self.pygeoapi.cross_section(coords, width=1000.0, numpts=101, crs=DEF_CRS)
         gdfb = nhd.pygeoapi(gs, "cross_section")
-        assert abs(gdf.iloc[-1, 1] - 767.870) < SMALL and abs(gdfb.iloc[-1, 1] - 767.870) < SMALL
+        assert abs(gdf.iloc[-1, 2] - 767.870) < SMALL and abs(gdfb.iloc[-1, 2] - 767.870) < SMALL
 
 
 class TestNLDI:
