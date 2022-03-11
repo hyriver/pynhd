@@ -279,7 +279,14 @@ def pygeoapi(coords: gpd.GeoDataFrame, service: str) -> gpd.GeoDataFrame:
     pgab = PyGeoAPIBatch(coords)
     url = pgab._get_url(pgab.service[service])
     payload = pgab.get_payload(service)
-    return pgab._get_response(url, payload)
+    gdf = pgab._get_response(url, payload)
+    if service == "flow_trace":
+        gdf[["comid", "reachcode"]] = gdf[["comid", "reachcode"]].astype("Int64")
+        feat = gdf[~gdf.comid.isna()].set_index("req_idx")
+        raindrop = gdf.loc[gdf.comid.isna(), ["req_idx", "geometry"]].set_index("req_idx")
+        feat["raindrop_path"] = raindrop.geometry
+        return feat.reset_index()
+    return gdf
 
 
 class WaterData:

@@ -294,22 +294,29 @@ class PyGeoAPIBase:
     ) -> gpd.GeoDataFrame:
         """Post the request and return the response as a GeoDataFrame."""
         resp = ar.retrieve_json([url] * len(payload), payload, "POST")
-        if any("code" in r for r in resp):
+        nfeat = len(resp)
+        idx, resp = zip(*[(i, r) for i, r in enumerate(resp) if "code" not in r])
+
+        if len(resp) == 0:
             msg = "Invalid inpute parameters, check them and retry."
             raise ServiceError(msg)
 
-        if len(resp) == 1:
-            return geoutils.json2geodf(resp)
+        if len(resp) < nfeat:
+            logger.warning(
+                " ".join(
+                    [
+                        f"There was {nfeat - len(resp)} requests that",
+                        "didn't return any features. Check their parameters and retry.",
+                    ]
+                )
+            )
 
         gdf = gpd.GeoDataFrame(
-            pd.concat((geoutils.json2geodf(r) for r in resp), keys=self.req_idx),
+            pd.concat((geoutils.json2geodf(r) for r in resp), keys=[self.req_idx[i] for i in idx]),
             crs="epsg:4326",
         )
-        return (
-            gdf.reset_index()
-            .rename(columns={"level_0": "req_idx"})
-            .drop(columns=["level_1", "spatial_ref"])
-        )
+        drop_cols = ["level_1", "spatial_ref"] if "spatial_ref" in gdf else ["level_1"]
+        return gdf.reset_index().rename(columns={"level_0": "req_idx"}).drop(columns=drop_cols)
 
     @staticmethod
     def _check_coords(
@@ -423,7 +430,8 @@ class PyGeoAPIBatch(PyGeoAPIBase):
 class ScienceBase:
     """Access and explore files on ScienceBase."""
 
-    def get_children(self, item: str) -> Dict[str, Any]:
+    @staticmethod
+    def get_children(item: str) -> Dict[str, Any]:
         """Get children items of an item."""
         url = "https://www.sciencebase.gov/catalog/items"
         payload = {
@@ -437,7 +445,8 @@ class ScienceBase:
         )
         return resp[0]
 
-    def get_file_urls(self, item: str) -> pd.DataFrame:
+    @staticmethod
+    def get_file_urls(item: str) -> pd.DataFrame:
         """Get download and meta URLs of all the available files for an item."""
         url = "https://www.sciencebase.gov/catalog/item"
         payload = {"fields": "files,downloadUri", "format": "json"}
