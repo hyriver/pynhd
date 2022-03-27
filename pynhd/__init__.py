@@ -9,7 +9,9 @@ from .exceptions import (
     MissingItems,
 )
 from .network_tools import (
+    flowline_resample,
     flowline_xsection,
+    network_resample,
     network_xsection,
     nhdflw2nx,
     prepare_nhdplus,
@@ -21,14 +23,13 @@ from .print_versions import show_versions
 from .pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData, pygeoapi
 
 try:
-    import importlib.metadata as metadata
+    import importlib.metadata
 except ImportError:
-    import importlib_metadata as metadata  # type: ignore[no-redef]
+    import importlib_metadata
 
-try:
-    __version__ = metadata.version("pynhd")
-except Exception:
-    __version__ = "999"
+    __version__ = importlib_metadata.version("pynhd")
+else:
+    __version__ = importlib.metadata.version("pynhd")
 
 __all__ = [
     "InvalidInputRange",
@@ -40,6 +41,8 @@ __all__ = [
     "prepare_nhdplus",
     "topoogical_sort",
     "vector_accumulation",
+    "flowline_resample",
+    "network_resample",
     "flowline_xsection",
     "network_xsection",
     "nhdflw2nx",
