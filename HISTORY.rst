@@ -2,11 +2,17 @@
 History
 =======
 
-0.12.3 (unreleased)
+0.13.0 (2022-04-03)
 -------------------
 
 New Features
 ~~~~~~~~~~~~
+- Add support for the new NLDI endpoint called "hydrolocation". The ``NLDI`` class
+  now has two methods for getting features by coordinates: ``feature_byloc``
+  and ``comid_byloc``. The ``feature_byloc`` method returns the flowline that is
+  associated with the closest NHDPlus feature to the given coordinates. The
+  ``comid_byloc`` method returns a point on the closest downstream flowline to
+  the given coordinates.
 - Add a new function called ``pygeoapi`` for calling the API in batch mode.
   This function accepts the input coordinates as a ``geopandas.GeoDataFrame``.
   It is more performant than calling its counteract ``PyGeoAPI`` multiple times.
@@ -16,6 +22,25 @@ New Features
 - Add a new step to ``prepare_nhdplus`` to convert ``MultiLineString`` to ``LineString``.
 - Add support for the ``simplified`` flag of NLDI's ``get_basins`` function.
   The default value is ``True`` to retain the old behavior.
+
+Breaking Changes
+~~~~~~~~~~~~~~~~
+- Remove caching-related arguments from all functions since now they
+  can be set globally via three environmental variables:
+
+  * ``HYRIVER_CACHE_NAME``: Path to the caching SQLite database.
+  * ``HYRIVER_CACHE_EXPIRE``: Expiration time for cached requests in seconds.
+  * ``HYRIVER_CACHE_DISABLE``: Disable reading/writing from/to the cache file.
+
+  You can do this like so:
+
+.. code-block:: python
+
+    import os
+
+    os.environ["HYRIVER_CACHE_NAME"] = "path/to/file.sqlite"
+    os.environ["HYRIVER_CACHE_EXPIRE"] = "3600"
+    os.environ["HYRIVER_CACHE_DISABLE"] = "true"
 
 0.12.2 (2022-02-04)
 -------------------
