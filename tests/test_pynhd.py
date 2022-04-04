@@ -32,12 +32,13 @@ def trib():
     return wd.byid("comid", comids.nhdplus_comid.tolist())
 
 
-def test_nhd_xs():
+def test_nhd_xs_resample():
     main = NLDI().navigate_byid(site, station_id, UM, "flowlines")
     flw = NHD("flowline_mr").byids("COMID", main.nhdplus_comid.tolist()).to_crs("epsg:3857")
     main_nhd = nhd.prepare_nhdplus(flw, 0, 0, 0, purge_non_dendritic=True)
     cs = nhd.network_xsection(main_nhd, 2000, 1000)
-    assert len(cs) == 45
+    rs = nhd.network_resample(main_nhd, 2000)
+    assert len(cs) == 29 and len(rs) == 46
 
 
 class TestPyGeoAPI:
@@ -131,11 +132,18 @@ class TestNLDI:
         wqp = self.nldi.navigate_byloc((-70, 44), UT, "wqp")
         assert wqp.comid.iloc[0] == "6710923"
 
-    def test_feature(self):
+    def test_comid_loc(self):
+        station = self.nldi.getfeature_byid(site, station_id)
+        lon = station.geometry[0].centroid.x
+        lat = station.geometry[0].centroid.y
+        comid = self.nldi.comid_byloc((lon, lat))
+        assert station.comid.values[0] == comid.comid.values[0] == "1722317"
+
+    def test_feature_loc(self):
         station = self.nldi.getfeature_byid(site, station_id)
         lon = round(station.geometry[0].centroid.x, 1)
         lat = round(station.geometry[0].centroid.y, 1)
-        comid = self.nldi.comid_byloc((lon, lat))
+        comid = self.nldi.feature_byloc((lon, lat))
         assert station.comid.values[0] == "1722317" and comid.comid.values[0] == "1722211"
 
     def test_basin(self):
@@ -157,7 +165,7 @@ class TestNLDI:
 
     @pytest.mark.skipif(has_typeguard, reason="Broken if Typeguard is enabled")
     def test_feature_missing(self):
-        _, missing = self.nldi.comid_byloc([(45.2, -69.3), (-69.3, 45.2)])
+        _, missing = self.nldi.feature_byloc([(45.2, -69.3), (-69.3, 45.2)])
         assert len(missing) == 1
 
     @pytest.mark.skipif(has_typeguard, reason="Broken if Typeguard is enabled")
