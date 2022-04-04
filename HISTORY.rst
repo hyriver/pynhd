@@ -7,6 +7,9 @@ History
 
 New Features
 ~~~~~~~~~~~~
+- Add two new function called ``flowline_resample`` and ``network_resample`` for
+  Resample a flowline or network of flowlines based on a given spacing. This is
+  useful for smoothing jagged flowlines similar to those in the NHDPlus database.
 - Add support for the new NLDI endpoint called "hydrolocation". The ``NLDI`` class
   now has two methods for getting features by coordinates: ``feature_byloc``
   and ``comid_byloc``. The ``feature_byloc`` method returns the flowline that is
