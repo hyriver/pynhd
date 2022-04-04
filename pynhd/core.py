@@ -131,10 +131,7 @@ class AGRBase:
         dict
             A dictionary of valid layers.
         """
-        rjson = ar.retrieve_json(
-            [url],
-            [{"params": {"f": "json"}}],
-        )
+        rjson = ar.retrieve_json([url], [{"params": {"f": "json"}}])
         return {lyr["name"].lower(): int(lyr["id"]) for lyr in rjson[0]["layers"]}
 
     def _getfeatures(
