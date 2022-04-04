@@ -594,7 +594,90 @@ class NLDI:
 
         return features
 
+    def __byloc(
+        self,
+        source: str,
+        coords: Union[Tuple[float, float], List[Tuple[float, float]]],
+        loc_crs: str = DEF_CRS,
+    ) -> Union[gpd.GeoDataFrame, Tuple[gpd.GeoDataFrame, List[Tuple[float, float]]]]:
+        """Get the closest feature ID(s) based on coordinates.
+
+        Parameters
+        ----------
+        source : str
+            The name of feature(s) source. The valid sources are ``comid`` and ``feature``.
+        coords : tuple or list
+            A tuple of length two (x, y) or a list of them.
+        loc_crs : str, optional
+            The spatial reference of the input coordinate, defaults to EPSG:4326.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame or (geopandas.GeoDataFrame, list)
+            NLDI indexed ComID(s) in EPSG:4326. If some coords don't return any ComID
+            a list of missing coords are returned as well.
+        """
+        endpoint = "comid/position" if source == "feature" else "hydrolocation"
+        base_url = "/".join([self.base_url, "linked-data", endpoint])
+
+        _coords = [coords] if isinstance(coords, tuple) else coords
+
+        if not isinstance(_coords, list) or any(len(c) != 2 for c in _coords):
+            raise InvalidInputType("coords", "list or tuple")
+
+        _coords = ogc.utils.match_crs(_coords, loc_crs, DEF_CRS)
+
+        urls = {
+            f"{(lon, lat)}": (base_url, {"coords": f"POINT({lon} {lat})"}) for lon, lat in _coords
+        }
+        comids, not_found = self._get_urls(urls)
+
+        if len(comids) == 0:
+            raise ZeroMatched
+
+        comids = comids.reset_index(drop=True)
+
+        if len(not_found) > 0:
+            self._missing_warning(len(not_found), len(_coords))
+            return comids, not_found
+
+        return comids
+
     def comid_byloc(
+        self,
+        coords: Union[Tuple[float, float], List[Tuple[float, float]]],
+        loc_crs: str = DEF_CRS,
+    ) -> Union[gpd.GeoDataFrame, Tuple[gpd.GeoDataFrame, List[Tuple[float, float]]]]:
+        """Get the closest ComID based on coordinates.
+
+        Notes
+        -----
+        This function tries to find the closest ComID based on flowline grid cells. If
+        such a cell is not found, it will return the closest ComID using the flowtrace
+        endpoint of the PyGeoAPI service to find the closest downstream ComID. The returned
+        dataframe has a ``measure`` column that indicates the location of the input
+        coordinate on the flowline as a percentage of the total flowline length.
+
+        Parameters
+        ----------
+        coords : tuple or list of tuples
+            A tuple of length two (x, y) or a list of them.
+        loc_crs : str, optional
+            The spatial reference of the input coordinate, defaults to EPSG:4326.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame or (geopandas.GeoDataFrame, list)
+            NLDI indexed ComID(s) and points in EPSG:4326. If some coords don't return
+            any ComID a list of missing coords are returned as well.
+        """
+        comids = self.__byloc("comid", coords, loc_crs)
+        if isinstance(comids, tuple):
+            cdf, miss = comids
+            return cdf[cdf["source"] == "indexed"].reset_index(drop=True), miss
+        return comids[comids["source"] == "indexed"].reset_index(drop=True)
+
+    def feature_byloc(
         self,
         coords: Union[Tuple[float, float], List[Tuple[float, float]]],
         loc_crs: str = DEF_CRS,
@@ -611,32 +694,10 @@ class NLDI:
         Returns
         -------
         geopandas.GeoDataFrame or (geopandas.GeoDataFrame, list)
-            NLDI indexed ComID(s) in EPSG:4326. If some coords don't return any ComID
-            a list of missing coords are returned as well.
+            NLDI indexed feature ID(s) and flowlines in EPSG:4326. If some coords don't
+            return any IDs a list of missing coords are returned as well.
         """
-        _coords = [coords] if isinstance(coords, tuple) else coords
-
-        if not isinstance(_coords, list) or any(len(c) != 2 for c in _coords):
-            raise InvalidInputType("coords", "list or tuple")
-
-        _coords = ogc.utils.match_crs(_coords, loc_crs, DEF_CRS)
-
-        base_url = "/".join([self.base_url, "linked-data", "comid", "position"])
-        urls = {
-            f"{(lon, lat)}": (base_url, {"coords": f"POINT({lon} {lat})"}) for lon, lat in _coords
-        }
-        comids, not_found = self._get_urls(urls)
-
-        if len(comids) == 0:
-            raise ZeroMatched
-
-        comids = comids.reset_index(drop=True)
-
-        if len(not_found) > 0:
-            self._missing_warning(len(not_found), len(_coords))
-            return comids, not_found
-
-        return comids
+        return self.__byloc("feature", coords, loc_crs)
 
     def get_basins(
         self,
@@ -759,6 +820,9 @@ class NLDI:
 
     def get_validchars(self, char_type: str) -> pd.DataFrame:
         """Get all the available characteristics IDs for a given characteristics type."""
+        if char_type not in self.valid_chartypes:
+            raise InvalidInputValue("char", list(self.valid_chartypes))
+
         resp = self._get_url("/".join([self.base_url, "lookups", char_type, "characteristics"]))
         c_list = ogc.utils.traverse_json(resp, ["characteristicMetadata", "characteristic"])
         return pd.DataFrame.from_dict(
@@ -865,7 +929,7 @@ class NLDI:
         """
         if not (isinstance(coords, tuple) and len(coords) == 2):
             raise InvalidInputType("coods", "tuple of length 2", "(x, y)")
-        resp = self.comid_byloc(coords, loc_crs)
+        resp = self.feature_byloc(coords, loc_crs)
         comid_df = resp[0] if isinstance(resp, tuple) else resp
         comid = comid_df.comid.iloc[0]
 
