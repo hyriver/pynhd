@@ -11,7 +11,7 @@ from pandas._libs.missing import NAType
 from pygeoutils import GeoBSpline, InvalidInputType
 from pygeoutils.pygeoutils import Spline
 from shapely import ops
-from shapely.geometry import LineString
+from shapely.geometry import LineString, MultiLineString, Point
 
 from . import nhdplus_derived as derived
 from .core import logger
@@ -21,10 +21,45 @@ __all__ = [
     "prepare_nhdplus",
     "topoogical_sort",
     "vector_accumulation",
+    "flowline_resample",
+    "network_resample",
     "flowline_xsection",
     "network_xsection",
     "nhdflw2nx",
 ]
+
+
+def nhdflw2nx(
+    flowlines: pd.DataFrame,
+    id_col: str = "comid",
+    toid_col: str = "tocomid",
+    edge_attr: Optional[Union[str, List[str]]] = None,
+) -> nx.DiGraph:
+    """Convert NHDPlus flowline database to networkx graph.
+
+    Parameters
+    ----------
+    flowlines : geopandas.GeoDataFrame
+        NHDPlus flowlines.
+    id_col : str, optional
+        Name of the column containing the node ID, defaults to "comid".
+    toid_col : str, optional
+        Name of the column containing the downstream node ID, defaults to "tocomid".
+    edge_attr : str, optional
+        Name of the column containing the edge attributes, defaults to ``None``.
+
+    Returns
+    -------
+    nx.DiGraph
+        Networkx directed graph of the NHDPlus flowlines.
+    """
+    return nx.from_pandas_edgelist(
+        flowlines,
+        source=id_col,
+        target=toid_col,
+        create_using=nx.DiGraph,
+        edge_attr=edge_attr,
+    )
 
 
 class NHDTools:
@@ -87,7 +122,10 @@ class NHDTools:
         ]
 
         self.check_requirements(req_cols, self.flw)
-        self.flw[req_cols] = self.flw[req_cols].astype("Int64")
+        try:
+            self.flw[req_cols] = self.flw[req_cols].astype("int64")
+        except TypeError:
+            self.flw[req_cols] = self.flw[req_cols].astype("Int64")
 
     def to_linestring(self) -> None:
         """Convert flowlines to shapely LineString objects."""
@@ -129,7 +167,10 @@ class NHDTools:
             "pathlength",
         ]
         self.check_requirements(req_cols, self.flw)
-        self.flw[req_cols[:-2]] = self.flw[req_cols[:-2]].astype("Int64")
+        try:
+            self.flw[req_cols[:-2]] = self.flw[req_cols[:-2]].astype("int64")
+        except TypeError:
+            self.flw[req_cols[:-2]] = self.flw[req_cols[:-2]].astype("Int64")
 
         if min_path_size > 0:
             short_paths = self.flw.groupby("levelpathi").apply(
@@ -147,6 +188,22 @@ class NHDTools:
             tiny_networks = self.flw[terminal_filter].append(self.flw[start_filter])
             self.flw = self.flw[~self.flw.terminalpa.isin(tiny_networks.terminalpa.unique())]
 
+    def remove_isolated(self) -> None:
+        """Remove isolated flowlines."""
+        req_cols = ["comid", "tocomid"]
+        self.check_requirements(req_cols, self.flw)
+        if self.flw.tocomid.isna().sum() > 0:
+            enhd_attrs = derived.enhd_attrs()
+            self.flw = self.flw.reset_index().set_index("comid")
+            self.flw["tocomid"] = enhd_attrs.set_index("comid")["tocomid"]
+            self.flw = self.flw.reset_index().set_index("index")
+
+        zeros = self.flw.tocomid == 0
+        if zeros.sum() > 0:
+            self.flw.loc[zeros, "tocomid"] = -self.flw.loc[zeros, "comid"]
+        comids = max(nx.weakly_connected_components(nhdflw2nx(self.flw)), key=len)
+        self.flw = self.flw[self.flw.comid.isin(comids)].copy()
+
     def add_tocomid(self) -> None:
         """Find the downstream comid(s) of each comid in NHDPlus flowline database.
 
@@ -157,7 +214,11 @@ class NHDTools:
         """
         req_cols = ["comid", "terminalpa", "fromnode", "tonode"]
         self.check_requirements(req_cols, self.flw)
-        self.flw[req_cols] = self.flw[req_cols].astype("Int64")
+        try:
+            self.flw[req_cols] = self.flw[req_cols].astype("int64")
+        except TypeError:
+            self.flw[req_cols] = self.flw[req_cols].astype("Int64")
+
         if "tocomid" in self.flw:
             self.flw = self.flw.drop(columns="tocomid")
 
@@ -201,6 +262,7 @@ def prepare_nhdplus(
     min_path_length: float,
     min_path_size: float = 0,
     purge_non_dendritic: bool = False,
+    remove_isolated: bool = False,
     use_enhd_attrs: bool = False,
     terminal2nan: bool = True,
 ) -> gpd.GeoDataFrame:
@@ -224,7 +286,10 @@ def prepare_nhdplus(
         Drainage basins with an outlet drainage area smaller than
         this value will be removed. Defaults to 0.
     purge_non_dendritic : bool, optional
-        Whether to remove non dendritic paths, defaults to False
+        Whether to remove non dendritic paths, defaults to False.
+    remove_isolated : bool, optional
+        Whether to remove isolated flowlines, defaults to False. If True,
+        ``terminal2nan`` will be set to False.
     use_enhd_attrs : bool, optional
         Whether to replace the attributes with the ENHD attributes, defaults to False.
         For more information, see
@@ -265,40 +330,9 @@ def prepare_nhdplus(
     if nhd.flw.shape[0] > 0 and ("tocomid" not in nhd.flw or terminal2nan):
         nhd.add_tocomid()
 
+    if remove_isolated:
+        nhd.remove_isolated()
     return nhd.flw
-
-
-def nhdflw2nx(
-    flowlines: pd.DataFrame,
-    id_col: str = "comid",
-    toid_col: str = "tocomid",
-    edge_attr: Optional[Union[str, List[str]]] = None,
-) -> nx.DiGraph:
-    """Convert NHDPlus flowline database to networkx graph.
-
-    Parameters
-    ----------
-    flowlines : geopandas.GeoDataFrame
-        NHDPlus flowlines.
-    id_col : str, optional
-        Name of the column containing the node ID, defaults to "comid".
-    toid_col : str, optional
-        Name of the column containing the downstream node ID, defaults to "tocomid".
-    edge_attr : str, optional
-        Name of the column containing the edge attributes, defaults to ``None``.
-
-    Returns
-    -------
-    nx.DiGraph
-        Networkx directed graph of the NHDPlus flowlines.
-    """
-    return nx.from_pandas_edgelist(
-        flowlines,
-        source=id_col,
-        target=toid_col,
-        create_using=nx.DiGraph,
-        edge_attr=edge_attr,
-    )
 
 
 def topoogical_sort(
@@ -394,36 +428,129 @@ def vector_accumulation(
     return acc
 
 
-def get_spline(line: LineString, ns_pts: int, crs: Union[str, pyproj.CRS]) -> Spline:
+def __get_spline(line: LineString, ns_pts: int, crs: Union[str, pyproj.CRS]) -> Spline:
     """Get a B-spline from a line."""
     x, y = line.xy
     pts = gpd.GeoSeries(gpd.points_from_xy(x, y, crs=crs))
     return GeoBSpline(pts, ns_pts).spline
 
 
-def get_idx(d_sp: np.ndarray, distance: float) -> np.ndarray:  # type: ignore
-    """Get the index of the closest point to a given distance."""
+def __get_idx(d_sp: np.ndarray, distance: float) -> np.ndarray:  # type: ignore
+    """Get the index of the closest points based on a given distance."""
     dis = pd.DataFrame(d_sp, columns=["distance"]).reset_index()
     grouper = pd.cut(dis.distance, np.arange(0, dis.distance.max() + distance, distance))
-    return dis.groupby(grouper).last()["index"].values  # type: ignore
+    idx = dis.groupby(grouper).last()["index"].to_numpy()
+    return np.append(0, idx)
 
 
-def get_perpendicular(
+def __get_spline_params(
+    line: LineString, n_seg: int, distance: float, crs: Union[str, pyproj.CRS]
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:  # type: ignore[type-arg]
+    """Get perpendiculars to a line."""
+    _n_seg = n_seg
+    spline = __get_spline(line, _n_seg, crs)
+    idx = __get_idx(spline.distance, distance)
+    while np.isnan(idx).any():
+        _n_seg *= 2
+        spline = __get_spline(line, _n_seg, crs)
+        idx = __get_idx(spline.distance, distance)
+    return spline.x[idx].flatten(), spline.y[idx].flatten(), spline.phi[idx].flatten()
+
+
+def __get_perpendicular(
     line: LineString, n_seg: int, distance: float, half_width: float, crs: Union[str, pyproj.CRS]
 ) -> List[LineString]:
     """Get perpendiculars to a line."""
-    _n_seg = n_seg
-    spline = get_spline(line, _n_seg, crs)
-    idx = get_idx(spline.distance, distance)
-    while np.isnan(idx).any():
-        _n_seg *= 2
-        spline = get_spline(line, _n_seg, crs)
-        idx = get_idx(spline.distance, distance)
-    x_l = spline.x[idx] - half_width * np.sin(spline.phi[idx])
-    x_r = spline.x[idx] + half_width * np.sin(spline.phi[idx])
-    y_l = spline.y[idx] - half_width * np.cos(spline.phi[idx])
-    y_r = spline.y[idx] + half_width * np.cos(spline.phi[idx])
+    x, y, phi = __get_spline_params(line, n_seg, distance, crs)
+    x_l = x - half_width * np.sin(phi)
+    x_r = x + half_width * np.sin(phi)
+    y_l = y + half_width * np.cos(phi)
+    y_r = y - half_width * np.cos(phi)
     return [LineString([(x1, y1), (x2, y2)]) for x1, y1, x2, y2 in zip(x_l, y_l, x_r, y_r)]
+
+
+def __check_flw(flw: gpd.GeoDataFrame, req_cols: List[str]) -> None:
+    """Get flowlines."""
+    if flw.crs is None:
+        raise MissingCRS
+
+    if not flw.crs.is_projected:
+        raise InvalidInputType("flw.crs", "projected CRS")
+
+    if any(col not in flw for col in req_cols):
+        raise MissingItems(req_cols)
+
+
+def __merge_flowlines(flw: List[Union[LineString, MultiLineString]]) -> List[LineString]:
+    """Merge flowlines."""
+    merged = ops.linemerge(flw)
+    if isinstance(merged, LineString):
+        return [merged]
+    return list(merged.geoms)
+
+
+def flowline_resample(flw: gpd.GeoDataFrame, spacing: float) -> gpd.GeoDataFrame:
+    """Resample a flowline based on a given spacing.
+
+    Parameters
+    ----------
+    flw : geopandas.GeoDataFrame
+        A dataframe with ``geometry`` and ``comid`` columns and CRS attribute.
+        The flowlines should be able to merged to a single ``LineString``.
+        Otherwise, you should use the :func:`network_resample` function.
+    spacing : float
+        Spacing between the sample points in meters.
+
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        Resampled flowline.
+    """
+    __check_flw(flw, ["geometry", "comid"])
+
+    line_list = __merge_flowlines(flw.geometry.to_list())
+    if len(line_list) > 1:
+        raise InvalidInputType("flw.geometry", "mergeable to a single line")
+    line = line_list[0]
+
+    dist = sorted(line.project(Point(p)) for p in line.coords)
+    n_seg = int(np.ceil(line.length / spacing)) * 100
+    xs, ys, _ = __get_spline_params(line, n_seg, spacing, flw.crs)
+    line = LineString(list(zip(xs, ys)))
+
+    lines = [ops.substring(line, s, e) for s, e in zip(dist[:-1], dist[1:])]
+    resampled = gpd.GeoDataFrame(geometry=lines, crs=flw.crs)
+    rs_idx, flw_idx = flw.sindex.nearest(resampled.geometry, max_distance=spacing, return_all=False)
+    merged_idx = tlz.merge_with(list, ({t: i} for t, i in zip(flw_idx, rs_idx)))
+
+    resampled["comid"] = 0
+    for fi, ci in merged_idx.items():
+        resampled.loc[ci, "comid"] = flw.iloc[fi].comid
+    resampled = resampled.dissolve(by="comid")
+    resampled["geometry"] = [
+        ln if isinstance(ln, LineString) else ops.linemerge(ln) for ln in resampled.geometry
+    ]
+    return resampled
+
+
+def network_resample(flw: gpd.GeoDataFrame, spacing: float) -> gpd.GeoDataFrame:
+    """Get cross-section of a river network at a given spacing.
+
+    Parameters
+    ----------
+    flw : geopandas.GeoDataFrame
+        A dataframe with ``geometry`` and ``comid`` columns and CRS attribute.
+    spacing : float
+        The spacing between the points.
+
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        Resampled flowlines.
+    """
+    __check_flw(flw, ["comid", "levelpathi", "geometry"])
+    cs = pd.concat(flowline_resample(f, spacing) for _, f in flw.groupby("levelpathi"))
+    return gpd.GeoDataFrame(cs, crs=flw.crs).drop_duplicates().dissolve(by="comid")
 
 
 def flowline_xsection(flw: gpd.GeoDataFrame, distance: float, width: float) -> gpd.GeoDataFrame:
@@ -447,6 +574,7 @@ def flowline_xsection(flw: gpd.GeoDataFrame, distance: float, width: float) -> g
         Note that each ``comid`` can have multiple cross-sections depending on
         the given spacing distance.
     """
+    __check_flw(flw, ["geometry", "comid"])
     if flw.crs is None:
         raise MissingCRS
 
@@ -458,14 +586,10 @@ def flowline_xsection(flw: gpd.GeoDataFrame, distance: float, width: float) -> g
         raise MissingItems(req_cols)
 
     half_width = width * 0.5
-    merged = ops.linemerge(flw.geometry.to_list())
-    if isinstance(merged, LineString):
-        lines = [merged]
-    else:
-        lines = list(merged.geoms)
+    lines = __merge_flowlines(flw.geometry.to_list())
     n_segments = (int(np.ceil(ln.length / distance)) * 100 for ln in lines)
     main_split = tlz.concat(
-        get_perpendicular(ln, n_seg, distance, half_width, flw.crs)
+        __get_perpendicular(ln, n_seg, distance, half_width, flw.crs)
         for ln, n_seg in zip(lines, n_segments)
     )
 
@@ -476,7 +600,7 @@ def flowline_xsection(flw: gpd.GeoDataFrame, distance: float, width: float) -> g
     cs["comid"] = 0
     for fi, ci in merged_idx.items():
         cs.loc[ci, "comid"] = flw.iloc[fi].comid
-    return cs.drop_duplicates()
+    return cs.drop_duplicates().dissolve(by="comid")
 
 
 def network_xsection(flw: gpd.GeoDataFrame, distance: float, width: float) -> gpd.GeoDataFrame:
@@ -500,14 +624,6 @@ def network_xsection(flw: gpd.GeoDataFrame, distance: float, width: float) -> gp
         Note that each ``comid`` can have multiple cross-sections depending on
         the given spacing distance.
     """
-    if flw.crs is None:
-        raise MissingCRS
-
-    if not flw.crs.is_projected:
-        raise InvalidInputType("flw.crs", "projected CRS")
-
-    req_cols = ["comid", "levelpathi", "geometry"]
-    if any(col not in flw for col in req_cols):
-        raise MissingItems(req_cols)
+    __check_flw(flw, ["comid", "levelpathi", "geometry"])
     cs = pd.concat(flowline_xsection(f, distance, width) for _, f in flw.groupby("levelpathi"))
-    return gpd.GeoDataFrame(cs, crs=flw.crs).drop_duplicates()
+    return gpd.GeoDataFrame(cs, crs=flw.crs).drop_duplicates().dissolve(by="comid")
