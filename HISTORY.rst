@@ -2,6 +2,15 @@
 History
 =======
 
+0.13.1 (unreleased)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Add support for passing any of the supported NLDI feature sources to
+  the ``get_basins`` method of the ``NLDI`` class. The default is ``nwissite``
+  to retain backward compatibility.
+
 0.13.0 (2022-04-03)
 -------------------
 
