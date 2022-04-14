@@ -1,5 +1,5 @@
 """Access NLDI and WaterData databases."""
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import async_retriever as ar
 import geopandas as gpd
@@ -573,7 +573,19 @@ class NLDI:
         ----------
         fsource : str
             The name of feature(s) source. The valid sources are:
-            comid, huc12pp, nwissite, wade, wqp
+
+            * 'comid' for NHDPlus comid.
+            * 'ca_gages' for Streamgage catalog for CA SB19
+            * 'gfv11_pois' for USGS Geospatial Fabric V1.1 Points of Interest
+            * 'huc12pp' for HUC12 Pour Points
+            * 'nmwdi-st' for New Mexico Water Data Initative Sites
+            * 'nwisgw' for NWIS Groundwater Sites
+            * 'nwissite' for NWIS Surface Water Sites
+            * 'ref_gage' for geoconnex.us reference gages
+            * 'vigil' for Vigil Network Data
+            * 'wade' for Water Data Exchange 2.0 Sites
+            * 'WQP' for Water Quality Portal
+
         fid : str or list of str
             Feature ID(s).
 
@@ -701,7 +713,8 @@ class NLDI:
 
     def get_basins(
         self,
-        station_ids: Union[str, List[str]],
+        feature_ids: Union[str, List[str]],
+        fsource: str = "nwissite",
         split_catchment: bool = False,
         simplified: bool = True,
     ) -> Union[gpd.GeoDataFrame, Tuple[gpd.GeoDataFrame, List[str]]]:
@@ -709,8 +722,24 @@ class NLDI:
 
         Parameters
         ----------
-        station_ids : str or list
-            USGS station ID(s).
+        feature_ids : str or list
+            Target feature ID(s).
+        fsource : str
+            The name of feature(s) source, defaults to ``nwissite``.
+            The valid sources are:
+
+            * 'comid' for NHDPlus comid.
+            * 'ca_gages' for Streamgage catalog for CA SB19
+            * 'gfv11_pois' for USGS Geospatial Fabric V1.1 Points of Interest
+            * 'huc12pp' for HUC12 Pour Points
+            * 'nmwdi-st' for New Mexico Water Data Initative Sites
+            * 'nwisgw' for NWIS Groundwater Sites
+            * 'nwissite' for NWIS Surface Water Sites
+            * 'ref_gage' for geoconnex.us reference gages
+            * 'vigil' for Vigil Network Data
+            * 'wade' for Water Data Exchange 2.0 Sites
+            * 'WQP' for Water Quality Portal
+
         split_catchment : bool, optional
             If ``True``, split basins at their outlet locations. Default to ``False``.
         simplified : bool, optional
@@ -722,14 +751,24 @@ class NLDI:
             NLDI indexed basins in EPSG:4326. If some IDs don't return any features
             a list of missing ID(s) are returned as well.
         """
-        station_ids = station_ids if isinstance(station_ids, list) else [station_ids]
+        self._validate_fsource(fsource)
+        if not isinstance(feature_ids, Sequence):
+            raise InvalidInputType("feature_ids", "str, list or tuple")
+
+        feature_ids = feature_ids if isinstance(feature_ids, list) else [feature_ids]
+        if fsource == "nwissite":
+            feature_ids = [f"USGS-{fid.lower().replace('usgs-', '')}" for fid in feature_ids]
+
         payload = {
             "splitCatchment": str(split_catchment).lower(),
             "simplified": str(simplified).lower(),
         }
         urls = {
-            s: (f"{self.base_url}/linked-data/nwissite/USGS-{s}/basin", payload)
-            for s in station_ids
+            fid.lower().replace("usgs-", ""): (
+                f"{self.base_url}/linked-data/{fsource}/{fid}/basin",
+                payload,
+            )
+            for fid in feature_ids
         }
         basins, not_found = self._get_urls(urls)
         basins = basins.reset_index(level=1, drop=True)
@@ -739,7 +778,7 @@ class NLDI:
         basins = basins[~nulls].copy()
 
         if len(not_found) > 0:
-            self._missing_warning(len(not_found), len(station_ids))
+            self._missing_warning(len(not_found), len(feature_ids))
             return basins, not_found
 
         return basins
@@ -756,7 +795,7 @@ class NLDI:
         Parameters
         ----------
         comids : str or list
-            The ID of the feature.
+            The NHDPlus Common Identifier(s).
         char_type : str
             Type of the characteristic. Valid values are ``local`` for
             individual reach catchments, ``tot`` for network-accumulated values
@@ -843,8 +882,20 @@ class NLDI:
         Parameters
         ----------
         fsource : str
-            The name of feature source. The valid sources are:
-            ``comid``, ``huc12pp``, ``nwissite``, ``wade``, ``WQP``.
+            The name of feature(s) source. The valid sources are:
+
+            * 'comid' for NHDPlus comid.
+            * 'ca_gages' for Streamgage catalog for CA SB19
+            * 'gfv11_pois' for USGS Geospatial Fabric V1.1 Points of Interest
+            * 'huc12pp' for HUC12 Pour Points
+            * 'nmwdi-st' for New Mexico Water Data Initative Sites
+            * 'nwisgw' for NWIS Groundwater Sites
+            * 'nwissite' for NWIS Surface Water Sites
+            * 'ref_gage' for geoconnex.us reference gages
+            * 'vigil' for Vigil Network Data
+            * 'wade' for Water Data Exchange 2.0 Sites
+            * 'WQP' for Water Quality Portal
+
         fid : str
             The ID of the feature.
         navigation : str
