@@ -257,6 +257,7 @@ def pygeoapi(coords: gpd.GeoDataFrame, service: str) -> gpd.GeoDataFrame:
         * ``cross_section``: ``numpts`` that indicates the number of points to extract
           along the flowpath and ``width`` that indicates the width of the cross-section
           in meters.
+
     service : str
         The service to query, can be ``flow_trace``, ``split_catchment``, ``elevation_profile``,
         or ``cross_section``.
@@ -268,12 +269,18 @@ def pygeoapi(coords: gpd.GeoDataFrame, service: str) -> gpd.GeoDataFrame:
 
     Examples
     --------
-    >>> from pynhd import PyGeoAPI
-    >>> pygeoapi = PyGeoAPI()
-    >>> gdf = pygeoapi.flow_trace(
-    ...     (1774209.63, 856381.68), crs="ESRI:102003", direction="none"
-    ... )  # doctest: +SKIP
-    >>> print(gdf.comid.iloc[0])  # doctest: +SKIP
+    >>> from shapely.geometry import Point
+    >>> gdf = gpd.GeoDataFrame(
+    ...     {
+    ...         "direction": [
+    ...             "none",
+    ...         ]
+    ...     },
+    ...     geometry=[Point((1774209.63, 856381.68))],
+    ...     crs="ESRI:102003",
+    ... )
+    >>> trace = nhd.pygeoapi(gdf, "flow_trace")
+    >>> print(trace.comid.iloc[0])
     22294818
     """
     pgab = PyGeoAPIBatch(coords)
@@ -759,12 +766,13 @@ class NLDI:
         if fsource == "nwissite":
             feature_ids = [f"USGS-{fid.lower().replace('usgs-', '')}" for fid in feature_ids]
 
+        ftype = type(feature_ids[0])
         payload = {
             "splitCatchment": str(split_catchment).lower(),
             "simplified": str(simplified).lower(),
         }
         urls = {
-            fid.lower().replace("usgs-", ""): (
+            ftype(str(fid).lower().replace("usgs-", "")): (
                 f"{self.base_url}/linked-data/{fsource}/{fid}/basin",
                 payload,
             )

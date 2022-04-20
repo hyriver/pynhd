@@ -33,7 +33,7 @@ def nhdflw2nx(
     flowlines: pd.DataFrame,
     id_col: str = "comid",
     toid_col: str = "tocomid",
-    edge_attr: Optional[Union[str, List[str]]] = None,
+    edge_attr: Optional[Union[str, List[str], bool]] = None,
 ) -> nx.DiGraph:
     """Convert NHDPlus flowline database to networkx graph.
 
@@ -47,6 +47,7 @@ def nhdflw2nx(
         Name of the column containing the downstream node ID, defaults to "tocomid".
     edge_attr : str, optional
         Name of the column containing the edge attributes, defaults to ``None``.
+        If ``True``, all remaining columns will be used as edge attributes.
 
     Returns
     -------
