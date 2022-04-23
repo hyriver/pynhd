@@ -3,7 +3,17 @@ from typing import List
 
 import async_retriever as ar
 import pygeoutils as pgu
+import pygeoogc as ogc
 
+
+class ZeroMatched(ogc.ZeroMatched):
+    """Exception raised when a function argument is missing.
+
+    Parameters
+    ----------
+    msg : str
+        The exception error message
+    """
 
 class MissingColumns(pgu.MissingColumns):
     """Exception raised when a required column is missing from a dataframe.

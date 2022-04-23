@@ -7,6 +7,7 @@ from .exceptions import (
     MissingColumns,
     MissingCRS,
     MissingItems,
+    ZeroMatched,
 )
 from .network_tools import (
     flowline_resample,
@@ -38,6 +39,7 @@ __all__ = [
     "MissingItems",
     "MissingColumns",
     "MissingCRS",
+    "ZeroMatched",
     "prepare_nhdplus",
     "topoogical_sort",
     "vector_accumulation",

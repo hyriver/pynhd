@@ -7,12 +7,12 @@ import numpy as np
 import pandas as pd
 import pygeoogc as ogc
 import pygeoutils as geoutils
-from pygeoogc import WFS, InvalidInputValue, ServiceUnavailable, ServiceURL, ZeroMatched
+from pygeoogc import WFS, InvalidInputValue, ServiceUnavailable, ServiceURL, ZeroMatched as ZeroMatchedOGC
 from pygeoutils import InvalidInputType
 from shapely.geometry import MultiPolygon, Polygon
 
 from .core import ALT_CRS, DEF_CRS, AGRBase, PyGeoAPIBase, PyGeoAPIBatch, logger
-from .exceptions import InvalidInputRange, MissingItems
+from .exceptions import InvalidInputRange, MissingItems, ZeroMatched
 
 
 class NHD(AGRBase):
@@ -561,7 +561,7 @@ class NLDI:
             try:
                 rjson = self._get_url(u, p)
                 resp.append((f, geoutils.json2geodf(rjson, ALT_CRS, DEF_CRS)))
-            except (ZeroMatched, InvalidInputType, ar.ServiceError):
+            except (ZeroMatchedOGC, ZeroMatched, InvalidInputType, ar.ServiceError):
                 not_found.append(f)
 
         if len(resp) == 0:
@@ -933,6 +933,9 @@ class NLDI:
         url = "/".join([self.base_url, "linked-data", fsource, fid, "navigation"])
 
         valid_navigations: Dict[str, Any] = self._get_url(url)  # type: ignore
+        if len(valid_navigations) == 0:
+            raise ZeroMatched
+
         if navigation not in valid_navigations.keys():
             raise InvalidInputValue("navigation", list(valid_navigations.keys()))
 

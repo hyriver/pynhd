@@ -185,7 +185,7 @@ def nhdplus_attrs(
     except IndexError as ex:
         raise InvalidInputValue("name", char_df.name.unique()) from ex
     resp = ar.retrieve_binary([url])
-    return pd.read_csv(io.BytesIO(resp[0]), compression="zip")
+    return pd.read_csv(io.BytesIO(resp[0]), compression="zip", engine="pyarrow")
 
 
 def nhd_fcode() -> pd.DataFrame:
