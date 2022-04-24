@@ -47,6 +47,19 @@ def get_parquet(parquet_path: Union[Path, str]) -> Path:
     return output
 
 
+class GCXURL(NamedTuple):
+    items: str
+    queryables: str
+
+
+class EndPoints(NamedTuple):
+    name: str
+    description: str
+    url: str
+    query_fields: List[str]
+    extent: Tuple[float, float, float, float]
+
+
 class ServiceInfo(NamedTuple):
     """Information about a web service."""
 

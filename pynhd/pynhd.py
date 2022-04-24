@@ -2,16 +2,18 @@
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import async_retriever as ar
+import cytoolz as tlz
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pygeoogc as ogc
 import pygeoutils as geoutils
-from pygeoogc import WFS, InvalidInputValue, ServiceUnavailable, ServiceURL, ZeroMatched as ZeroMatchedOGC
+from pygeoogc import WFS, InvalidInputValue, ServiceUnavailable, ServiceURL
+from pygeoogc import ZeroMatched as ZeroMatchedOGC
 from pygeoutils import InvalidInputType
-from shapely.geometry import MultiPolygon, Polygon
+from shapely.geometry import MultiPolygon, Point, Polygon
 
-from .core import ALT_CRS, DEF_CRS, AGRBase, PyGeoAPIBase, PyGeoAPIBatch, logger
+from .core import ALT_CRS, DEF_CRS, AGRBase, EndPoints, PyGeoAPIBase, PyGeoAPIBatch, logger
 from .exceptions import InvalidInputRange, MissingItems, ZeroMatched
 
 
@@ -999,3 +1001,148 @@ class NLDI:
             raise MissingItems(["navigation", "source"])
 
         return self.navigate_byid("comid", comid, navigation, source, distance, trim_start)
+
+
+class GeoConnex:
+    """Access to the GeoConnex API.
+
+    Parameters
+    ----------
+    item : str, optional
+        The target endpoint to query, defaults to ``None``.
+    """
+
+    @staticmethod
+    def __get_url(url: str, kwds: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+        params = {"params": {**kwds, "f": "json"}} if kwds else {"params": {"f": "json"}}
+        return ar.retrieve_json([url], [params])[0]
+
+    def __get_endpoints(self) -> Dict[str, EndPoints]:
+        pluck = tlz.partial(tlz.pluck, seqs=self.__get_url(self.base_url)["collections"])
+
+        def get_links(links: List[Dict[str, Any]]) -> Dict[str, Union[str, List[str]]]:
+            """Get links."""
+            urls = {
+                lk["rel"]: lk["href"].replace("?f=json", "")
+                for lk in links
+                if lk["type"] == "application/json"
+            }
+            return {
+                "url": f"{urls['self']}/items",
+                "query_fields": list(self.__get_url(urls["queryables"])["properties"]),
+            }
+
+        eps = zip(
+            pluck(ind="id"), pluck(ind="description"), pluck(ind="links"), pluck(ind="extent")
+        )
+        return {
+            ep[0]: EndPoints(
+                name=ep[0],
+                description=ep[1],
+                **get_links(ep[2]),  # type: ignore
+                extent=tuple(ep[3]["spatial"]["bbox"][0]),  # type: ignore
+            )
+            for ep in eps
+        }
+
+    def __init__(self, item: Optional[str] = None) -> None:
+        self.base_url = f"{ServiceURL().restful.geoconnex}/collections"
+        self.endpoints = self.__get_endpoints()
+        self.query_url: Optional[str] = None
+        self.item = item
+
+    @property
+    def item(self) -> Optional[str]:
+        """Return the name of the endpoint."""
+        return self._item
+
+    @item.setter
+    def item(self, value: Optional[str]) -> None:
+        self._item = value
+        if value is not None:
+            if value not in self.endpoints:
+                raise InvalidInputValue("item", list(self.endpoints))
+            self.query_url = self.endpoints[value].url
+        else:
+            self.query_url = None
+
+    def query(
+        self,
+        kwds: Dict[str, Union[str, int, float, Point, Polygon, MultiPolygon]],
+        skip_geometry: bool = False,
+    ) -> gpd.GeoDataFrame:
+        """Query the GeoConnex endpoint."""
+        if self.query_url is None or self.item is None:
+            raise MissingItems(["item"])
+
+        valid_keys = self.endpoints[self.item].query_fields
+        invalid_key = [k for k in kwds if k not in valid_keys]
+        if len(invalid_key) > 0:
+            keys = ", ".join(invalid_key)
+            raise InvalidInputValue(f"query: {keys}", valid_keys)
+
+        params = {
+            p: q.wkt if isinstance(q, (Point, Polygon, MultiPolygon)) else q
+            for p, q in kwds.items()
+        }
+        if skip_geometry:
+            params["skip_geometry"] = "true"
+
+        gdf = geoutils.json2geodf(self.__get_url(self.query_url, params))
+
+        if len(gdf) == 0:
+            raise ZeroMatched
+        return gdf
+
+    def __repr__(self) -> str:
+        if self.item is None:
+            return "\n".join(
+                [
+                    "Available Endpoints:",
+                    "\n".join(f"    '{k}': {v.description}" for k, v in self.endpoints.items()),
+                ]
+            )
+        return "\n".join(
+            [
+                f"Item: '{self.item}'",
+                f"Description: {self.endpoints[self.item].description}",
+                f"Queryable Fields: {', '.join(self.endpoints[self.item].query_fields)}",
+                f"Extent: {self.endpoints[self.item].extent}",
+            ],
+        )
+
+
+def geoconnex(
+    item: Optional[str] = None,
+    query: Optional[Dict[str, Union[str, int, float, Point, Polygon, MultiPolygon]]] = None,
+    skip_geometry: bool = False,
+) -> Optional[gpd.GeoDataFrame]:
+    """Query the GeoConnex API.
+
+    Notes
+    -----
+    If you run the function without any arguments, it will print out a list
+    of available endpoints. If you run the function with ``item`` but no ``query``,
+    it will print out the description, queryable fields, and extent of the
+    selected endpoint (``item``).
+
+    Parameters
+    ----------
+    item: str, optional
+        The item to query.
+    query: dict, optional
+        Query value.
+    skip_geometry: bool, optional
+        If ``True``, the geometry will not be returned.
+
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        The data.
+    """
+    gcx = GeoConnex(item)
+    if item is None or query is None:
+        print(gcx)
+        return None
+
+    return gcx.query(query, skip_geometry)

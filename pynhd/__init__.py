@@ -21,7 +21,7 @@ from .network_tools import (
 )
 from .nhdplus_derived import enhd_attrs, nhd_fcode, nhdplus_attrs, nhdplus_vaa
 from .print_versions import show_versions
-from .pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData, pygeoapi
+from .pynhd import NHD, NLDI, GeoConnex, NHDPlusHR, PyGeoAPI, WaterData, geoconnex, pygeoapi
 
 try:
     import importlib.metadata
@@ -41,6 +41,7 @@ __all__ = [
     "MissingCRS",
     "ZeroMatched",
     "prepare_nhdplus",
+    "geoconnex",
     "topoogical_sort",
     "vector_accumulation",
     "flowline_resample",
@@ -51,6 +52,7 @@ __all__ = [
     "show_versions",
     "NLDI",
     "AGRBase",
+    "GeoConnex",
     "NHDPlusHR",
     "NHD",
     "PyGeoAPI",

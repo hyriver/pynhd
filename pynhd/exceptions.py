@@ -2,8 +2,8 @@
 from typing import List
 
 import async_retriever as ar
-import pygeoutils as pgu
 import pygeoogc as ogc
+import pygeoutils as pgu
 
 
 class ZeroMatched(ogc.ZeroMatched):
@@ -14,6 +14,7 @@ class ZeroMatched(ogc.ZeroMatched):
     msg : str
         The exception error message
     """
+
 
 class MissingColumns(pgu.MissingColumns):
     """Exception raised when a required column is missing from a dataframe.
