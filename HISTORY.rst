@@ -7,6 +7,9 @@ History
 
 New Features
 ~~~~~~~~~~~~
+- Add support for all the GeoConnex web service endpoints. There are two
+  ways to use it. For a single query, you can use the ``geoconnex`` function and
+  for multiple queries, it's more efficient to use the ``GeoConnex`` class.
 - Add support for passing any of the supported NLDI feature sources to
   the ``get_basins`` method of the ``NLDI`` class. The default is ``nwissite``
   to retain backward compatibility.
