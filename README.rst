@@ -106,13 +106,17 @@ Features
 PyNHD is a part of `HyRiver <https://github.com/cheginit/HyRiver>`__ software stack that
 is designed to aid in hydroclimate analysis through web services.
 
-This package provides access to
-`WaterData <https://labs.waterdata.usgs.gov/geoserver/web/wicket/bookmarkable/org.geoserver.web.demo.MapPreviewPage?1>`__,
-the National Map's `NHDPlus HR <https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer>`__,
-`NLDI <https://labs.waterdata.usgs.gov/about-nldi/>`__,
-and `PyGeoAPI <https://labs.waterdata.usgs.gov/api/nldi/pygeoapi>`__ web services.
+This package provides access to several hydro-linked datasets including:
+
+- `WaterData <https://labs.waterdata.usgs.gov/geoserver/web/wicket/bookmarkable/org.geoserver.web.demo.MapPreviewPage?1>`__
+- The National Map's `NHDPlus MR <https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer>`__
+  and `NHDPlus HR <https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer>`__
+- `NLDI <https://labs.waterdata.usgs.gov/about-nldi/>`__
+- `PyGeoAPI <https://labs.waterdata.usgs.gov/api/nldi/pygeoapi>`__
+- `GeoConnex <https://geoconnex.internetofwater.dev/>`__
+
 These web services can be used to navigate and extract vector data from NHDPlus V2 (both mid-
-and high-resolution) a database such as catchments, HUC8, HUC12, GagesII, flowlines, and water
+and high-resolution) database such as catchments, HUC8, HUC12, GagesII, flowlines, and water
 bodies. Moreover, PyNHD gives access to an item on `ScienceBase <https://sciencebase.usgs.gov>`__
 called Select Attributes for NHDPlus Version 2.1 Reach Catchments and Modified Network Routed
 Upstream Watersheds for the Conterminous United States that is located
@@ -124,15 +128,15 @@ These attributes are available in three categories:
 2. Total (`upstream_acc`): For network-accumulated values using total cumulative drainage area,
 3. Divergence (`div_routing`): For network-accumulated values using divergence-routed.
 
+A list of these attributes for each characteristic type can be accessed using ``nhdplus_attrs``
+function.
+
 Moreover, the PyGeoAPI service provides four functionalities:
 
 1. ``flow_trace``: Trace flow from a starting point to up/downstream direction.
 2. ``split_catchment``: Split the local catchment of a point of interest at the point's location.
 3. ``elevation_profile``: Extract elevation profile along a flow path between two points.
 4. ``cross_section``: Extract cross-section at a point of interest along a flow line.
-
-A list of these attributes for each characteristic type can be accessed using ``nhdplus_attrs``
-function.
 
 Similarly, PyNHD provides access to ComID-linked NHDPlus Value Added Attributes on
 `Hydroshare <https://www.hydroshare.org/resource/6092c8a62fac45be97a09bfd0b0bf726/>`__.
@@ -141,9 +145,11 @@ You can use ``nhdplus_vaa`` function to get this dataset.
 
 Additionally, PyNHD offers some extra utilities for processing the flowlines:
 
-- ``flowline_xsection``: Get cross-section lines along a flowline at a given spacing.
-- ``network_xsection``: Get cross-section lines along with a network of flowlines at a given
-  spacing.
+- ``flowline_xsection`` and ``network_xsection``: Get cross-section lines along a flowline
+  at a given spacing or a network of flowlines at a given spacing.
+- ``flowline_resample`` and ``network_resample``:
+  Resampe a flowline or network of flowlines based on a given spacing. This is
+  useful for smoothing jagged flowlines similar to those in the NHDPlus database.
 - ``prepare_nhdplus``: For cleaning up the data frame by, for example, removing tiny networks,
   adding a ``to_comid`` column, and finding terminal flowlines if it doesn't exist.
 - ``topoogical_sort``: For sorting the river network topologically which is useful for routing
@@ -151,8 +157,9 @@ Additionally, PyNHD offers some extra utilities for processing the flowlines:
 - ``vector_accumulation``: For computing flow accumulation in a river network. This function
   is generic, and any routing method can be plugged in.
 
-These utilities are developed based on an ``R`` package called
-`nhdplusTools <https://github.com/USGS-R/nhdplusTools>`__.
+These utilities are developed based on an R package called
+`nhdplusTools <https://github.com/USGS-R/nhdplusTools>`__ and a Python package
+called `nldi-xstool <https://code.usgs.gov/wma/nhgf/toolsteam/nldi-xstool>`__.
 
 All functions and classes that request data from web services use ``async_retriever``
 that offers response caching. By default, the expiration time is set to never expire.
@@ -281,6 +288,17 @@ and even set a distance limit (in km):
         navigation="upstreamTributaries",
         source="nwissite",
         distance=20,
+    )
+
+We can get more information about these stations using GeoConnex:
+
+.. code:: python
+
+    gcx = GeoConnex("gages")
+    stations = st_all.identifier.str.split("-").str[1].unique()
+    gages = gpd.GeoDataFrame(
+        pd.concat(gcx.query({"provider_id": sid}) for sid in stations),
+        crs="epsg:4326",
     )
 
 Now, let's get the
