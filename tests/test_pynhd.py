@@ -209,6 +209,20 @@ class TestWaterData:
         assert wb.shape[0] == 52 and hucs.name[0] == "Upper Wenas River"
 
 
+class TestGCX:
+    def test_single(self):
+        empty = nhd.geoconnex()
+        gage = nhd.geoconnex(item="gages", query={"provider_id": "01031500"})
+        assert empty is None and (gage.nhdpv2_COMID == 1722317).sum() == 1
+
+    def test_multiple(self):
+        gcx = nhd.GeoConnex()
+        gcx.item = "hu02"
+        h2 = gcx.query({"HUC2": "02"})
+        h3 = gcx.query({"HUC2": "03"})
+        assert (h2.GNIS_ID == 2730132).sum() == 1 and (h3.GNIS_ID == 2730133).sum() == 1
+
+
 def test_nhdphr():
     hr = NHDPlusHR("flowline")
     flwb = hr.bygeom((-69.77, 45.07, -69.31, 45.45))
