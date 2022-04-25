@@ -221,6 +221,10 @@ class TestGCX:
         h2 = gcx.query({"HUC2": "02"})
         h3 = gcx.query({"HUC2": "03"})
         assert (h2.GNIS_ID == 2730132).sum() == 1 and (h3.GNIS_ID == 2730133).sum() == 1
+    
+    def test_bbox(self):
+        gages = nhd.geoconnex(item="gages", query={"bbox": (-69.7718, 45.0742, -69.3141, 45.4534)})
+        assert gages.shape[0] == 11
 
 
 def test_nhdphr():
