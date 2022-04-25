@@ -1027,9 +1027,19 @@ class GeoConnex:
                 for lk in links
                 if lk["type"] == "application/json"
             }
+            fields = list(self.__get_url(urls["queryables"])["properties"])
+            if "geom" in fields:
+                fields.remove("geom")
+                fields.append("bbox")
+
+            if "geometry" in fields:
+                fields.remove("geometry")
+                if "bbox" not in fields:
+                    fields.append("bbox")
+
             return {
                 "url": f"{urls['self']}/items",
-                "query_fields": list(self.__get_url(urls["queryables"])["properties"]),
+                "query_fields": fields,
             }
 
         eps = zip(
@@ -1068,7 +1078,7 @@ class GeoConnex:
 
     def query(
         self,
-        kwds: Dict[str, Union[str, int, float, Point, Polygon, MultiPolygon]],
+        kwds: Dict[str, Union[str, int, float, Tuple[float, float, float, float]]],
         skip_geometry: bool = False,
     ) -> gpd.GeoDataFrame:
         """Query the GeoConnex endpoint."""
@@ -1082,7 +1092,7 @@ class GeoConnex:
             raise InvalidInputValue(f"query: {keys}", valid_keys)
 
         params = {
-            p: q.wkt if isinstance(q, (Point, Polygon, MultiPolygon)) else q
+            p: ",".join(f"{c:.6f}" for c in q) if p == "bbox" else q
             for p, q in kwds.items()
         }
         if skip_geometry:
