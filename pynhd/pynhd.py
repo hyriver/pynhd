@@ -1063,6 +1063,11 @@ class GeoConnex:
         self.query_url: Optional[str] = None
         self.item = item
 
+    @staticmethod
+    def __get_urls(url: str, kwds: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+        params = [{"params": {**kwd, "f": "json"}} for kwd in kwds]
+        return ar.retrieve_json([url] * len(kwds), params)
+
     @property
     def item(self) -> Optional[str]:
         """Return the name of the endpoint."""
@@ -1103,35 +1108,44 @@ class GeoConnex:
             keys = ", ".join(invalid_key)
             raise InvalidInputValue(f"query: {keys}", valid_keys)
 
+        if skip_geometry:
+            kwds["skip_geometry"] = "true"
+
         if "geometry" in kwds:
-            if isinstance(kwds["geometry"], (sgeom.Polygon, sgeom.MultiPolygon)):
-                geometry = kwds["geometry"]
+            if isinstance(kwds["geometry"], sgeom.Polygon):
+                geometry = [kwds["geometry"]]
+            if isinstance(kwds["geometry"], sgeom.MultiPolygon):
+                geometry = list(kwds["geometry"].geoms)
             elif isinstance(kwds["geometry"], (tuple, list)) and len(kwds["geometry"]) == 4:
-                geometry = sgeom.box(*kwds["geometry"])
+                geometry = [sgeom.box(*kwds["geometry"])]
             else:
                 raise InvalidInputType(
                     "geometry", "Polygon, MultiPolygon, or tuple/list of length 4"
                 )
 
             extent = self.endpoints[self.item].extent
-            if not geometry.within(sgeom.box(*extent)):
+            if not all(g.within(sgeom.box(*extent)) for g in geometry):
                 raise InvalidInputRange("geometry", f"within {extent}")
 
-            kwds["geometry"] = ",".join(f"{c:.6f}" for c in geometry.bounds)
+            _ = kwds.pop("geometry")
+            param_list = [
+                {**kwds, "bbox": ",".join(f"{c:.6f}" for c in g.bounds)} for g in geometry  # type: ignore[arg-type]
+            ]
+            gdf = geoutils.json2geodf(self.__get_urls(self.query_url, param_list))
+            gdf = gdf.reset_index(drop=True)
+            _, idx = gdf.sindex.query_bulk(
+                gpd.GeoSeries(geometry, crs="epsg:4326"), predicate="contains"
+            )
+            if len(idx) == 0:
+                raise ZeroMatched
+            gdf = gdf.iloc[idx].reset_index(drop=True)
+        else:
+            gdf = geoutils.json2geodf(self.__get_url(self.query_url, kwds))  # type: ignore[arg-type]
+            if len(gdf) == 0:
+                raise ZeroMatched
 
-        if skip_geometry:
-            kwds["skip_geometry"] = "true"
-
-        params = {k.replace("geometry", "bbox"): f"{v}" for k, v in kwds.items()}
-        gdf = geoutils.json2geodf(self.__get_url(self.query_url, params))
         if "nhdpv2_COMID" in gdf:
             gdf["nhdpv2_COMID"] = gdf["nhdpv2_COMID"].astype("Int64")
-
-        if len(gdf) == 0:
-            raise ZeroMatched
-
-        if "geometry" in kwds:
-            return gdf[gdf.within(geometry)].reset_index(drop=True)
 
         return gdf
 
