@@ -8,10 +8,10 @@ import numpy as np
 import pandas as pd
 import pygeoogc as ogc
 import pygeoutils as geoutils
+import shapely.geometry as sgeom
 from pygeoogc import WFS, InvalidInputValue, ServiceUnavailable, ServiceURL
 from pygeoogc import ZeroMatched as ZeroMatchedOGC
 from pygeoutils import InvalidInputType
-from shapely.geometry import MultiPolygon, Point, Polygon
 
 from .core import ALT_CRS, DEF_CRS, AGRBase, EndPoints, PyGeoAPIBase, PyGeoAPIBatch, logger
 from .exceptions import InvalidInputRange, MissingItems, ZeroMatched
@@ -278,7 +278,7 @@ def pygeoapi(coords: gpd.GeoDataFrame, service: str) -> gpd.GeoDataFrame:
     ...             "none",
     ...         ]
     ...     },
-    ...     geometry=[Point((1774209.63, 856381.68))],
+    ...     geometry=[sgeom.Point((1774209.63, 856381.68))],
     ...     crs="ESRI:102003",
     ... )
     >>> trace = nhd.pygeoapi(gdf, "flow_trace")
@@ -355,7 +355,7 @@ class WaterData:
 
     def bygeom(
         self,
-        geometry: Union[Polygon, MultiPolygon],
+        geometry: Union[sgeom.Polygon, sgeom.MultiPolygon],
         geo_crs: str = DEF_CRS,
         xy: bool = True,
         predicate: str = "INTERSECTS",
@@ -1006,6 +1006,12 @@ class NLDI:
 class GeoConnex:
     """Access to the GeoConnex API.
 
+    Notes
+    -----
+    The ``geometry`` field of the query can be a Polygon, MultiPolygon,
+    or tuple/list of length 4 (bbox) in ``EPSG:4326`` CRS. They should
+    be within the extent of the GeoConnex API.
+
     Parameters
     ----------
     item : str, optional
@@ -1030,12 +1036,8 @@ class GeoConnex:
             fields = list(self.__get_url(urls["queryables"])["properties"])
             if "geom" in fields:
                 fields.remove("geom")
-                fields.append("bbox")
-
-            if "geometry" in fields:
-                fields.remove("geometry")
-                if "bbox" not in fields:
-                    fields.append("bbox")
+                if "geometry" not in fields:
+                    fields.append("geometry")
 
             return {
                 "url": f"{urls['self']}/items",
@@ -1078,7 +1080,17 @@ class GeoConnex:
 
     def query(
         self,
-        kwds: Dict[str, Union[str, int, float, Tuple[float, float, float, float]]],
+        kwds: Dict[
+            str,
+            Union[
+                str,
+                int,
+                float,
+                Tuple[float, float, float, float],
+                sgeom.Polygon,
+                sgeom.MultiPolygon,
+            ],
+        ],
         skip_geometry: bool = False,
     ) -> gpd.GeoDataFrame:
         """Query the GeoConnex endpoint."""
@@ -1091,17 +1103,36 @@ class GeoConnex:
             keys = ", ".join(invalid_key)
             raise InvalidInputValue(f"query: {keys}", valid_keys)
 
-        params = {
-            p: ",".join(f"{c:.6f}" for c in q) if p == "bbox" else q
-            for p, q in kwds.items()
-        }
-        if skip_geometry:
-            params["skip_geometry"] = "true"
+        if "geometry" in kwds:
+            if isinstance(kwds["geometry"], (sgeom.Polygon, sgeom.MultiPolygon)):
+                geometry = kwds["geometry"]
+            elif isinstance(kwds["geometry"], (tuple, list)) and len(kwds["geometry"]) == 4:
+                geometry = sgeom.box(*kwds["geometry"])
+            else:
+                raise InvalidInputType(
+                    "geometry", "Polygon, MultiPolygon, or tuple/list of length 4"
+                )
 
+            extent = self.endpoints[self.item].extent
+            if not geometry.within(sgeom.box(*extent)):
+                raise InvalidInputRange("geometry", f"within {extent}")
+
+            kwds["geometry"] = ",".join(f"{c:.6f}" for c in geometry.bounds)
+
+        if skip_geometry:
+            kwds["skip_geometry"] = "true"
+
+        params = {k.replace("geometry", "bbox"): f"{v}" for k, v in kwds.items()}
         gdf = geoutils.json2geodf(self.__get_url(self.query_url, params))
+        if "nhdpv2_COMID" in gdf:
+            gdf["nhdpv2_COMID"] = gdf["nhdpv2_COMID"].astype("Int64")
 
         if len(gdf) == 0:
             raise ZeroMatched
+
+        if "geometry" in kwds:
+            return gdf[gdf.within(geometry)].reset_index(drop=True)
+
         return gdf
 
     def __repr__(self) -> str:
@@ -1124,7 +1155,19 @@ class GeoConnex:
 
 def geoconnex(
     item: Optional[str] = None,
-    query: Optional[Dict[str, Union[str, int, float, Point, Polygon, MultiPolygon]]] = None,
+    query: Optional[
+        Dict[
+            str,
+            Union[
+                str,
+                int,
+                float,
+                Tuple[float, float, float, float],
+                sgeom.Polygon,
+                sgeom.MultiPolygon,
+            ],
+        ]
+    ] = None,
     skip_geometry: bool = False,
 ) -> Optional[gpd.GeoDataFrame]:
     """Query the GeoConnex API.
@@ -1141,7 +1184,8 @@ def geoconnex(
     item: str, optional
         The item to query.
     query: dict, optional
-        Query value.
+        Query parameters. The ``geometry`` field can be a Polygon, MultiPolygon,
+        or tuple/list of length 4 (bbox) in ``EPSG:4326`` CRS.
     skip_geometry: bool, optional
         If ``True``, the geometry will not be returned.
 
