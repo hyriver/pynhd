@@ -306,9 +306,8 @@ Instead, we can carry out a spatial query within the basin of interest:
 
     gages = pynhd.geoconnex(
         item="gages",
-        query={"bbox": basin.geometry.iloc[0].bounds},
+        query={"geometry": basin.geometry.iloc[0]},
     )
-    gages = gages[gages.within(basin.geometry.iloc[0])]
 
 Now, let's get the
 `HUC12 pour points <https://www.sciencebase.gov/catalog/item/5762b664e4b07657d19a71ea>`__:
