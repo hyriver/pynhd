@@ -1014,7 +1014,7 @@ class GeoConnex:
     -----
     The ``geometry`` field of the query can be a Polygon, MultiPolygon,
     or tuple/list of length 4 (bbox) in ``EPSG:4326`` CRS. They should
-    be within the extent of the GeoConnex API.
+    be within the extent of the GeoConnex endpoint.
 
     Parameters
     ----------
@@ -1116,16 +1116,7 @@ class GeoConnex:
             kwds["skip_geometry"] = "true"
 
         if "geometry" in kwds:
-            if isinstance(kwds["geometry"], sgeom.Polygon):
-                geometry = [kwds["geometry"]]
-            if isinstance(kwds["geometry"], sgeom.MultiPolygon):
-                geometry = list(kwds["geometry"].geoms)
-            elif isinstance(kwds["geometry"], (tuple, list)) and len(kwds["geometry"]) == 4:
-                geometry = [sgeom.box(*kwds["geometry"])]
-            else:
-                raise InvalidInputType(
-                    "geometry", "Polygon, MultiPolygon, or tuple/list of length 4"
-                )
+            geometry = geoutils.geometry_list(kwds["geometry"])
 
             extent = self.endpoints[self.item].extent
             if not all(g.within(sgeom.box(*extent)) for g in geometry):
