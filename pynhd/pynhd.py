@@ -311,12 +311,15 @@ class WaterData:
         be added to the given ``layer`` argument if it is not provided.
     crs : str, optional
         The target spatial reference system, defaults to ``epsg:4326``.
+    validation : bool, optional
+        Whether to validate the input data, defaults to ``True``.
     """
 
     def __init__(
         self,
         layer: str,
         crs: str = DEF_CRS,
+        validation: bool = True,
     ) -> None:
         self.layer = layer if ":" in layer else f"wmadata:{layer}"
         self.crs = crs
@@ -326,6 +329,7 @@ class WaterData:
             outformat="application/json",
             version="2.0.0",
             crs=ALT_CRS,
+            validation=validation,
         )
 
     def _to_geodf(self, resp: Union[List[Dict[str, Any]], Dict[str, Any]]) -> gpd.GeoDataFrame:
