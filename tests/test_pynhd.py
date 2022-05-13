@@ -108,7 +108,7 @@ class TestPyGeoAPI:
         )
         gdf = self.pygeoapi.cross_section(coords, width=1000.0, numpts=101, crs=DEF_CRS)
         gdfb = nhd.pygeoapi(gs, "cross_section")
-        assert abs(gdf.iloc[-1, 2] - 767.870) < SMALL and abs(gdfb.iloc[-1, 2] - 767.870) < SMALL
+        assert abs(gdf.iloc[-1, 2] - 767.885) < SMALL and abs(gdfb.iloc[-1, 2] - 767.885) < SMALL
 
 
 class TestNLDI:
@@ -150,7 +150,7 @@ class TestNLDI:
         eck4 = "+proj=eck4 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=km"
         basin = self.nldi.get_basins(STA_ID).to_crs(eck4)
         split = self.nldi.get_basins(STA_ID, split_catchment=True).to_crs(eck4)
-        assert abs((split.area.values[0] - basin.area.values[0]) - 1.824) < SMALL
+        assert abs((split.area.values[0] - basin.area.values[0]) - 0.489) < SMALL
 
     def test_empty_basin(self):
         empty_ids = ["04253294", "04253296"]
