@@ -10,16 +10,19 @@ import cytoolz as tlz
 import geopandas as gpd
 import pandas as pd
 import pygeoutils as geoutils
+import shapely.geometry as sgeom
 from pygeoogc import ArcGISRESTful, ServiceURL
 from pygeoogc import utils as ogc_utils
-from shapely.geometry import Polygon
 
 from .exceptions import (
+    InvalidInputRange,
     InvalidInputType,
     InvalidInputValue,
     MissingColumns,
     MissingCRS,
+    MissingItems,
     ServiceError,
+    ZeroMatched,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,7 +36,7 @@ DEF_CRS = "epsg:4326"
 ALT_CRS = "epsg:4269"
 EXPIRE = -1
 
-__all__ = ["AGRBase", "ScienceBase", "stage_nhdplus_attrs"]
+__all__ = ["AGRBase", "ScienceBase", "stage_nhdplus_attrs", "GeoConnex"]
 
 
 def get_parquet(parquet_path: Union[Path, str]) -> Path:
@@ -170,7 +173,7 @@ class AGRBase:
 
     def bygeom(
         self,
-        geom: Union[Polygon, List[Tuple[float, float]], Tuple[float, float, float, float]],
+        geom: Union[sgeom.Polygon, List[Tuple[float, float]], Tuple[float, float, float, float]],
         geo_crs: str = DEF_CRS,
         sql_clause: str = "",
         distance: Optional[int] = None,
@@ -567,3 +570,158 @@ def stage_nhdplus_attrs(
     char_df = pd.DataFrame(chars)
     char_df.to_parquet(output)
     return char_df
+
+
+class GeoConnex:
+    """Access to the GeoConnex API.
+
+    Notes
+    -----
+    The ``geometry`` field of the query can be a Polygon, MultiPolygon,
+    or tuple/list of length 4 (bbox) in ``EPSG:4326`` CRS. They should
+    be within the extent of the GeoConnex endpoint.
+
+    Parameters
+    ----------
+    item : str, optional
+        The target endpoint to query, defaults to ``None``.
+    """
+
+    @staticmethod
+    def __get_url(url: str, kwds: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+        params = {"params": {**kwds, "f": "json"}} if kwds else {"params": {"f": "json"}}
+        return ar.retrieve_json([url], [params])[0]
+
+    def __get_endpoints(self) -> Dict[str, EndPoints]:
+        pluck = tlz.partial(tlz.pluck, seqs=self.__get_url(self.base_url)["collections"])
+
+        def get_links(links: List[Dict[str, Any]]) -> Dict[str, Union[str, List[str]]]:
+            """Get links."""
+            urls = {
+                lk["rel"]: lk["href"].replace("?f=json", "")
+                for lk in links
+                if lk["type"] == "application/json"
+            }
+            fields = list(self.__get_url(urls["queryables"])["properties"])
+            if "geom" in fields:
+                fields.remove("geom")
+                if "geometry" not in fields:
+                    fields.append("geometry")
+
+            return {
+                "url": f"{urls['self']}/items",
+                "query_fields": fields,
+            }
+
+        eps = zip(
+            pluck(ind="id"), pluck(ind="description"), pluck(ind="links"), pluck(ind="extent")
+        )
+        return {
+            ep[0]: EndPoints(
+                name=ep[0],
+                description=ep[1],
+                **get_links(ep[2]),  # type: ignore
+                extent=tuple(ep[3]["spatial"]["bbox"][0]),  # type: ignore
+            )
+            for ep in eps
+        }
+
+    def __init__(self, item: Optional[str] = None) -> None:
+        self.base_url = f"{ServiceURL().restful.geoconnex}/collections"
+        self.endpoints = self.__get_endpoints()
+        self.query_url: Optional[str] = None
+        self.item = item
+
+    @staticmethod
+    def __get_urls(url: str, kwds: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+        params = [{"params": {**kwd, "f": "json"}} for kwd in kwds]
+        return ar.retrieve_json([url] * len(kwds), params)
+
+    @property
+    def item(self) -> Optional[str]:
+        """Return the name of the endpoint."""
+        return self._item
+
+    @item.setter
+    def item(self, value: Optional[str]) -> None:
+        self._item = value
+        if value is not None:
+            if value not in self.endpoints:
+                raise InvalidInputValue("item", list(self.endpoints))
+            self.query_url = self.endpoints[value].url
+        else:
+            self.query_url = None
+
+    def query(
+        self,
+        kwds: Dict[
+            str,
+            Union[
+                str,
+                int,
+                float,
+                Tuple[float, float, float, float],
+                sgeom.Polygon,
+                sgeom.MultiPolygon,
+            ],
+        ],
+        skip_geometry: bool = False,
+    ) -> gpd.GeoDataFrame:
+        """Query the GeoConnex endpoint."""
+        if self.query_url is None or self.item is None:
+            raise MissingItems(["item"])
+
+        valid_keys = self.endpoints[self.item].query_fields
+        invalid_key = [k for k in kwds if k not in valid_keys]
+        if len(invalid_key) > 0:
+            keys = ", ".join(invalid_key)
+            raise InvalidInputValue(f"query: {keys}", valid_keys)
+
+        if skip_geometry:
+            kwds["skip_geometry"] = "true"
+
+        if "geometry" in kwds:
+            geometry = geoutils.geometry_list(kwds["geometry"])
+
+            extent = self.endpoints[self.item].extent
+            if not all(g.within(sgeom.box(*extent)) for g in geometry):
+                raise InvalidInputRange("geometry", f"within {extent}")
+
+            _ = kwds.pop("geometry")
+            param_list = [
+                {**kwds, "bbox": ",".join(f"{c:.6f}" for c in g.bounds)} for g in geometry  # type: ignore[arg-type]
+            ]
+            gdf = geoutils.json2geodf(self.__get_urls(self.query_url, param_list))
+            gdf = gdf.reset_index(drop=True)
+            _, idx = gdf.sindex.query_bulk(
+                gpd.GeoSeries(geometry, crs="epsg:4326"), predicate="contains"
+            )
+            if len(idx) == 0:
+                raise ZeroMatched
+            gdf = gdf.iloc[idx].reset_index(drop=True)
+        else:
+            gdf = geoutils.json2geodf(self.__get_url(self.query_url, kwds))  # type: ignore[arg-type]
+            if len(gdf) == 0:
+                raise ZeroMatched
+
+        if "nhdpv2_COMID" in gdf:
+            gdf["nhdpv2_COMID"] = gdf["nhdpv2_COMID"].astype("Int64")
+
+        return gdf
+
+    def __repr__(self) -> str:
+        if self.item is None:
+            return "\n".join(
+                [
+                    "Available Endpoints:",
+                    "\n".join(f"    '{k}': {v.description}" for k, v in self.endpoints.items()),
+                ]
+            )
+        return "\n".join(
+            [
+                f"Item: '{self.item}'",
+                f"Description: {self.endpoints[self.item].description}",
+                f"Queryable Fields: {', '.join(self.endpoints[self.item].query_fields)}",
+                f"Extent: {self.endpoints[self.item].extent}",
+            ],
+        )

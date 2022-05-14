@@ -1,5 +1,5 @@
 """Top-level package for PyNHD."""
-from .core import AGRBase
+from .core import AGRBase, GeoConnex
 from .exceptions import (
     InvalidInputRange,
     InvalidInputType,
@@ -21,7 +21,7 @@ from .network_tools import (
 )
 from .nhdplus_derived import enhd_attrs, nhd_fcode, nhdplus_attrs, nhdplus_vaa
 from .print_versions import show_versions
-from .pynhd import NHD, NLDI, GeoConnex, NHDPlusHR, PyGeoAPI, WaterData, geoconnex, pygeoapi
+from .pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData, geoconnex, pygeoapi
 
 try:
     import importlib.metadata
