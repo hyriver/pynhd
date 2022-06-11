@@ -1,5 +1,6 @@
 """Tests for PyNHD package."""
 import io
+import os
 from pathlib import Path
 
 import geopandas as gpd
@@ -16,6 +17,7 @@ except ImportError:
 else:
     has_typeguard = True
 
+is_ci = os.environ["GH_CI"] == "true"
 STA_ID = "01031500"
 station_id = f"USGS-{STA_ID}"
 site = "nwissite"
@@ -248,6 +250,7 @@ def test_nhdplus_vaa():
     assert abs(vaa.slope.max() - 4.6) < SMALL
 
 
+@pytest.mark.skipif(is_ci, reason="GitHub Actions fails due to memory issues.")
 def test_use_enhd(trib):
     org_attrs = nhd.prepare_nhdplus(trib, 0, 0, 0, use_enhd_attrs=False)
     enhd_attrs_na = nhd.prepare_nhdplus(trib, 0, 0, 0, use_enhd_attrs=False, terminal2nan=False)
