@@ -14,6 +14,11 @@ New Features
   the ``get_basins`` method of the ``NLDI`` class. The default is ``nwissite``
   to retain backward compatibility.
 
+Bug Fixes
+~~~~~~~~~
+- Set the type of "ReachCode" column to ``str`` instead of ``int`` in ``pygeoapi``
+  and ``nhdplus_vaa`` functions.
+
 0.13.0 (2022-04-03)
 -------------------
 
