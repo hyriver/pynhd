@@ -29,6 +29,7 @@ DEF_CRS = "epsg:4326"
 
 @pytest.fixture
 def trib():
+    os.environ["HYRIVER_CACHE_DISABLE"] = "true"
     comids = NLDI().navigate_byid(site, station_id, UT, "flowlines")
     wd = WaterData("nhdflowline_network")
     return wd.byid("comid", comids.nhdplus_comid.tolist())
