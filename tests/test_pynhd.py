@@ -26,7 +26,6 @@ UT = "upstreamTributaries"
 SMALL = 1e-3
 DEF_CRS = "epsg:4326"
 
-os.environ["HYRIVER_CACHE_DISABLE"] = "true"
 
 @pytest.fixture
 def trib():
