@@ -1,4 +1,6 @@
 """Top-level package for PyNHD."""
+import importlib.metadata
+
 from .core import AGRBase, GeoConnex
 from .exceptions import (
     InvalidInputRange,
@@ -23,14 +25,7 @@ from .nhdplus_derived import enhd_attrs, nhd_fcode, nhdplus_attrs, nhdplus_vaa
 from .print_versions import show_versions
 from .pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData, geoconnex, pygeoapi
 
-try:
-    import importlib.metadata
-except ImportError:
-    import importlib_metadata
-
-    __version__ = importlib_metadata.version("pynhd")
-else:
-    __version__ = importlib.metadata.version("pynhd")
+__version__ = importlib.metadata.version("pynhd")
 
 __all__ = [
     "InvalidInputRange",
