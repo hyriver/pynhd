@@ -17,7 +17,7 @@ except ImportError:
 else:
     has_typeguard = True
 
-is_ci = os.environ["GH_CI"] == "true"
+is_ci = os.environ.get("GH_CI") == "true"
 STA_ID = "01031500"
 station_id = f"USGS-{STA_ID}"
 site = "nwissite"
