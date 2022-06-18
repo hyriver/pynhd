@@ -34,7 +34,6 @@ logger.propagate = False
 
 DEF_CRS = "epsg:4326"
 ALT_CRS = "epsg:4269"
-EXPIRE = -1
 
 __all__ = ["AGRBase", "ScienceBase", "stage_nhdplus_attrs", "GeoConnex"]
 
@@ -326,7 +325,7 @@ class PyGeoAPIBase:
 
         gdf = gpd.GeoDataFrame(
             pd.concat((geoutils.json2geodf(r) for r in resp), keys=[self.req_idx[i] for i in idx]),
-            crs="epsg:4326",
+            crs=DEF_CRS,
         )
         drop_cols = ["level_1", "spatial_ref"] if "spatial_ref" in gdf else ["level_1"]
         return gdf.reset_index().rename(columns={"level_0": "req_idx"}).drop(columns=drop_cols)
@@ -694,7 +693,7 @@ class GeoConnex:
             gdf = geoutils.json2geodf(self.__get_urls(self.query_url, param_list))
             gdf = gdf.reset_index(drop=True)
             _, idx = gdf.sindex.query_bulk(
-                gpd.GeoSeries(geometry, crs="epsg:4326"), predicate="contains"
+                gpd.GeoSeries(geometry, crs=DEF_CRS), predicate="contains"
             )
             if len(idx) == 0:
                 raise ZeroMatched
