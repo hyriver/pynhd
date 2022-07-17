@@ -13,7 +13,7 @@ def get_package_name():
     return config.get("metadata", "name")
 
 
-python_versions = ["3.9"]
+python_versions = ["3.10"]
 package = get_package_name()
 base = ["async_retriever", "pygeoogc", "pygeoutils"]
 gh_deps = {
@@ -97,7 +97,7 @@ def activate_virtualenv_in_precommit_hooks(session):
         hook.write_text("\n".join(lines))
 
 
-@nox.session(name="pre-commit", python="3.9")
+@nox.session(name="pre-commit", python="3.10")
 def pre_commit(session) -> None:
     """Lint using pre-commit."""
     args = session.posargs or ["run", "--all-files"]
