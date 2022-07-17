@@ -154,11 +154,6 @@ class TestNLDI:
         split = self.nldi.get_basins(STA_ID, split_catchment=True).to_crs(eck4)
         assert abs((split.area.values[0] - basin.area.values[0]) - 0.489) < SMALL
 
-    def test_basin_empty(self):
-        empty_ids = ["04253294", "04253296"]
-        _, not_found = self.nldi.get_basins(empty_ids)
-        assert not_found == empty_ids
-
     def test_char(self):
         tot, prc = self.nldi.getcharacteristic_byid(
             "6710923", "local", char_ids="all", values_only=False

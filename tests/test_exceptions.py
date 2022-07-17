@@ -1,7 +1,13 @@
 import pytest
 
 import pynhd
-from pynhd import InvalidInputRange
+from pynhd import InvalidInputRange, ZeroMatched
+
+
+def test_basin_empty():
+    with pytest.raises(ZeroMatched) as ex:
+        _ = pynhd.NLDI().get_basins(["04253294", "04253296"])
+        assert "no features" in str(ex.value)
 
 
 class TestGCXException:
