@@ -1,4 +1,5 @@
 """Access NLDI and WaterData databases."""
+import re
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import async_retriever as ar
@@ -516,6 +517,8 @@ class NLDI:
         except ConnectionError as ex:
             raise ServiceUnavailable(self.base_url) from ex
         else:
+            if isinstance(resp[0], dict) and resp[0].get("type", "") == "error":
+                raise ZeroMatched(resp[0].get("description", "Feature not found"))
             return resp[0]
 
     def __init__(self) -> None:
@@ -662,6 +665,7 @@ class NLDI:
         comids = comids.reset_index(drop=True)
 
         if len(not_found) > 0:
+            not_found = [tuple(float(p) for p in re.sub("\(|\)| ", "", m).split(",")) for m in not_found]
             self._missing_warning(len(not_found), len(_coords))
             return comids, not_found
 
