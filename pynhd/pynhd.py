@@ -503,7 +503,7 @@ class NLDI:
 
     def _get_url(
         self, url: str, payload: Optional[Dict[str, str]] = None
-    ) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
+    ) -> Union[List[Dict[str, Any]], Dict[str, Any], None]:
         """Send a request to the service using GET method."""
         if payload is None:
             payload = {"f": "json"}
