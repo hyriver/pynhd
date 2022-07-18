@@ -665,7 +665,7 @@ class NLDI:
         comids = comids.reset_index(drop=True)
 
         if len(not_found) > 0:
-            not_found = [tuple(float(p) for p in re.sub("\(|\)| ", "", m).split(",")) for m in not_found]
+            not_found = [tuple(float(p) for p in re.sub(r"\(|\)| ", "", m).split(",")) for m in not_found]
             self._missing_warning(len(not_found), len(_coords))
             return comids, not_found
 
