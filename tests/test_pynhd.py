@@ -33,6 +33,7 @@ def trib():
     wd = WaterData("nhdflowline_network")
     return wd.byid("comid", comids.nhdplus_comid.tolist())
 
+
 @pytest.mark.xfail(reason="Hydro is unstable.")
 def test_nhd_xs_resample():
     main = NLDI().navigate_byid(site, station_id, UM, "flowlines")
