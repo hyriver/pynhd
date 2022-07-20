@@ -11,7 +11,7 @@ build-backend = "setuptools.build_meta"
 fallback_version = "999"
 
 [tool.pytest.ini_options]
-addopts = "--ignore=noxfile.py -v --cov=pynhd --cov-report xml --durations=5"
+addopts = "--ignore=noxfile.py -n=auto -v --cov=pynhd --cov-report xml --durations=5"
 doctest_optionflags = 'NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER'
 testpaths = [
     "tests",
