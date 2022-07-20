@@ -33,7 +33,7 @@ def trib():
     wd = WaterData("nhdflowline_network")
     return wd.byid("comid", comids.nhdplus_comid.tolist())
 
-
+@pytest.mark.xfail(reason="Hydro is unstable.")
 def test_nhd_xs_resample():
     main = NLDI().navigate_byid(site, station_id, UM, "flowlines")
     flw = NHD("flowline_mr").byids("COMID", main.nhdplus_comid.tolist()).to_crs("epsg:3857")
@@ -245,7 +245,6 @@ def test_nhdplus_vaa():
     assert abs(vaa.slope.max() - 4.6) < SMALL
 
 
-@pytest.mark.skipif(is_ci, reason="GitHub Actions fails due to memory issues.")
 def test_use_enhd(trib):
     org_attrs = nhd.prepare_nhdplus(trib, 0, 0, 0, use_enhd_attrs=False)
     enhd_attrs_na = nhd.prepare_nhdplus(trib, 0, 0, 0, use_enhd_attrs=False, terminal2nan=False)
