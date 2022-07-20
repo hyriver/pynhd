@@ -503,7 +503,7 @@ class NLDI:
 
     def _get_url(
         self, url: str, payload: Optional[Dict[str, str]] = None
-    ) -> Union[List[Dict[str, Any]], Dict[str, Any], None]:
+    ) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
         """Send a request to the service using GET method."""
         if payload is None:
             payload = {"f": "json"}
@@ -657,15 +657,17 @@ class NLDI:
         urls = {
             f"{(lon, lat)}": (base_url, {"coords": f"POINT({lon} {lat})"}) for lon, lat in _coords
         }
-        comids, not_found = self._get_urls(urls)
+        comids, not_found_str = self._get_urls(urls)
 
         if len(comids) == 0:
             raise ZeroMatched
 
         comids = comids.reset_index(drop=True)
 
-        if len(not_found) > 0:
-            not_found = [tuple(float(p) for p in re.sub(r"\(|\)| ", "", m).split(",")) for m in not_found]
+        if len(not_found_str) > 0:
+            not_found = [
+                tuple(float(p) for p in re.sub(r"\(|\)| ", "", m).split(",")) for m in not_found_str
+            ]
             self._missing_warning(len(not_found), len(_coords))
             return comids, not_found
 
