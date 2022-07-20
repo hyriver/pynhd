@@ -1,5 +1,6 @@
 """Access NLDI and WaterData databases."""
 import io
+import tempfile
 from pathlib import Path
 from typing import Optional, Union
 
@@ -45,11 +46,11 @@ def enhd_attrs(
 
     sb = ScienceBase()
     files = sb.get_file_urls("60c92503d34e86b9389df1c9")
-    resp = ar.retrieve_binary(
-        [files.loc["enhd_nhdplusatts.parquet"].url],
-    )
-    attrs = pd.read_parquet(io.BytesIO(resp[0]))
-    attrs.to_parquet(output)
+
+    with tempfile.NamedTemporaryFile(suffix=".parquet") as temp:
+        ar.stream_write([files.loc["enhd_nhdplusatts.parquet"].url], [temp.name])
+        attrs = pd.read_parquet(temp.name)
+        attrs.to_parquet(output)
     return attrs
 
 
@@ -60,7 +61,7 @@ def nhdplus_vaa(
 
     Notes
     -----
-    This function downloads a 200 MB ``parquet`` file from
+    This function downloads a 245 MB ``parquet`` file from
     `here <https://www.hydroshare.org/resource/6092c8a62fac45be97a09bfd0b0bf726>`__ .
     Although this dataframe does not include geometry, it can be linked to other geospatial
     NHDPlus dataframes through ComIDs.
@@ -142,11 +143,11 @@ def nhdplus_vaa(
     fpath = "data/contents/nhdplusVAA.parquet"
     url = f"https://www.hydroshare.org/resource/{rid}/{fpath}"
 
-    resp = ar.retrieve_binary([url])
-
-    vaa = pd.read_parquet(io.BytesIO(resp[0]))
-    vaa = vaa.astype(dtypes, errors="ignore")
-    vaa.to_parquet(output)
+    with tempfile.NamedTemporaryFile(suffix=".parquet") as temp:
+        ar.stream_write([url], [temp.name])
+        vaa = pd.read_parquet(temp.name)
+        vaa = vaa.astype(dtypes, errors="ignore")
+        vaa.to_parquet(output)
     return vaa
 
 
