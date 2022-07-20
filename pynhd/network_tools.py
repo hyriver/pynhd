@@ -99,9 +99,10 @@ class NHDTools:
             if not terminal2nan and not use_enhd_attrs:
                 logger.info("The use_enhd_attrs is set to True, so all attrs will be updated.")
             enhd_attrs = derived.enhd_attrs()
+            enhd_attrs = enhd_attrs.set_index("comid").loc[self.flw["comid"]].copy()
             self.flw["tocomid"] = self.flw["comid"].astype("Int64")
             self.flw = self.flw.reset_index().set_index("comid")
-            self.flw.update(enhd_attrs.set_index("comid"))
+            self.flw.update(enhd_attrs)
             self.flw = self.flw.reset_index().set_index("index")
 
         if "fcode" in self.flw:
