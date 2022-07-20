@@ -519,6 +519,8 @@ class NLDI:
         else:
             if isinstance(resp[0], dict) and resp[0].get("type", "") == "error":
                 raise ZeroMatched(resp[0].get("description", "Feature not found"))
+            if resp[0] is None:
+                raise ZeroMatched
             return resp[0]
 
     def __init__(self) -> None:
