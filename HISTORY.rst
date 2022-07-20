@@ -16,6 +16,8 @@ Internal Changes
   service's error handling. The NLDI web service now returns more descriptive
   error messages in a ``json`` format instead of returning the usual status
   errors.
+- Slice the ENHD dataframe in ``NHDTools.clean_flowlines`` before updating
+  the flowline dataframe to reduce the required memory for the ``update`` operation.
 
 0.13.2 (2022-06-14)
 -------------------
