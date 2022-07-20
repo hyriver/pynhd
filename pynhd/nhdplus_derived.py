@@ -3,6 +3,7 @@ import io
 import tempfile
 from pathlib import Path
 from typing import Optional, Union
+import uuid
 
 import async_retriever as ar
 import pandas as pd
@@ -47,10 +48,12 @@ def enhd_attrs(
     sb = ScienceBase()
     files = sb.get_file_urls("60c92503d34e86b9389df1c9")
 
-    with tempfile.NamedTemporaryFile(suffix=".parquet") as temp:
+    tempfile = Path("cache", f"enhd_{uuid.uuid4().hex}.parquet")
+    with tempfile.open("wb") as temp:
         ar.stream_write([files.loc["enhd_nhdplusatts.parquet"].url], [temp.name])
         attrs = pd.read_parquet(temp.name)
         attrs.to_parquet(output)
+    tempfile.unlink()
     return attrs
 
 
@@ -143,11 +146,13 @@ def nhdplus_vaa(
     fpath = "data/contents/nhdplusVAA.parquet"
     url = f"https://www.hydroshare.org/resource/{rid}/{fpath}"
 
-    with tempfile.NamedTemporaryFile(suffix=".parquet") as temp:
+    tempfile = Path("cache", f"vaa_{uuid.uuid4().hex}.parquet")
+    with tempfile.open("wb") as temp:
         ar.stream_write([url], [temp.name])
         vaa = pd.read_parquet(temp.name)
         vaa = vaa.astype(dtypes, errors="ignore")
         vaa.to_parquet(output)
+    tempfile.unlink()
     return vaa
 
 
