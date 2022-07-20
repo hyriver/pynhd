@@ -2,6 +2,21 @@
 History
 =======
 
+0.13.3 (2022-07-20)
+-------------------
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Use the new ``async_retriever.stream_write`` function to download files in
+  ``nhdplus_vaa`` and ``enhd_attrs`` functions. This is more memory efficient.
+- Convert the type of list of not found items in ``NLDI.comid_byloc`` and
+  ``NLDI.feature_byloc`` to list of tuples of coordinates from list of strings.
+  This matches the type of returned not found coordinates to that of the inputs.
+- Fix an issue with NLDI that was caused by the recent changes in the NLDI web
+  service's error handling. The NLDI web service now returns more descriptive
+  error messages in a ``json`` format instead of returning the usual status
+  errors.
+
 0.13.2 (2022-06-14)
 -------------------
 
