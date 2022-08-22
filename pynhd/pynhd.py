@@ -775,7 +775,11 @@ class NLDI:
         if not isinstance(feature_ids, Sequence):
             raise InvalidInputType("feature_ids", "str, list or tuple")
 
-        feature_ids = feature_ids if isinstance(feature_ids, list) else [feature_ids]
+        feature_ids = [feature_ids] if isinstance(feature_ids, (str, int)) else feature_ids
+
+        if len(feature_ids) == 0:
+            raise InvalidInputType("feature_ids", "list with at least one element")
+
         if fsource == "nwissite":
             feature_ids = [f"USGS-{fid.lower().replace('usgs-', '')}" for fid in feature_ids]
 
@@ -949,15 +953,15 @@ class NLDI:
         if len(valid_navigations) == 0:
             raise ZeroMatched
 
-        if navigation not in valid_navigations.keys():
-            raise InvalidInputValue("navigation", list(valid_navigations.keys()))
+        if navigation not in valid_navigations:
+            raise InvalidInputValue("navigation", list(valid_navigations))
 
         url = valid_navigations[navigation]
 
         r_json = self._get_url(url)
         valid_sources = {s["source"].lower(): s["features"] for s in r_json}  # type: ignore
         if source not in valid_sources:
-            raise InvalidInputValue("source", list(valid_sources.keys()))
+            raise InvalidInputValue("source", list(valid_sources))
 
         url = valid_sources[source]
         payload = {"distance": f"{int(distance)}", "trimStart": f"{trim_start}".lower()}
