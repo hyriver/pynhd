@@ -491,24 +491,26 @@ def __merge_flowlines(flw: List[Union[LineString, MultiLineString]]) -> List[Lin
     return list(merged.geoms)
 
 
-def flowline_resample(flw: gpd.GeoDataFrame, spacing: float) -> gpd.GeoDataFrame:
+def flowline_resample(flw: gpd.GeoDataFrame, spacing: float, id_col: str = "comid") -> gpd.GeoDataFrame:
     """Resample a flowline based on a given spacing.
 
     Parameters
     ----------
     flw : geopandas.GeoDataFrame
-        A dataframe with ``geometry`` and ``comid`` columns and CRS attribute.
+        A dataframe with ``geometry`` and ``id_col`` columns and CRS attribute.
         The flowlines should be able to merged to a single ``LineString``.
         Otherwise, you should use the :func:`network_resample` function.
     spacing : float
         Spacing between the sample points in meters.
+    id_col : str, optional
+        Name of the flowlines column containing IDs, defaults to ``comid``.
 
     Returns
     -------
     geopandas.GeoDataFrame
         Resampled flowline.
     """
-    __check_flw(flw, ["geometry", "comid"])
+    __check_flw(flw, ["geometry", id_col])
 
     line_list = __merge_flowlines(flw.geometry.to_list())
     if len(line_list) > 1:
@@ -525,10 +527,10 @@ def flowline_resample(flw: gpd.GeoDataFrame, spacing: float) -> gpd.GeoDataFrame
     rs_idx, flw_idx = flw.sindex.nearest(resampled.geometry, max_distance=spacing, return_all=False)
     merged_idx = tlz.merge_with(list, ({t: i} for t, i in zip(flw_idx, rs_idx)))
 
-    resampled["comid"] = 0
+    resampled[id_col] = 0
     for fi, ci in merged_idx.items():
-        resampled.loc[ci, "comid"] = flw.iloc[fi].comid
-    resampled = resampled.dissolve(by="comid")
+        resampled.loc[ci, id_col] = flw.iloc[fi][id_col]
+    resampled = resampled.dissolve(by=id_col)
     resampled["geometry"] = [
         ln if isinstance(ln, LineString) else ops.linemerge(ln) for ln in resampled.geometry
     ]
@@ -555,17 +557,19 @@ def network_resample(flw: gpd.GeoDataFrame, spacing: float) -> gpd.GeoDataFrame:
     return gpd.GeoDataFrame(cs, crs=flw.crs).drop_duplicates().dissolve(by="comid")
 
 
-def flowline_xsection(flw: gpd.GeoDataFrame, distance: float, width: float) -> gpd.GeoDataFrame:
+def flowline_xsection(flw: gpd.GeoDataFrame, distance: float, width: float, id_col: str = "comid") -> gpd.GeoDataFrame:
     """Get cross-section of a river network at a given spacing.
 
     Parameters
     ----------
     flw : geopandas.GeoDataFrame
-        A dataframe with ``geometry`` and ``comid`` columns and CRS attribute.
+        A dataframe with ``geometry`` and ``id_col`` columns and CRS attribute.
     distance : float
         The distance between two consecutive cross-sections.
     width : float
         The width of the cross-section.
+    id_col : str, optional
+        Name of the flowlines column containing IDs, defaults to ``comid``.
 
     Returns
     -------
@@ -576,14 +580,14 @@ def flowline_xsection(flw: gpd.GeoDataFrame, distance: float, width: float) -> g
         Note that each ``comid`` can have multiple cross-sections depending on
         the given spacing distance.
     """
-    __check_flw(flw, ["geometry", "comid"])
+    __check_flw(flw, ["geometry", id_col])
     if flw.crs is None:
         raise MissingCRS
 
     if not flw.crs.is_projected:
         raise InvalidInputType("points.crs", "projected CRS")
 
-    req_cols = ["comid", "geometry"]
+    req_cols = [id_col, "geometry"]
     if any(col not in flw for col in req_cols):
         raise MissingItems(req_cols)
 
@@ -599,10 +603,10 @@ def flowline_xsection(flw: gpd.GeoDataFrame, distance: float, width: float) -> g
     cs_idx, flw_idx = flw.sindex.query_bulk(cs.geometry)
     merged_idx = tlz.merge_with(list, ({t: i} for t, i in zip(flw_idx, cs_idx)))
 
-    cs["comid"] = 0
+    cs[id_col] = 0
     for fi, ci in merged_idx.items():
-        cs.loc[ci, "comid"] = flw.iloc[fi].comid
-    return cs.drop_duplicates().dissolve(by="comid")
+        cs.loc[ci, id_col] = flw.iloc[fi][id_col]
+    return cs.drop_duplicates().dissolve(by=id_col)
 
 
 def network_xsection(flw: gpd.GeoDataFrame, distance: float, width: float) -> gpd.GeoDataFrame:
