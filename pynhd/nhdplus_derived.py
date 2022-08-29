@@ -1,6 +1,5 @@
 """Access NLDI and WaterData databases."""
 import io
-import uuid
 from pathlib import Path
 from typing import Optional, Union
 
@@ -47,13 +46,8 @@ def enhd_attrs(
     sb = ScienceBase()
     files = sb.get_file_urls("60c92503d34e86b9389df1c9")
 
-    temp_file = Path("cache", f"enhd_{uuid.uuid4().hex}.parquet")
-    with temp_file.open("wb") as f:
-        ar.stream_write([files.loc["enhd_nhdplusatts.parquet"].url], [f.name])
-        attrs = pd.read_parquet(f.name)
-        attrs.to_parquet(output)
-    temp_file.unlink()
-    return attrs
+    ar.stream_write([files.loc["enhd_nhdplusatts.parquet"].url], [output])
+    return pd.read_parquet(output)
 
 
 def nhdplus_vaa(
@@ -145,13 +139,11 @@ def nhdplus_vaa(
     fpath = "data/contents/nhdplusVAA.parquet"
     url = f"https://www.hydroshare.org/resource/{rid}/{fpath}"
 
-    temp_file = Path("cache", f"vaa_{uuid.uuid4().hex}.parquet")
-    with temp_file.open("wb") as f:
-        ar.stream_write([url], [f.name])
-        vaa = pd.read_parquet(f.name)
-        vaa = vaa.astype(dtypes, errors="ignore")
-        vaa.to_parquet(output)
-    temp_file.unlink()
+    ar.stream_write([url], [output])
+    vaa = pd.read_parquet(output)
+    vaa = vaa.astype(dtypes, errors="ignore")
+    output.unlink()
+    vaa.to_parquet(output)
     return vaa
 
 
