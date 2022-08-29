@@ -491,7 +491,9 @@ def __merge_flowlines(flw: List[Union[LineString, MultiLineString]]) -> List[Lin
     return list(merged.geoms)
 
 
-def flowline_resample(flw: gpd.GeoDataFrame, spacing: float, id_col: str = "comid") -> gpd.GeoDataFrame:
+def flowline_resample(
+    flw: gpd.GeoDataFrame, spacing: float, id_col: str = "comid"
+) -> gpd.GeoDataFrame:
     """Resample a flowline based on a given spacing.
 
     Parameters
@@ -557,7 +559,9 @@ def network_resample(flw: gpd.GeoDataFrame, spacing: float) -> gpd.GeoDataFrame:
     return gpd.GeoDataFrame(cs, crs=flw.crs).drop_duplicates().dissolve(by="comid")
 
 
-def flowline_xsection(flw: gpd.GeoDataFrame, distance: float, width: float, id_col: str = "comid") -> gpd.GeoDataFrame:
+def flowline_xsection(
+    flw: gpd.GeoDataFrame, distance: float, width: float, id_col: str = "comid"
+) -> gpd.GeoDataFrame:
     """Get cross-section of a river network at a given spacing.
 
     Parameters
