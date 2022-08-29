@@ -15,14 +15,14 @@ from pygeoogc import ArcGISRESTful, ServiceURL
 from pygeoogc import utils as ogc_utils
 
 from .exceptions import (
-    InvalidInputRange,
-    InvalidInputType,
-    InvalidInputValue,
-    MissingColumns,
-    MissingCRS,
-    MissingItems,
+    InputRangeError,
+    InputTypeError,
+    InputValueError,
+    MissingColumnError,
+    MissingCRSError,
+    MissingItemError,
     ServiceError,
-    ZeroMatched,
+    ZeroMatchedError,
 )
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ __all__ = ["AGRBase", "ScienceBase", "stage_nhdplus_attrs", "GeoConnex"]
 def get_parquet(parquet_path: Union[Path, str]) -> Path:
     """Get a parquet filename from a path or a string."""
     if Path(parquet_path).suffix != ".parquet":
-        raise InvalidInputValue("parquet_path", ["a filename with `.parquet` extension."])
+        raise InputValueError("parquet_path", ["a filename with `.parquet` extension."])
 
     output = Path(parquet_path)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -110,7 +110,7 @@ class AGRBase:
                     crs=crs,
                 )
             except KeyError as ex:
-                raise InvalidInputValue("layer", list(valid_layers)) from ex
+                raise InputValueError("layer", list(valid_layers)) from ex
         else:
             self.client = ArcGISRESTful(
                 base_url,
@@ -339,7 +339,7 @@ class PyGeoAPIBase:
         _coords = [coords] if isinstance(coords, tuple) else coords
 
         if not isinstance(_coords, list) or any(len(c) != 2 for c in _coords):
-            raise InvalidInputType("coords", "tuple or list", "(lon, lat) or [(lon, lat), ...]")
+            raise InputTypeError("coords", "tuple or list", "(lon, lat) or [(lon, lat), ...]")
 
         return ogc_utils.match_crs(_coords, crs, DEF_CRS)
 
@@ -370,7 +370,7 @@ class PyGeoAPIBatch(PyGeoAPIBase):
     def __init__(self, coords: gpd.GeoDataFrame) -> None:
         super().__init__()
         if coords.crs is None:
-            raise MissingCRS
+            raise MissingCRSError
 
         self.coords = coords.to_crs(DEF_CRS)
         self.req_idx = self.coords.index.tolist()
@@ -397,12 +397,12 @@ class PyGeoAPIBatch(PyGeoAPIBase):
         """Check if the required columns are present in the GeoDataFrame."""
         missing = [c for c in self.req_cols[method] if c not in self.coords]
         if missing:
-            raise MissingColumns(missing)
+            raise MissingColumnError(missing)
 
     def check_geotype(self, method: str) -> None:
         """Check if the required geometry type is present in the GeoDataFrame."""
         if any(self.coords.geom_type != self.geo_types[method]):
-            raise InvalidInputType("coords", self.geo_types[method])
+            raise InputTypeError("coords", self.geo_types[method])
 
     def get_payload(self, method: str) -> List[Dict[str, Dict[str, List[Dict[str, Any]]]]]:
         """Return the payload for a request."""
@@ -421,7 +421,7 @@ class PyGeoAPIBatch(PyGeoAPIBase):
 
         if method == "elevation_profile":
             if any(len(g.geoms) != 2 for g in coords.geometry):
-                raise InvalidInputType("coords", "MultiPoint of length 2")
+                raise InputTypeError("coords", "MultiPoint of length 2")
 
             return self._request_body(
                 [
@@ -646,7 +646,7 @@ class GeoConnex:
         self._item = value
         if value is not None:
             if value not in self.endpoints:
-                raise InvalidInputValue("item", list(self.endpoints))
+                raise InputValueError("item", list(self.endpoints))
             self.query_url = self.endpoints[value].url
         else:
             self.query_url = None
@@ -668,13 +668,13 @@ class GeoConnex:
     ) -> gpd.GeoDataFrame:
         """Query the GeoConnex endpoint."""
         if self.query_url is None or self.item is None:
-            raise MissingItems(["item"])
+            raise MissingItemError(["item"])
 
         valid_keys = self.endpoints[self.item].query_fields
         invalid_key = [k for k in kwds if k not in valid_keys]
         if len(invalid_key) > 0:
             keys = ", ".join(invalid_key)
-            raise InvalidInputValue(f"query: {keys}", valid_keys)
+            raise InputValueError(f"query: {keys}", valid_keys)
 
         if skip_geometry:
             kwds["skip_geometry"] = "true"
@@ -684,7 +684,7 @@ class GeoConnex:
 
             extent = self.endpoints[self.item].extent
             if not all(g.within(sgeom.box(*extent)) for g in geometry):
-                raise InvalidInputRange("geometry", f"within {extent}")
+                raise InputRangeError("geometry", f"within {extent}")
 
             _ = kwds.pop("geometry")
             param_list = [
@@ -696,12 +696,12 @@ class GeoConnex:
                 gpd.GeoSeries(geometry, crs=DEF_CRS), predicate="contains"
             )
             if len(idx) == 0:
-                raise ZeroMatched
+                raise ZeroMatchedError
             gdf = gdf.iloc[idx].reset_index(drop=True)
         else:
             gdf = geoutils.json2geodf(self.__get_url(self.query_url, kwds))  # type: ignore[arg-type]
             if len(gdf) == 0:
-                raise ZeroMatched
+                raise ZeroMatchedError
 
         if "nhdpv2_COMID" in gdf:
             gdf["nhdpv2_COMID"] = gdf["nhdpv2_COMID"].astype("Int64")

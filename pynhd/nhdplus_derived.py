@@ -5,7 +5,7 @@ from typing import Optional, Union
 
 import async_retriever as ar
 import pandas as pd
-from pygeoogc import InvalidInputValue
+from pygeoogc import InputValueError
 
 from .core import ScienceBase, get_parquet, stage_nhdplus_attrs
 
@@ -180,7 +180,7 @@ def nhdplus_attrs(
     try:
         url = char_df[char_df.name == name].url.values[0]
     except IndexError as ex:
-        raise InvalidInputValue("name", char_df.name.unique()) from ex
+        raise InputValueError("name", char_df.name.unique()) from ex
     resp = ar.retrieve_binary([url])
     return pd.read_csv(io.BytesIO(resp[0]), compression="zip")
 

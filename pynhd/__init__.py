@@ -1,5 +1,5 @@
 """Top-level package for PyNHD."""
-from importlib.metadata import version, PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, version
 
 from .core import AGRBase, GeoConnex
 from .exceptions import (

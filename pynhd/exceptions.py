@@ -6,7 +6,7 @@ import pygeoogc as ogc
 import pygeoutils as pgu
 
 
-class ZeroMatched(ogc.ZeroMatched):
+class ZeroMatchedError(ogc.ZeroMatchedError):
     """Exception raised when a function argument is missing.
 
     Parameters
@@ -16,7 +16,7 @@ class ZeroMatched(ogc.ZeroMatched):
     """
 
 
-class MissingColumns(pgu.MissingColumns):
+class MissingColumnError(pgu.MissingColumnError):
     """Exception raised when a required column is missing from a dataframe.
 
     Parameters
@@ -36,7 +36,7 @@ class ServiceError(ar.ServiceError):
     """
 
 
-class InvalidInputValue(ar.InvalidInputValue):
+class InputValueError(ar.InputValueError):
     """Exception raised for invalid input.
 
     Parameters
@@ -48,7 +48,7 @@ class InvalidInputValue(ar.InvalidInputValue):
     """
 
 
-class InvalidInputType(ar.InvalidInputType):
+class InputTypeError(ar.InputTypeError):
     """Exception raised when a function argument type is invalid.
 
     Parameters
@@ -62,7 +62,7 @@ class InvalidInputType(ar.InvalidInputType):
     """
 
 
-class MissingItems(Exception):
+class MissingItemError(Exception):
     """Exception raised when a required item is missing.
 
     Parameters
@@ -79,7 +79,7 @@ class MissingItems(Exception):
         return self.message
 
 
-class InvalidInputRange(Exception):
+class InputRangeError(Exception):
     """Exception raised when a function argument is not in the valid range.
 
     Parameters
@@ -98,7 +98,7 @@ class InvalidInputRange(Exception):
         return self.message
 
 
-class MissingCRS(Exception):
+class MissingCRSError(Exception):
     """Exception raised when CRS is not given."""
 
     def __init__(self) -> None:

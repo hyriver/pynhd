@@ -8,14 +8,14 @@ import numpy as np
 import pandas as pd
 import pyproj
 from pandas._libs.missing import NAType
-from pygeoutils import GeoBSpline, InvalidInputType
+from pygeoutils import GeoBSpline, InputTypeError
 from pygeoutils.pygeoutils import Spline
 from shapely import ops
 from shapely.geometry import LineString, MultiLineString, Point
 
 from . import nhdplus_derived as derived
 from .core import logger
-from .exceptions import MissingCRS, MissingItems
+from .exceptions import MissingCRSError, MissingItemError
 
 __all__ = [
     "prepare_nhdplus",
@@ -93,7 +93,7 @@ class NHDTools:
         self.flw.columns = self.flw.columns.str.lower()
 
         if not ("fcode" in self.flw and "ftype" in self.flw):
-            raise MissingItems(["fcode", "ftype"])
+            raise MissingItemError(["fcode", "ftype"])
 
         if use_enhd_attrs or not terminal2nan:
             if not terminal2nan and not use_enhd_attrs:
@@ -251,11 +251,11 @@ class NHDTools:
             A list of variable names (str)
         """
         if not isinstance(reqs, Iterable):
-            raise InvalidInputType("reqs", "iterable")
+            raise InputTypeError("reqs", "iterable")
 
         missing = [r for r in reqs if r not in cols]
         if missing:
-            raise MissingItems(missing)
+            raise MissingItemError(missing)
 
 
 def prepare_nhdplus(
@@ -474,13 +474,13 @@ def __get_perpendicular(
 def __check_flw(flw: gpd.GeoDataFrame, req_cols: List[str]) -> None:
     """Get flowlines."""
     if flw.crs is None:
-        raise MissingCRS
+        raise MissingCRSError
 
     if not flw.crs.is_projected:
-        raise InvalidInputType("flw.crs", "projected CRS")
+        raise InputTypeError("flw.crs", "projected CRS")
 
     if any(col not in flw for col in req_cols):
-        raise MissingItems(req_cols)
+        raise MissingItemError(req_cols)
 
 
 def __merge_flowlines(flw: List[Union[LineString, MultiLineString]]) -> List[LineString]:
@@ -516,7 +516,7 @@ def flowline_resample(
 
     line_list = __merge_flowlines(flw.geometry.to_list())
     if len(line_list) > 1:
-        raise InvalidInputType("flw.geometry", "mergeable to a single line")
+        raise InputTypeError("flw.geometry", "mergeable to a single line")
     line = line_list[0]
 
     dist = sorted(line.project(Point(p)) for p in line.coords)
@@ -586,14 +586,14 @@ def flowline_xsection(
     """
     __check_flw(flw, ["geometry", id_col])
     if flw.crs is None:
-        raise MissingCRS
+        raise MissingCRSError
 
     if not flw.crs.is_projected:
-        raise InvalidInputType("points.crs", "projected CRS")
+        raise InputTypeError("points.crs", "projected CRS")
 
     req_cols = [id_col, "geometry"]
     if any(col not in flw for col in req_cols):
-        raise MissingItems(req_cols)
+        raise MissingItemError(req_cols)
 
     half_width = width * 0.5
     lines = __merge_flowlines(flw.geometry.to_list())

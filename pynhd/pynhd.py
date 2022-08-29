@@ -9,12 +9,12 @@ import pandas as pd
 import pygeoogc as ogc
 import pygeoutils as geoutils
 import shapely.geometry as sgeom
-from pygeoogc import WFS, InvalidInputValue, ServiceUnavailable, ServiceURL
-from pygeoogc import ZeroMatched as ZeroMatchedOGC
-from pygeoutils import InvalidInputType
+from pygeoogc import WFS, InputValueError, ServiceUnavailableError, ServiceURL
+from pygeoogc import ZeroMatchedError as ZeroMatchedErrorOGC
+from pygeoutils import InputTypeError
 
 from .core import ALT_CRS, DEF_CRS, AGRBase, GeoConnex, PyGeoAPIBase, PyGeoAPIBatch, logger
-from .exceptions import InvalidInputRange, MissingItems, ZeroMatched
+from .exceptions import InputRangeError, MissingItemError, ZeroMatchedError
 
 
 class NHD(AGRBase):
@@ -75,7 +75,7 @@ class NHD(AGRBase):
         }
         _layer = self.valid_layers.get(layer)
         if _layer is None:
-            raise InvalidInputValue("layer", list(self.valid_layers))
+            raise InputValueError("layer", list(self.valid_layers))
         super().__init__(
             ServiceURL().restful.nhd,
             _layer,
@@ -195,7 +195,7 @@ class PyGeoAPI(PyGeoAPIBase):
         411.5906
         """
         if not isinstance(coords, list) or any(len(c) != 2 for c in coords):
-            raise InvalidInputType("coords", "list", "[(lon1, lat1), (lon2, lat2)]")
+            raise InputTypeError("coords", "list", "[(lon1, lat1), (lon2, lat2)]")
 
         lons, lats = zip(*self._check_coords(coords, crs))
 
@@ -347,7 +347,7 @@ class WaterData:
         """
         features = geoutils.json2geodf(resp, ALT_CRS, self.crs)
         if features.empty:
-            raise ZeroMatched
+            raise ZeroMatchedError
         return features
 
     def bybox(
@@ -395,7 +395,7 @@ class WaterData:
     ) -> gpd.GeoDataFrame:
         """Get features within a radius (in meters) of a point."""
         if not (isinstance(coords, tuple) and len(coords) == 2):
-            raise InvalidInputType("coods", "tuple of length 2", "(x, y)")
+            raise InputTypeError("coods", "tuple of length 2", "(x, y)")
 
         x, y = ogc.utils.match_crs([coords], loc_crs, ALT_CRS)[0]
         cql_filter = f"DWITHIN(the_geom,POINT({y:.6f} {x:.6f}),{distance},meters)"
@@ -489,7 +489,7 @@ class NHDPlusHR(AGRBase):
         }
         _layer = self.valid_layers.get(layer)
         if _layer is None:
-            raise InvalidInputValue("layer", list(self.valid_layers))
+            raise InputValueError("layer", list(self.valid_layers))
         super().__init__(
             ServiceURL().restful.nhdplushr_edits,
             _layer,
@@ -513,14 +513,14 @@ class NLDI:
         try:
             resp = ar.retrieve_json([url], [{"params": payload}])
         except ar.ServiceError as ex:
-            raise ZeroMatched from ex
+            raise ZeroMatchedError from ex
         except ConnectionError as ex:
-            raise ServiceUnavailable(self.base_url) from ex
+            raise ServiceUnavailableError(self.base_url) from ex
         else:
             if isinstance(resp[0], dict) and resp[0].get("type", "") == "error":
-                raise ZeroMatched(resp[0].get("description", "Feature not found"))
+                raise ZeroMatchedError(resp[0].get("description", "Feature not found"))
             if resp[0] is None:
-                raise ZeroMatched
+                raise ZeroMatchedError
             return resp[0]
 
     def __init__(self) -> None:
@@ -548,7 +548,7 @@ class NLDI:
         """Check if the given feature source is valid."""
         if fsource not in self.valid_fsources:
             valids = [f'"{s}" for {d}' for s, d in self.valid_fsources.items()]
-            raise InvalidInputValue("fsource", valids)
+            raise InputValueError("fsource", valids)
 
     def _get_urls(
         self, urls: Mapping[Any, Tuple[str, Optional[Dict[str, str]]]]
@@ -571,11 +571,11 @@ class NLDI:
             try:
                 rjson = self._get_url(u, p)
                 resp.append((f, geoutils.json2geodf(rjson, ALT_CRS, DEF_CRS)))
-            except (ZeroMatchedOGC, ZeroMatched, InvalidInputType, ar.ServiceError):
+            except (ZeroMatchedErrorOGC, ZeroMatchedError, InputTypeError, ar.ServiceError):
                 not_found.append(f)
 
         if len(resp) == 0:
-            raise ZeroMatched
+            raise ZeroMatchedError
 
         resp_df = gpd.GeoDataFrame(pd.concat(dict(resp)), crs=DEF_CRS)
 
@@ -652,7 +652,7 @@ class NLDI:
         _coords = [coords] if isinstance(coords, tuple) else coords
 
         if not isinstance(_coords, list) or any(len(c) != 2 for c in _coords):
-            raise InvalidInputType("coords", "list or tuple")
+            raise InputTypeError("coords", "list or tuple")
 
         _coords = ogc.utils.match_crs(_coords, loc_crs, DEF_CRS)
 
@@ -662,7 +662,7 @@ class NLDI:
         comids, not_found_str = self._get_urls(urls)
 
         if len(comids) == 0:
-            raise ZeroMatched
+            raise ZeroMatchedError
 
         comids = comids.reset_index(drop=True)
 
@@ -773,12 +773,12 @@ class NLDI:
         """
         self._validate_fsource(fsource)
         if not isinstance(feature_ids, Sequence):
-            raise InvalidInputType("feature_ids", "str, list or tuple")
+            raise InputTypeError("feature_ids", "str, list or tuple")
 
         feature_ids = [feature_ids] if isinstance(feature_ids, (str, int)) else feature_ids
 
         if len(feature_ids) == 0:
-            raise InvalidInputType("feature_ids", "list with at least one element")
+            raise InputTypeError("feature_ids", "list with at least one element")
 
         if fsource == "nwissite":
             feature_ids = [f"USGS-{fid.lower().replace('usgs-', '')}" for fid in feature_ids]
@@ -840,7 +840,7 @@ class NLDI:
         """
         if char_type not in self.valid_chartypes:
             valids = [f'"{s}" for {d}' for s, d in self.valid_chartypes.items()]
-            raise InvalidInputValue("char", valids)
+            raise InputValueError("char", valids)
 
         comids = comids if isinstance(comids, list) else [comids]
         v_dict, nd_dict = {}, {}
@@ -854,7 +854,7 @@ class NLDI:
             idx = valid_charids.index
             if any(c not in idx for c in _char_ids):
                 vids = valid_charids["characteristic_description"]
-                raise InvalidInputValue("char_id", [f'"{s}" for {d}' for s, d in vids.items()])
+                raise InputValueError("char_id", [f'"{s}" for {d}' for s, d in vids.items()])
             payload = {"characteristicId": ",".join(_char_ids)}
 
         for comid in comids:
@@ -885,7 +885,7 @@ class NLDI:
     def get_validchars(self, char_type: str) -> pd.DataFrame:
         """Get all the available characteristics IDs for a given characteristics type."""
         if char_type not in self.valid_chartypes:
-            raise InvalidInputValue("char", list(self.valid_chartypes))
+            raise InputValueError("char", list(self.valid_chartypes))
 
         resp = self._get_url("/".join([self.base_url, "lookups", char_type, "characteristics"]))
         c_list = ogc.utils.traverse_json(resp, ["characteristicMetadata", "characteristic"])
@@ -943,7 +943,7 @@ class NLDI:
             NLDI indexed features in EPSG:4326.
         """
         if not (1 <= distance <= 9999):
-            raise InvalidInputRange("distance", "[1, 9999]")
+            raise InputRangeError("distance", "[1, 9999]")
 
         self._validate_fsource(fsource)
 
@@ -951,17 +951,17 @@ class NLDI:
 
         valid_navigations: Dict[str, Any] = self._get_url(url)  # type: ignore
         if len(valid_navigations) == 0:
-            raise ZeroMatched
+            raise ZeroMatchedError
 
         if navigation not in valid_navigations:
-            raise InvalidInputValue("navigation", list(valid_navigations))
+            raise InputValueError("navigation", list(valid_navigations))
 
         url = valid_navigations[navigation]
 
         r_json = self._get_url(url)
         valid_sources = {s["source"].lower(): s["features"] for s in r_json}  # type: ignore
         if source not in valid_sources:
-            raise InvalidInputValue("source", list(valid_sources))
+            raise InputValueError("source", list(valid_sources))
 
         url = valid_sources[source]
         payload = {"distance": f"{int(distance)}", "trimStart": f"{trim_start}".lower()}
@@ -1007,13 +1007,13 @@ class NLDI:
             NLDI indexed features in EPSG:4326.
         """
         if not (isinstance(coords, tuple) and len(coords) == 2):
-            raise InvalidInputType("coods", "tuple of length 2", "(x, y)")
+            raise InputTypeError("coods", "tuple of length 2", "(x, y)")
         resp = self.feature_byloc(coords, loc_crs)
         comid_df = resp[0] if isinstance(resp, tuple) else resp
         comid = comid_df.comid.iloc[0]
 
         if navigation is None or source is None:
-            raise MissingItems(["navigation", "source"])
+            raise MissingItemError(["navigation", "source"])
 
         return self.navigate_byid("comid", comid, navigation, source, distance, trim_start)
 
