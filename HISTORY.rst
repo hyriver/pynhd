@@ -2,6 +2,14 @@
 History
 =======
 
+0.13.4 (unreleased)
+-------------------
+
+Bug Fixes
+~~~~~~~~~
+- Address an issue in ``nhdplus_vaa`` and ``enhd_attrs`` functions where
+  the temporarily created files were on saved correctly.
+
 0.13.3 (2022-07-31)
 -------------------
 
