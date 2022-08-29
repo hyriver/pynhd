@@ -2,6 +2,18 @@
 History
 =======
 
+0.14.0 (unreleased)
+-------------------
+
+Breaking Changes
+~~~~~~~~~~~~~~~~
+- Append "Error" to all exception classes for conforming to PEP-8 naming conventions.
+
+Bug Fixes
+~~~~~~~~~
+- Fix an issue in ``nhdplus_vaa`` and ``enhd_attrs`` functions where if ``cache`` folder
+  does not exist, it would not have been created, thus resulting to an error.
+
 0.13.4 (unreleased)
 -------------------
 
