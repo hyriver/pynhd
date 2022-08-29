@@ -2,25 +2,22 @@
 History
 =======
 
-0.13.5 (unreleased)
+0.13.5 (2022-08-29)
 -------------------
 
 Breaking Changes
 ~~~~~~~~~~~~~~~~
 - Append "Error" to all exception classes for conforming to PEP-8 naming conventions.
 
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Bump the minimum versions of ``pygeoogc`` and ``pygeoutils`` to 0.13.5 and that of
+  ``async-retriever`` to 0.3.5.
+
 Bug Fixes
 ~~~~~~~~~
 - Fix an issue in ``nhdplus_vaa`` and ``enhd_attrs`` functions where if ``cache`` folder
   does not exist, it would not have been created, thus resulting to an error.
-
-0.13.4 (unreleased)
--------------------
-
-Bug Fixes
-~~~~~~~~~
-- Address an issue in ``nhdplus_vaa`` and ``enhd_attrs`` functions where
-  the temporarily created files were on saved correctly.
 
 0.13.3 (2022-07-31)
 -------------------
