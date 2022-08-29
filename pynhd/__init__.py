@@ -1,15 +1,15 @@
 """Top-level package for PyNHD."""
-import importlib.metadata
+from importlib.metadata import version, PackageNotFoundError
 
 from .core import AGRBase, GeoConnex
 from .exceptions import (
-    InvalidInputRange,
-    InvalidInputType,
-    InvalidInputValue,
-    MissingColumns,
-    MissingCRS,
-    MissingItems,
-    ZeroMatched,
+    InputRangeError,
+    InputTypeError,
+    InputValueError,
+    MissingColumnError,
+    MissingCRSError,
+    MissingItemError,
+    ZeroMatchedError,
 )
 from .network_tools import (
     flowline_resample,
@@ -25,16 +25,19 @@ from .nhdplus_derived import enhd_attrs, nhd_fcode, nhdplus_attrs, nhdplus_vaa
 from .print_versions import show_versions
 from .pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData, geoconnex, pygeoapi
 
-__version__ = importlib.metadata.version("pynhd")
+try:
+    __version__ = version("pynhd")
+except PackageNotFoundError:
+    __version__ = "999"
 
 __all__ = [
-    "InvalidInputRange",
-    "InvalidInputValue",
-    "InvalidInputType",
-    "MissingItems",
-    "MissingColumns",
-    "MissingCRS",
-    "ZeroMatched",
+    "InputRangeError",
+    "InputValueError",
+    "InputTypeError",
+    "MissingItemError",
+    "MissingColumnError",
+    "MissingCRSError",
+    "ZeroMatchedError",
     "prepare_nhdplus",
     "geoconnex",
     "topoogical_sort",
