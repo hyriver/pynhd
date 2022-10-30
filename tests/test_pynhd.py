@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 import geopandas as gpd
+import numpy as np
 import pytest
 from shapely.geometry import MultiPoint, Point, box
 
@@ -23,8 +24,10 @@ station_id = f"USGS-{STA_ID}"
 site = "nwissite"
 UM = "upstreamMain"
 UT = "upstreamTributaries"
-SMALL = 1e-3
-DEF_CRS = "epsg:4326"
+
+
+def assert_close(a: float, b: float) -> bool:
+    assert np.isclose(a, b, rtol=1e-3).all()
 
 
 @pytest.fixture
@@ -32,6 +35,18 @@ def trib():
     comids = NLDI().navigate_byid(site, station_id, UT, "flowlines")
     wd = WaterData("nhdflowline_network")
     return wd.byid("comid", comids.nhdplus_comid.tolist())
+
+
+def test_epa():
+    data = nhd.epa_nhd_catchments(9533477, "curve_number")
+    assert_close(data["curve_number"].mean(axis=1), 75.576)
+
+    data = nhd.epa_nhd_catchments([9533477, 1440291], "comid_info")
+    assert data["comid_info"].loc[1440291, "TOCOMID"] == 1439303
+
+    data = nhd.epa_nhd_catchments(1440291, "catchment_metrics")
+    assert_close(data["catchment_metrics"].loc[1440291, "AvgWetIndxCat"], 579.532)
+    assert data["metadata"].loc["AvgWetIndxCat", "short_display_name"] == "Wetness Index"
 
 
 @pytest.mark.xfail(reason="Hydro is unstable.")
@@ -71,9 +86,9 @@ class TestPyGeoAPI:
                 ]
             },
             geometry=[Point(coords)],
-            crs=DEF_CRS,
+            crs=4326,
         )
-        gdf = self.pygeoapi.split_catchment(coords, crs=DEF_CRS, upstream=False)
+        gdf = self.pygeoapi.split_catchment(coords, crs=4326, upstream=False)
         gdfb = nhd.pygeoapi(gs, "split_catchment")
         assert gdf.catchmentID.iloc[0] == gdfb.catchmentID.iloc[0] == "22294818"
 
@@ -89,11 +104,13 @@ class TestPyGeoAPI:
                 ],
             },
             geometry=[MultiPoint(coords)],
-            crs=DEF_CRS,
+            crs=4326,
         )
-        gdf = self.pygeoapi.elevation_profile(coords, numpts=101, dem_res=1, crs=DEF_CRS)
+        gdf = self.pygeoapi.elevation_profile(coords, numpts=101, dem_res=1, crs=4326)
         gdfb = nhd.pygeoapi(gs, "elevation_profile")
-        assert abs(gdf.iloc[-1, 2] - 316.053) < SMALL and abs(gdfb.iloc[-1, 2] - 316.053) < SMALL
+
+        assert_close(gdf.iloc[-1, 2], 316.053)
+        assert_close(gdfb.iloc[-1, 2], 316.053)
 
     def test_cross_section(self):
         coords = (-103.80119, 40.2684)
@@ -107,11 +124,13 @@ class TestPyGeoAPI:
                 ],
             },
             geometry=[Point(coords)],
-            crs=DEF_CRS,
+            crs=4326,
         )
-        gdf = self.pygeoapi.cross_section(coords, width=1000.0, numpts=101, crs=DEF_CRS)
+        gdf = self.pygeoapi.cross_section(coords, width=1000.0, numpts=101, crs=4326)
         gdfb = nhd.pygeoapi(gs, "cross_section")
-        assert abs(gdf.iloc[-1, 2] - 767.885) < SMALL and abs(gdfb.iloc[-1, 2] - 767.885) < SMALL
+
+        assert_close(gdf.iloc[-1, 2], 767.885)
+        assert_close(gdfb.iloc[-1, 2], 767.885)
 
 
 class TestNLDI:
@@ -153,13 +172,13 @@ class TestNLDI:
         eck4 = "+proj=eck4 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=km"
         basin = self.nldi.get_basins(STA_ID).to_crs(eck4)
         split = self.nldi.get_basins(STA_ID, split_catchment=True).to_crs(eck4)
-        assert abs((split.area.values[0] - basin.area.values[0]) - 0.489) < SMALL
+        assert_close(split.area.values[0] - basin.area.values[0], 0.489)
 
     def test_char(self):
         tot, prc = self.nldi.getcharacteristic_byid(
             "6710923", "local", char_ids="all", values_only=False
         )
-        assert abs(tot.CAT_BFI.values[0] - 57) < SMALL and prc.CAT_BFI.values[0] == 0
+        assert tot.CAT_BFI.values[0] == 57 and prc.CAT_BFI.values[0] == 0
 
     @pytest.mark.skipif(has_typeguard, reason="Broken if Typeguard is enabled")
     def test_feature_missing(self):
@@ -178,24 +197,26 @@ def test_nhd_attrs():
     _ = nhd.nhdplus_attrs("RECHG")
     cat = nhd.nhdplus_attrs("RECHG")
     Path("nhdplus_attrs.parquet").unlink()
-    assert abs(cat[cat.COMID > 0].CAT_RECHG.sum() - 143215331.64) < SMALL and len(meta) == 609
+    assert_close(cat[cat.COMID > 0].CAT_RECHG.sum(), 143215331.64)
+    assert len(meta) == 609
 
 
 class TestWaterData:
     def test_byid_flw(self, trib):
-        assert trib.shape[0] == 432 and abs(trib.lengthkm.sum() - 565.755) < SMALL
+        assert_close(trib.lengthkm.sum(), 565.755)
+        assert trib.shape[0] == 432
 
     def test_byid(self, trib):
         wd = WaterData("catchmentsp")
         ct = wd.byid("featureid", trib.comid.astype(str).to_list())
-        assert abs(ct.areasqkm.sum() - 773.954) < SMALL
+        assert_close(ct.areasqkm.sum(), 773.954)
 
     def test_bybox(self):
         wd = WaterData("nhdwaterbody")
         print(wd)
         wb_g = wd.bygeom(box(-69.7718, 45.0742, -69.3141, 45.4534), predicate="INTERSECTS", xy=True)
         wb_b = wd.bybox((-69.7718, 45.0742, -69.3141, 45.4534))
-        assert abs(wb_b.areasqkm.sum() - wb_g.areasqkm.sum()) < SMALL
+        assert_close(wb_b.areasqkm.sum(), wb_g.areasqkm.sum())
 
     def test_byfilter(self):
         crs = "epsg:3857"
@@ -243,7 +264,7 @@ def test_nhdplus_vaa():
     fname = Path("nhdplus_vaa.parquet")
     vaa = nhd.nhdplus_vaa(fname)
     fname.unlink()
-    assert abs(vaa.slope.max() - 4.6) < SMALL
+    assert_close(vaa.slope.max(), 4.6)
 
 
 def test_use_enhd(trib):
@@ -269,8 +290,7 @@ def test_acc(trib):
     )
     flw = flw.merge(qsim, on="comid")
     diff = flw.arbolatesu - flw.acc_lengthkm
-
-    assert abs(diff.abs().sum() - 439.451) < SMALL
+    assert_close(diff.abs().sum(), 439.451)
 
 
 def test_fcode():
