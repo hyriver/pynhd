@@ -2,6 +2,30 @@
 History
 =======
 
+0.13.7 (unreleased)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Add a new function called ``epa_nhd_catchments`` to access one of the
+  EPA's HMS endpoints called ``WSCatchment``. You can use this function to
+  access 414 catchment-scale characteristics for all the NHDPlus catchments
+  including 16-day average curve number. More information on the curve number
+  dataset can be found at its project page
+  `here <https://cfpub.epa.gov/si/si_public_record_Report.cfm?Lab=CEMM&dirEntryId=351307>`__.
+
+Bug Fixes
+~~~~~~~~~
+- Fix a bug in ``NHDTools`` where due to the recent changes in ``pandas``
+  exception handling, the ``NHDTools`` fails in converting columns with
+  ``NaN`` values to integer type. Now, ``pandas`` throws ``IntCastingNaNError``
+  instead of ``TypeError`` when using ``astype`` method on a column.
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Use ``pyupgrade`` package to update the type hinting annotations
+  to Python 3.10 style.
+
 0.13.6 (2022-08-30)
 -------------------
 
