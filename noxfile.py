@@ -15,15 +15,14 @@ def get_package_name():
 
 python_versions = ["3.10"]
 package = get_package_name()
-base = ["async_retriever", "pygeoogc", "pygeoutils"]
 gh_deps = {
     "async_retriever": [],
     "pygeoogc": ["async_retriever"],
     "pygeoutils": ["async_retriever", "pygeoogc"],
-    "pynhd": base,
-    "py3dep": base,
-    "pygeohydro": base + ["pynhd"],
-    "pydaymet": base + ["py3dep"],
+    "pynhd": ["async_retriever", "pygeoogc", "pygeoutils"],
+    "py3dep": ["async_retriever", "pygeoogc", "pygeoutils"],
+    "pygeohydro": ["async_retriever", "pygeoogc", "pygeoutils", "pynhd", "hydrosignatures"],
+    "pydaymet": ["async_retriever", "pygeoogc", "pygeoutils", "py3dep"],
 }
 nox.options.sessions = (
     "pre-commit",
