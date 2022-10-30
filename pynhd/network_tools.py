@@ -1,5 +1,7 @@
 """Access NLDI and WaterData databases."""
-from typing import Callable, Iterable, List, Optional, Tuple, Union
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Callable, Iterable
 
 import cytoolz as tlz
 import geopandas as gpd
@@ -7,15 +9,23 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import pyproj
-from pandas._libs.missing import NAType
+from loguru import logger
 from pygeoutils import GeoBSpline, InputTypeError
-from pygeoutils.pygeoutils import Spline
 from shapely import ops
 from shapely.geometry import LineString, MultiLineString, Point
 
 from . import nhdplus_derived as derived
-from .core import logger
 from .exceptions import MissingCRSError, MissingItemError
+
+try:
+    from pandas.errors import IntCastingNaNError
+except ImportError:
+    IntCastingNaNError = TypeError
+
+if TYPE_CHECKING:
+    from pandas._libs.missing import NAType
+    from pygeoutils.pygeoutils import Spline
+
 
 __all__ = [
     "prepare_nhdplus",
@@ -33,7 +43,7 @@ def nhdflw2nx(
     flowlines: pd.DataFrame,
     id_col: str = "comid",
     toid_col: str = "tocomid",
-    edge_attr: Optional[Union[str, List[str], bool]] = None,
+    edge_attr: str | list[str] | bool | None = None,
 ) -> nx.DiGraph:
     """Convert NHDPlus flowline database to networkx graph.
 
@@ -98,11 +108,11 @@ class NHDTools:
         if use_enhd_attrs or not terminal2nan:
             if not terminal2nan and not use_enhd_attrs:
                 logger.info("The use_enhd_attrs is set to True, so all attrs will be updated.")
-            enhd_attrs = derived.enhd_attrs()
-            enhd_attrs = enhd_attrs.set_index("comid").loc[self.flw["comid"]].copy()
+            enhd_attrs = derived.enhd_attrs().set_index("comid")
             self.flw["tocomid"] = self.flw["comid"].astype("Int64")
             self.flw = self.flw.reset_index().set_index("comid")
-            self.flw.update(enhd_attrs)
+            cols = list(set(self.flw.columns).intersection(enhd_attrs.columns))
+            self.flw[cols] = enhd_attrs.loc[self.flw.index, cols]
             self.flw = self.flw.reset_index().set_index("index")
 
         if "fcode" in self.flw:
@@ -126,7 +136,7 @@ class NHDTools:
         self.check_requirements(req_cols, self.flw)
         try:
             self.flw[req_cols] = self.flw[req_cols].astype("int64")
-        except TypeError:
+        except (TypeError, IntCastingNaNError):
             self.flw[req_cols] = self.flw[req_cols].astype("Int64")
 
     def to_linestring(self) -> None:
@@ -171,7 +181,7 @@ class NHDTools:
         self.check_requirements(req_cols, self.flw)
         try:
             self.flw[req_cols[:-2]] = self.flw[req_cols[:-2]].astype("int64")
-        except TypeError:
+        except (TypeError, IntCastingNaNError):
             self.flw[req_cols[:-2]] = self.flw[req_cols[:-2]].astype("Int64")
 
         if min_path_size > 0:
@@ -218,14 +228,14 @@ class NHDTools:
         self.check_requirements(req_cols, self.flw)
         try:
             self.flw[req_cols] = self.flw[req_cols].astype("int64")
-        except TypeError:
+        except (TypeError, IntCastingNaNError):
             self.flw[req_cols] = self.flw[req_cols].astype("Int64")
 
         if "tocomid" in self.flw:
             self.flw = self.flw.drop(columns="tocomid")
 
-        def tocomid(grp: pd.core.groupby.generic.DataFrameGroupBy) -> pd.DataFrame:
-            def toid(tonode: pd.DataFrame) -> pd.Int64Dtype:
+        def tocomid(grp: pd.core.groupby.generic.DataFrameGroupBy) -> pd.Series:
+            def toid(tonode: pd.DataFrame) -> pd.NaT | pd.Int64Dtype:
                 try:
                     return grp[grp.fromnode == tonode].comid.iloc[0]
                 except IndexError:
@@ -338,8 +348,8 @@ def prepare_nhdplus(
 
 
 def topoogical_sort(
-    flowlines: pd.DataFrame, edge_attr: Optional[Union[str, List[str]]] = None
-) -> Tuple[List[Union[np.int64, NAType]], pd.Series, nx.DiGraph]:
+    flowlines: pd.DataFrame, edge_attr: str | list[str] | None = None
+) -> tuple[list[np.int64 | NAType], pd.Series, nx.DiGraph]:
     """Topological sorting of a river network.
 
     Parameters
@@ -371,7 +381,7 @@ def vector_accumulation(
     flowlines: pd.DataFrame,
     func: Callable[..., float],
     attr_col: str,
-    arg_cols: List[str],
+    arg_cols: list[str],
     id_col: str = "comid",
     toid_col: str = "tocomid",
 ) -> pd.Series:
@@ -430,7 +440,7 @@ def vector_accumulation(
     return acc
 
 
-def __get_spline(line: LineString, ns_pts: int, crs: Union[str, pyproj.CRS]) -> Spline:
+def __get_spline(line: LineString, ns_pts: int, crs: str | pyproj.CRS) -> Spline:
     """Get a B-spline from a line."""
     x, y = line.xy
     pts = gpd.GeoSeries(gpd.points_from_xy(x, y, crs=crs))
@@ -446,8 +456,8 @@ def __get_idx(d_sp: np.ndarray, distance: float) -> np.ndarray:  # type: ignore
 
 
 def __get_spline_params(
-    line: LineString, n_seg: int, distance: float, crs: Union[str, pyproj.CRS]
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:  # type: ignore[type-arg]
+    line: LineString, n_seg: int, distance: float, crs: str | pyproj.CRS
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:  # type: ignore[type-arg]
     """Get perpendiculars to a line."""
     _n_seg = n_seg
     spline = __get_spline(line, _n_seg, crs)
@@ -460,8 +470,8 @@ def __get_spline_params(
 
 
 def __get_perpendicular(
-    line: LineString, n_seg: int, distance: float, half_width: float, crs: Union[str, pyproj.CRS]
-) -> List[LineString]:
+    line: LineString, n_seg: int, distance: float, half_width: float, crs: str | pyproj.CRS
+) -> list[LineString]:
     """Get perpendiculars to a line."""
     x, y, phi = __get_spline_params(line, n_seg, distance, crs)
     x_l = x - half_width * np.sin(phi)
@@ -471,7 +481,7 @@ def __get_perpendicular(
     return [LineString([(x1, y1), (x2, y2)]) for x1, y1, x2, y2 in zip(x_l, y_l, x_r, y_r)]
 
 
-def __check_flw(flw: gpd.GeoDataFrame, req_cols: List[str]) -> None:
+def __check_flw(flw: gpd.GeoDataFrame, req_cols: list[str]) -> None:
     """Get flowlines."""
     if flw.crs is None:
         raise MissingCRSError
@@ -483,7 +493,7 @@ def __check_flw(flw: gpd.GeoDataFrame, req_cols: List[str]) -> None:
         raise MissingItemError(req_cols)
 
 
-def __merge_flowlines(flw: List[Union[LineString, MultiLineString]]) -> List[LineString]:
+def __merge_flowlines(flw: list[LineString | MultiLineString]) -> list[LineString]:
     """Merge flowlines."""
     merged = ops.linemerge(flw)
     if isinstance(merged, LineString):

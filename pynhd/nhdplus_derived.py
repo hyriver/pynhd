@@ -1,19 +1,21 @@
 """Access NLDI and WaterData databases."""
+from __future__ import annotations
+
 import io
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any
 
 import async_retriever as ar
 import pandas as pd
-from pygeoogc import InputValueError
 
 from .core import ScienceBase, get_parquet, stage_nhdplus_attrs
+from .exceptions import InputValueError
 
 __all__ = ["enhd_attrs", "nhdplus_vaa", "nhdplus_attrs", "nhd_fcode"]
 
 
 def enhd_attrs(
-    parquet_path: Optional[Union[Path, str]] = None,
+    parquet_path: Path | str | None = None,
 ) -> pd.DataFrame:
     """Get updated NHDPlus attributes from ENHD.
 
@@ -47,11 +49,17 @@ def enhd_attrs(
     files = sb.get_file_urls("60c92503d34e86b9389df1c9")
 
     ar.stream_write([files.loc["enhd_nhdplusatts.parquet"].url], [output])
-    return pd.read_parquet(output)
+    enhd = pd.read_parquet(output)
+    enhd["comid"] = enhd["comid"].astype("int32")
+    enhd["gnis_id"] = enhd["gnis_id"].astype("Int32")
+    enhd["dnlevelpat"] = enhd["dnlevelpat"].astype("int32")
+    output.unlink()
+    enhd.to_parquet(output)
+    return enhd
 
 
 def nhdplus_vaa(
-    parquet_path: Optional[Union[Path, str]] = None,
+    parquet_path: Path | str | None = None,
 ) -> pd.DataFrame:
     """Get NHDPlus Value Added Attributes with ComID-level roughness and slope values.
 
@@ -148,8 +156,8 @@ def nhdplus_vaa(
 
 
 def nhdplus_attrs(
-    name: Optional[str] = None,
-    parquet_path: Optional[Union[Path, str]] = None,
+    name: str | None = None,
+    parquet_path: Path | str | None = None,
 ) -> pd.DataFrame:
     """Access NHDPlus V2.1 Attributes from ScienceBase over CONUS.
 
@@ -194,3 +202,87 @@ def nhd_fcode() -> pd.DataFrame:
         ]
     )
     return pd.read_json(url)
+
+
+def epa_nhd_catchments(
+    comids: int | str | list[int | str],
+    feature: str,
+) -> dict[str, pd.DataFrame]:
+    """Get NHDPlus catchment-scale data from EPA's HMS REST API.
+
+    Notes
+    -----
+    For more information about curve number please refer to the project's
+    webpage on the EPA's
+    `website <https://cfpub.epa.gov/si/si_public_record_Report.cfm?Lab=CEMM&dirEntryId=351307>`__.
+
+    Parameters
+    ----------
+    comids : int or list of int
+        ComID(s) of NHDPlus catchments.
+    feature : str
+        The feature of interest. Available options are:
+
+        - ``catchment_metrics``: 414 catchment-scale metrics.
+        - ``curve_number``: 16-day average Curve Number.
+        - ``comid_info``: ComID information.
+
+    Returns
+    -------
+    dict of pandas.DataFrame or geopandas.GeoDataFrame
+        A dict of the requested dataframes. A ``comid_info`` dataframe is
+        always returned.
+
+    Examples
+    --------
+    >>> import pynhd
+    >>> data = nhd.epa_nhd_catchments(1440291, "catchment_metrics")
+    >>> data["catchment_metrics"].loc[1440291, "AvgWetIndxCat"]
+    579.532
+    """
+    feature_names = {
+        "catchment_metrics": "streamcat",
+        "curve_number": "cn",
+        "comid_info": "",
+    }
+    if feature not in feature_names:
+        raise InputValueError("feature", list(feature_names))
+
+    clist = comids if isinstance(comids, (list, tuple)) else [comids]
+    f_kwd = {feature_names[feature]: "true"} if feature != "comid_info" else {}
+    urls, kwds = zip(
+        *[
+            (
+                "https://qed.epa.gov/hms/rest/api/info/catchment",
+                {"params": {**f_kwd, "comid": comid}},
+            )
+            for comid in clist
+        ]
+    )
+    resp = ar.retrieve_json(urls, kwds)
+    info = pd.DataFrame.from_dict(
+        {i: pd.Series(r["metadata"]) for i, r in zip(clist, resp)}, orient="index"
+    )
+    for c in info:
+        info[c] = pd.to_numeric(info[c], errors="ignore")
+
+    if feature == "catchment_metrics":
+        meta = pd.DataFrame(resp[0]["streamcat"]["metrics"]).drop(columns=["id", "metric_value"])
+        meta = meta.set_index("metric_alias")
+
+        def get_metrics(resp: dict[str, Any]) -> pd.Series:
+            df = pd.DataFrame(resp["streamcat"]["metrics"])[["metric_alias", "metric_value"]]
+            return df.set_index("metric_alias").metric_value
+
+        data = pd.DataFrame.from_dict(
+            {i: get_metrics(r) for i, r in zip(clist, resp)}, orient="index"
+        )
+        return {"comid_info": info, "catchment_metrics": data, "metadata": meta}
+
+    if feature == "curve_number":
+        data = pd.DataFrame.from_dict(
+            {i: r["curve_number"] for i, r in zip(clist, resp)}, orient="index", dtype="f8"
+        )
+        return {"comid_info": info, "curve_number": data}
+
+    return {"comid_info": info}

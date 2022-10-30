@@ -1,5 +1,5 @@
 """Customized PyNHD exceptions."""
-from typing import List
+from __future__ import annotations
 
 import async_retriever as ar
 import pygeoogc as ogc
@@ -71,7 +71,7 @@ class MissingItemError(Exception):
         The missing items.
     """
 
-    def __init__(self, missing: List[str]) -> None:
+    def __init__(self, missing: list[str]) -> None:
         self.message = "The following items are missing:\n" + f"{', '.join(missing)}"
         super().__init__(self.message)
 

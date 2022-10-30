@@ -1,6 +1,8 @@
 """Access NLDI and WaterData databases."""
+from __future__ import annotations
+
 import re
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Mapping, Sequence, Union
 
 import async_retriever as ar
 import geopandas as gpd
@@ -8,13 +10,17 @@ import numpy as np
 import pandas as pd
 import pygeoogc as ogc
 import pygeoutils as geoutils
+import pyproj
 import shapely.geometry as sgeom
+from loguru import logger
 from pygeoogc import WFS, InputValueError, ServiceUnavailableError, ServiceURL
 from pygeoogc import ZeroMatchedError as ZeroMatchedErrorOGC
 from pygeoutils import InputTypeError
 
-from .core import ALT_CRS, DEF_CRS, AGRBase, GeoConnex, PyGeoAPIBase, PyGeoAPIBatch, logger
+from .core import AGRBase, GeoConnex, PyGeoAPIBase, PyGeoAPIBatch
 from .exceptions import InputRangeError, MissingItemError, ZeroMatchedError
+
+CRSTYPE = Union[int, str, pyproj.CRS]
 
 
 class NHD(AGRBase):
@@ -48,15 +54,15 @@ class NHD(AGRBase):
 
     outfields : str or list, optional
         Target field name(s), default to "*" i.e., all the fields.
-    crs : str, optional
+    crs : str, int, or pyproj.CRS, optional
         Target spatial reference, default to ``EPSG:4326``
     """
 
     def __init__(
         self,
         layer: str,
-        outfields: Union[str, List[str]] = "*",
-        crs: str = DEF_CRS,
+        outfields: str | list[str] = "*",
+        crs: CRSTYPE = 4326,
     ):
         self.valid_layers = {
             "point": "point",
@@ -89,8 +95,8 @@ class PyGeoAPI(PyGeoAPIBase):
 
     def flow_trace(
         self,
-        coord: Tuple[float, float],
-        crs: str = DEF_CRS,
+        coord: tuple[float, float],
+        crs: CRSTYPE = 4326,
         direction: str = "none",
     ) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame from the flowtrace service.
@@ -113,8 +119,8 @@ class PyGeoAPI(PyGeoAPIBase):
         Examples
         --------
         >>> from pynhd import PyGeoAPI
-        >>> pygeoapi = PyGeoAPI()
-        >>> gdf = pygeoapi.flow_trace(
+        >>> pga = PyGeoAPI()
+        >>> gdf = pga.flow_trace(
         ...     (1774209.63, 856381.68), crs="ESRI:102003", direction="none"
         ... )  # doctest: +SKIP
         >>> print(gdf.comid.iloc[0])  # doctest: +SKIP
@@ -126,7 +132,7 @@ class PyGeoAPI(PyGeoAPIBase):
         return self._get_response(url, payload)
 
     def split_catchment(
-        self, coord: Tuple[float, float], crs: str = DEF_CRS, upstream: bool = False
+        self, coord: tuple[float, float], crs: CRSTYPE = 4326, upstream: bool = False
     ) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame from the splitcatchment service.
 
@@ -134,7 +140,7 @@ class PyGeoAPI(PyGeoAPIBase):
         ----------
         coord : tuple
             The coordinate of the point to trace as a tuple,e.g., (lon, lat).
-        crs : str, optional
+        crs : str, int, or pyproj.CRS, optional
             The coordinate reference system of the coordinates, defaults to EPSG:4326.
         upstream : bool, optional
             If True, return all upstream catchments rather than just the local catchment,
@@ -148,8 +154,8 @@ class PyGeoAPI(PyGeoAPIBase):
         Examples
         --------
         >>> from pynhd import PyGeoAPI
-        >>> pygeoapi = PyGeoAPI()
-        >>> gdf = pygeoapi.split_catchment((-73.82705, 43.29139), crs=DEF_CRS, upstream=False)  # doctest: +SKIP
+        >>> pga = PyGeoAPI()
+        >>> gdf = pga.split_catchment((-73.82705, 43.29139), crs=4326, upstream=False)  # doctest: +SKIP
         >>> print(gdf.catchmentID.iloc[0])  # doctest: +SKIP
         22294818
         """
@@ -160,10 +166,10 @@ class PyGeoAPI(PyGeoAPIBase):
 
     def elevation_profile(
         self,
-        coords: List[Tuple[float, float]],
+        coords: list[tuple[float, float]],
         numpts: int,
         dem_res: int,
-        crs: str = DEF_CRS,
+        crs: CRSTYPE = 4326,
     ) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame from the xsatendpts service.
 
@@ -176,7 +182,7 @@ class PyGeoAPI(PyGeoAPIBase):
             The number of points to extract the elevation profile from the DEM.
         dem_res : int
             The target resolution for requesting the DEM from 3DEP service.
-        crs : str, optional
+        crs : str, int, or pyproj.CRS, optional
             The coordinate reference system of the coordinates, defaults to EPSG:4326.
 
         Returns
@@ -187,9 +193,9 @@ class PyGeoAPI(PyGeoAPIBase):
         Examples
         --------
         >>> from pynhd import PyGeoAPI
-        >>> pygeoapi = PyGeoAPI()
-        >>> gdf = pygeoapi.elevation_profile(
-        ...     [(-103.801086, 40.26772), (-103.80097, 40.270568)], numpts=101, dem_res=1, crs=DEF_CRS
+        >>> pga = PyGeoAPI()
+        >>> gdf = pga.elevation_profile(
+        ...     [(-103.801086, 40.26772), (-103.80097, 40.270568)], numpts=101, dem_res=1, crs=4326
         ... )  # doctest: +SKIP
         >>> print(gdf.iloc[-1, 1])  # doctest: +SKIP
         411.5906
@@ -206,7 +212,7 @@ class PyGeoAPI(PyGeoAPIBase):
         return self._get_response(url, payload)
 
     def cross_section(
-        self, coord: Tuple[float, float], width: float, numpts: int, crs: str = DEF_CRS
+        self, coord: tuple[float, float], width: float, numpts: int, crs: CRSTYPE = 4326
     ) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame from the xsatpoint service.
 
@@ -218,7 +224,7 @@ class PyGeoAPI(PyGeoAPIBase):
             The width of the cross-section in meters.
         numpts : int
             The number of points to extract the cross-section from the DEM.
-        crs : str, optional
+        crs : str, int, or pyproj.CRS, optional
             The coordinate reference system of the coordinates, defaults to EPSG:4326.
 
         Returns
@@ -229,8 +235,8 @@ class PyGeoAPI(PyGeoAPIBase):
         Examples
         --------
         >>> from pynhd import PyGeoAPI
-        >>> pygeoapi = PyGeoAPI()
-        >>> gdf = pygeoapi.cross_section((-103.80119, 40.2684), width=1000.0, numpts=101, crs=DEF_CRS)  # doctest: +SKIP
+        >>> pga = PyGeoAPI()
+        >>> gdf = pga.cross_section((-103.80119, 40.2684), width=1000.0, numpts=101, crs=4326)  # doctest: +SKIP
         >>> print(gdf.iloc[-1, 1])  # doctest: +SKIP
         1000.0
         """
@@ -309,7 +315,7 @@ class WaterData:
         ``gagesii``, ``huc08``, ``huc12``, ``huc12agg``, and ``huc12all``. Note that
         the layers' worksapce for the Water Data service is ``wmadata`` which will
         be added to the given ``layer`` argument if it is not provided.
-    crs : str, optional
+    crs : str, int, or pyproj.CRS, optional
         The target spatial reference system, defaults to ``epsg:4326``.
     validation : bool, optional
         Whether to validate the input data, defaults to ``True``.
@@ -318,7 +324,7 @@ class WaterData:
     def __init__(
         self,
         layer: str,
-        crs: str = DEF_CRS,
+        crs: CRSTYPE = 4326,
         validation: bool = True,
     ) -> None:
         self.layer = layer if ":" in layer else f"wmadata:{layer}"
@@ -328,11 +334,11 @@ class WaterData:
             layer=self.layer,
             outformat="application/json",
             version="2.0.0",
-            crs=ALT_CRS,
+            crs=4269,
             validation=validation,
         )
 
-    def _to_geodf(self, resp: Union[List[Dict[str, Any]], Dict[str, Any]]) -> gpd.GeoDataFrame:
+    def _to_geodf(self, resp: list[dict[str, Any]] | dict[str, Any]) -> gpd.GeoDataFrame:
         """Convert a response from WaterData to a GeoDataFrame.
 
         Parameters
@@ -345,22 +351,22 @@ class WaterData:
         geopandas.GeoDataFrame
             The requested features in a GeoDataFrames.
         """
-        features = geoutils.json2geodf(resp, ALT_CRS, self.crs)
+        features = geoutils.json2geodf(resp, self.wfs.crs, self.crs)
         if features.empty:
             raise ZeroMatchedError
         return features
 
     def bybox(
-        self, bbox: Tuple[float, float, float, float], box_crs: str = DEF_CRS
+        self, bbox: tuple[float, float, float, float], box_crs: CRSTYPE = 4326
     ) -> gpd.GeoDataFrame:
         """Get features within a bounding box."""
-        resp: Dict[str, Any] = self.wfs.getfeature_bybox(bbox, box_crs, always_xy=True)  # type: ignore
+        resp: dict[str, Any] = self.wfs.getfeature_bybox(bbox, box_crs, always_xy=True)  # type: ignore
         return self._to_geodf(resp)
 
     def bygeom(
         self,
-        geometry: Union[sgeom.Polygon, sgeom.MultiPolygon],
-        geo_crs: str = DEF_CRS,
+        geometry: sgeom.Polygon | sgeom.MultiPolygon,
+        geo_crs: CRSTYPE = 4326,
         xy: bool = True,
         predicate: str = "INTERSECTS",
     ) -> gpd.GeoDataFrame:
@@ -370,7 +376,7 @@ class WaterData:
         ----------
         geometry : shapely.geometry
             The input geometry
-        geo_crs : str, optional
+        geo_crs : str, int, or pyproj.CRS, optional
             The CRS of the input geometry, default to epsg:4326.
         xy : bool, optional
             Whether axis order of the input geometry is xy or yx.
@@ -385,29 +391,32 @@ class WaterData:
         geopandas.GeoDataFrame
             The requested features in the given geometry.
         """
-        resp: Dict[str, Any] = self.wfs.getfeature_bygeom(  # type: ignore
+        resp: dict[str, Any] = self.wfs.getfeature_bygeom(  # type: ignore
             geometry, geo_crs, always_xy=not xy, predicate=predicate
         )
         return self._to_geodf(resp)
 
     def bydistance(
-        self, coords: Tuple[float, float], distance: int, loc_crs: str = DEF_CRS
+        self, coords: tuple[float, float], distance: int, loc_crs: CRSTYPE = 4326
     ) -> gpd.GeoDataFrame:
         """Get features within a radius (in meters) of a point."""
         if not (isinstance(coords, tuple) and len(coords) == 2):
             raise InputTypeError("coods", "tuple of length 2", "(x, y)")
 
-        x, y = ogc.utils.match_crs([coords], loc_crs, ALT_CRS)[0]
+        x, y = ogc.utils.match_crs([coords], loc_crs, self.wfs.crs)[0]
         cql_filter = f"DWITHIN(the_geom,POINT({y:.6f} {x:.6f}),{distance},meters)"
-        resp: Dict[str, Any] = self.wfs.getfeature_byfilter(cql_filter, "GET")  # type: ignore
+        resp: dict[str, Any] = self.wfs.getfeature_byfilter(cql_filter, "GET")  # type: ignore
         return self._to_geodf(resp)
 
-    def byid(self, featurename: str, featureids: Union[List[str], str]) -> gpd.GeoDataFrame:
+    def byid(self, featurename: str, featureids: list[int | str] | int | str) -> gpd.GeoDataFrame:
         """Get features based on IDs."""
-        resp: Dict[str, Any] = self.wfs.getfeature_byid(featurename, featureids)  # type: ignore
+        resp: dict[str, Any] = self.wfs.getfeature_byid(featurename, featureids)  # type: ignore
         features = self._to_geodf(resp)
 
-        fids = [str(f) for f in featureids] if isinstance(featureids, list) else [str(featureids)]
+        if isinstance(featureids, (str, int)):
+            fids = [str(featureids)]
+        else:
+            fids = [str(f) for f in featureids]
         missing = set(fids).difference(set(features[featurename].astype(str)))
         if missing:
             verb = "ID was" if len(missing) == 1 else "IDs were"
@@ -419,7 +428,7 @@ class WaterData:
 
     def byfilter(self, cql_filter: str, method: str = "GET") -> gpd.GeoDataFrame:
         """Get features based on a CQL filter."""
-        resp: Dict[str, Any] = self.wfs.getfeature_byfilter(cql_filter, method)  # type: ignore
+        resp: dict[str, Any] = self.wfs.getfeature_byfilter(cql_filter, method)  # type: ignore
         return self._to_geodf(resp)
 
     def __repr__(self) -> str:
@@ -462,15 +471,15 @@ class NHDPlusHR(AGRBase):
 
     outfields : str or list, optional
         Target field name(s), default to "*" i.e., all the fields.
-    crs : str, optional
+    crs : str, int, or pyproj.CRS, optional
         Target spatial reference, default to ``EPSG:4326``
     """
 
     def __init__(
         self,
         layer: str,
-        outfields: Union[str, List[str]] = "*",
-        crs: str = DEF_CRS,
+        outfields: str | list[str] = "*",
+        crs: CRSTYPE = 4326,
     ):
         self.valid_layers = {
             "point": "NHDPoint",
@@ -502,8 +511,8 @@ class NLDI:
     """Access the Hydro Network-Linked Data Index (NLDI) service."""
 
     def _get_url(
-        self, url: str, payload: Optional[Dict[str, str]] = None
-    ) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
+        self, url: str, payload: dict[str, str] | None = None
+    ) -> list[dict[str, Any]] | dict[str, Any]:
         """Send a request to the service using GET method."""
         if payload is None:
             payload = {"f": "json"}
@@ -551,8 +560,8 @@ class NLDI:
             raise InputValueError("fsource", valids)
 
     def _get_urls(
-        self, urls: Mapping[Any, Tuple[str, Optional[Dict[str, str]]]]
-    ) -> Tuple[gpd.GeoDataFrame, List[str]]:
+        self, urls: Mapping[Any, tuple[str, dict[str, str] | None]]
+    ) -> tuple[gpd.GeoDataFrame, list[str]]:
         """Get basins for a list of station IDs.
 
         Parameters
@@ -570,20 +579,20 @@ class NLDI:
         for f, (u, p) in urls.items():
             try:
                 rjson = self._get_url(u, p)
-                resp.append((f, geoutils.json2geodf(rjson, ALT_CRS, DEF_CRS)))
+                resp.append((f, geoutils.json2geodf(rjson, 4269, 4326)))
             except (ZeroMatchedErrorOGC, ZeroMatchedError, InputTypeError, ar.ServiceError):
                 not_found.append(f)
 
         if len(resp) == 0:
             raise ZeroMatchedError
 
-        resp_df = gpd.GeoDataFrame(pd.concat(dict(resp)), crs=DEF_CRS)
+        resp_df = gpd.GeoDataFrame(pd.concat(dict(resp)), crs=4326)
 
         return resp_df, not_found
 
     def getfeature_byid(
-        self, fsource: str, fid: Union[str, List[str]]
-    ) -> Union[gpd.GeoDataFrame, Tuple[gpd.GeoDataFrame, List[str]]]:
+        self, fsource: str, fid: str | list[str]
+    ) -> gpd.GeoDataFrame | tuple[gpd.GeoDataFrame, list[str]]:
         """Get feature(s) based ID(s).
 
         Parameters
@@ -626,9 +635,9 @@ class NLDI:
     def __byloc(
         self,
         source: str,
-        coords: Union[Tuple[float, float], List[Tuple[float, float]]],
-        loc_crs: str = DEF_CRS,
-    ) -> Union[gpd.GeoDataFrame, Tuple[gpd.GeoDataFrame, List[Tuple[float, float]]]]:
+        coords: tuple[float, float] | list[tuple[float, float]],
+        loc_crs: CRSTYPE = 4326,
+    ) -> gpd.GeoDataFrame | tuple[gpd.GeoDataFrame, list[tuple[float, float]]]:
         """Get the closest feature ID(s) based on coordinates.
 
         Parameters
@@ -637,7 +646,7 @@ class NLDI:
             The name of feature(s) source. The valid sources are ``comid`` and ``feature``.
         coords : tuple or list
             A tuple of length two (x, y) or a list of them.
-        loc_crs : str, optional
+        loc_crs : str, int, or pyproj.CRS, optional
             The spatial reference of the input coordinate, defaults to EPSG:4326.
 
         Returns
@@ -654,7 +663,7 @@ class NLDI:
         if not isinstance(_coords, list) or any(len(c) != 2 for c in _coords):
             raise InputTypeError("coords", "list or tuple")
 
-        _coords = ogc.utils.match_crs(_coords, loc_crs, DEF_CRS)
+        _coords = ogc.utils.match_crs(_coords, loc_crs, 4326)
 
         urls = {
             f"{(lon, lat)}": (base_url, {"coords": f"POINT({lon} {lat})"}) for lon, lat in _coords
@@ -677,9 +686,9 @@ class NLDI:
 
     def comid_byloc(
         self,
-        coords: Union[Tuple[float, float], List[Tuple[float, float]]],
-        loc_crs: str = DEF_CRS,
-    ) -> Union[gpd.GeoDataFrame, Tuple[gpd.GeoDataFrame, List[Tuple[float, float]]]]:
+        coords: tuple[float, float] | list[tuple[float, float]],
+        loc_crs: CRSTYPE = 4326,
+    ) -> gpd.GeoDataFrame | tuple[gpd.GeoDataFrame, list[tuple[float, float]]]:
         """Get the closest ComID based on coordinates.
 
         Notes
@@ -694,7 +703,7 @@ class NLDI:
         ----------
         coords : tuple or list of tuples
             A tuple of length two (x, y) or a list of them.
-        loc_crs : str, optional
+        loc_crs : str, int, or pyproj.CRS, optional
             The spatial reference of the input coordinate, defaults to EPSG:4326.
 
         Returns
@@ -711,16 +720,16 @@ class NLDI:
 
     def feature_byloc(
         self,
-        coords: Union[Tuple[float, float], List[Tuple[float, float]]],
-        loc_crs: str = DEF_CRS,
-    ) -> Union[gpd.GeoDataFrame, Tuple[gpd.GeoDataFrame, List[Tuple[float, float]]]]:
+        coords: tuple[float, float] | list[tuple[float, float]],
+        loc_crs: CRSTYPE = 4326,
+    ) -> gpd.GeoDataFrame | tuple[gpd.GeoDataFrame, list[tuple[float, float]]]:
         """Get the closest feature ID(s) based on coordinates.
 
         Parameters
         ----------
         coords : tuple or list
             A tuple of length two (x, y) or a list of them.
-        loc_crs : str, optional
+        loc_crs : str, int, or pyproj.CRS, optional
             The spatial reference of the input coordinate, defaults to EPSG:4326.
 
         Returns
@@ -733,11 +742,11 @@ class NLDI:
 
     def get_basins(
         self,
-        feature_ids: Union[str, List[str]],
+        feature_ids: str | list[str],
         fsource: str = "nwissite",
         split_catchment: bool = False,
         simplified: bool = True,
-    ) -> Union[gpd.GeoDataFrame, Tuple[gpd.GeoDataFrame, List[str]]]:
+    ) -> gpd.GeoDataFrame | tuple[gpd.GeoDataFrame, list[str]]:
         """Get basins for a list of station IDs.
 
         Parameters
@@ -810,11 +819,11 @@ class NLDI:
 
     def getcharacteristic_byid(
         self,
-        comids: Union[List[str], str],
+        comids: list[str] | str,
         char_type: str,
-        char_ids: Union[str, List[str]] = "all",
+        char_ids: str | list[str] = "all",
         values_only: bool = True,
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.DataFrame]]:
+    ) -> pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]:
         """Get characteristics using a list ComIDs.
 
         Parameters
@@ -859,7 +868,7 @@ class NLDI:
 
         for comid in comids:
             url = "/".join([self.base_url, "linked-data", "comid", f"{comid}", char_type])
-            rjson: Dict[str, Any] = self._get_url(url, payload)  # type: ignore
+            rjson: dict[str, Any] = self._get_url(url, payload)  # type: ignore
             char = pd.DataFrame.from_dict(rjson["characteristics"], orient="columns").T
             char.columns = char.iloc[0]
             char = char.drop(index="characteristic_id")
@@ -870,7 +879,7 @@ class NLDI:
 
             nd_dict[comid] = char.loc["percent_nodata"]
 
-        def todf(df_dict: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+        def todf(df_dict: dict[str, pd.DataFrame]) -> pd.DataFrame:
             df = pd.DataFrame.from_dict(df_dict, orient="index")
             df[df == ""] = np.nan
             df.index = df.index.astype("int64")
@@ -949,7 +958,7 @@ class NLDI:
 
         url = "/".join([self.base_url, "linked-data", fsource, fid, "navigation"])
 
-        valid_navigations: Dict[str, Any] = self._get_url(url)  # type: ignore
+        valid_navigations: dict[str, Any] = self._get_url(url)  # type: ignore
         if len(valid_navigations) == 0:
             raise ZeroMatchedError
 
@@ -966,14 +975,14 @@ class NLDI:
         url = valid_sources[source]
         payload = {"distance": f"{int(distance)}", "trimStart": f"{trim_start}".lower()}
 
-        return geoutils.json2geodf(self._get_url(url, payload), ALT_CRS, DEF_CRS)
+        return geoutils.json2geodf(self._get_url(url, payload), 4269, 4326)
 
     def navigate_byloc(
         self,
-        coords: Tuple[float, float],
-        navigation: Optional[str] = None,
-        source: Optional[str] = None,
-        loc_crs: str = DEF_CRS,
+        coords: tuple[float, float],
+        navigation: str | None = None,
+        source: str | None = None,
+        loc_crs: CRSTYPE = 4326,
         distance: int = 500,
         trim_start: bool = False,
     ) -> gpd.GeoDataFrame:
@@ -990,7 +999,7 @@ class NLDI:
             Return the data from another source after navigating
             the features using fsource, defaults to None which throws an exception
             if comid_only is False.
-        loc_crs : str, optional
+        loc_crs : str, int, or pyproj.CRS, optional
             The spatial reference of the input coordinate, defaults to EPSG:4326.
         distance : int, optional
             Limit the search for navigation up to a distance in km,
@@ -1019,22 +1028,23 @@ class NLDI:
 
 
 def geoconnex(
-    item: Optional[str] = None,
-    query: Optional[
-        Dict[
+    item: str | None = None,
+    query: None
+    | (
+        dict[
             str,
-            Union[
-                str,
-                int,
-                float,
-                Tuple[float, float, float, float],
-                sgeom.Polygon,
-                sgeom.MultiPolygon,
-            ],
+            (
+                str
+                | int
+                | float
+                | tuple[float, float, float, float]
+                | sgeom.Polygon
+                | sgeom.MultiPolygon
+            ),
         ]
-    ] = None,
+    ) = None,
     skip_geometry: bool = False,
-) -> Optional[gpd.GeoDataFrame]:
+) -> gpd.GeoDataFrame | None:
     """Query the GeoConnex API.
 
     Notes

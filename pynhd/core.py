@@ -1,16 +1,20 @@
 """Base classes for PyNHD functions."""
-import logging
+from __future__ import annotations
+
+import os
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Union
+from typing import Any, Iterator, NamedTuple, Union
 
 import async_retriever as ar
 import cytoolz as tlz
 import geopandas as gpd
 import pandas as pd
 import pygeoutils as geoutils
+import pyproj
 import shapely.geometry as sgeom
+from loguru import logger
 from pygeoogc import ArcGISRESTful, ServiceURL
 from pygeoogc import utils as ogc_utils
 
@@ -25,20 +29,31 @@ from .exceptions import (
     ZeroMatchedError,
 )
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-handler = logging.StreamHandler(sys.stdout)
-handler.setFormatter(logging.Formatter(""))
-logger.handlers = [handler]
-logger.propagate = False
+logger.configure(
+    handlers=[
+        {
+            "sink": sys.stdout,
+            "colorize": True,
+            "format": " | ".join(
+                [
+                    "{time:YYYY-MM-DD at HH:mm:ss}",  # noqa: FS003
+                    "{name: ^15}.{function: ^15}:{line: >3}",  # noqa: FS003
+                    "{message}",  # noqa: FS003
+                ]
+            ),
+        }
+    ]
+)
+if os.environ.get("HYRIVER_VERBOSE", "false").lower() == "true":
+    logger.enable("pynhd")
+else:
+    logger.disable("pynhd")
 
-DEF_CRS = "epsg:4326"
-ALT_CRS = "epsg:4269"
-
+CRSTYPE = Union[int, str, pyproj.CRS]
 __all__ = ["AGRBase", "ScienceBase", "stage_nhdplus_attrs", "GeoConnex"]
 
 
-def get_parquet(parquet_path: Union[Path, str]) -> Path:
+def get_parquet(parquet_path: Path | str) -> Path:
     """Get a parquet filename from a path or a string."""
     if Path(parquet_path).suffix != ".parquet":
         raise InputValueError("parquet_path", ["a filename with `.parquet` extension."])
@@ -58,8 +73,8 @@ class EndPoints(NamedTuple):
     name: str
     description: str
     url: str
-    query_fields: List[str]
-    extent: Tuple[float, float, float, float]
+    query_fields: list[str]
+    extent: tuple[float, float, float, float]
 
 
 class ServiceInfo(NamedTuple):
@@ -67,8 +82,8 @@ class ServiceInfo(NamedTuple):
 
     url: str
     layer: str
-    extent: Optional[Tuple[float, float, float, float]]
-    feature_types: Optional[Dict[int, str]]
+    extent: tuple[float, float, float, float] | None
+    feature_types: dict[int, str] | None
 
 
 class AGRBase:
@@ -84,8 +99,8 @@ class AGRBase:
         without passing any argument.
     outfields : str or list, optional
         Target field name(s), default to "*" i.e., all the fields.
-    crs : str, optional
-        Target spatial reference, default to EPSG:4326
+    crs : str, int, or pyproj.CRS, optional
+        Target spatial reference, default to ``EPSG:4326``
     outformat : str, optional
         One of the output formats offered by the selected layer. If not correct
         a list of available formats is shown, defaults to ``json``.
@@ -94,9 +109,9 @@ class AGRBase:
     def __init__(
         self,
         base_url: str,
-        layer: Optional[str] = None,
-        outfields: Union[str, List[str]] = "*",
-        crs: str = DEF_CRS,
+        layer: str | None = None,
+        outfields: str | list[str] = "*",
+        crs: CRSTYPE = 4326,
         outformat: str = "json",
     ) -> None:
         if isinstance(layer, str):
@@ -133,7 +148,8 @@ class AGRBase:
         """Get the service information."""
         return self._service_info
 
-    def get_validlayers(self, url: str) -> Dict[str, int]:
+    @staticmethod
+    def get_validlayers(url: str) -> dict[str, int]:
         """Get a list of valid layers.
 
         Parameters
@@ -150,7 +166,7 @@ class AGRBase:
         return {lyr["name"].lower(): int(lyr["id"]) for lyr in rjson[0]["layers"]}
 
     def _getfeatures(
-        self, oids: Iterator[Tuple[str, ...]], return_m: bool = False, return_geom: bool = True
+        self, oids: Iterator[tuple[str, ...]], return_m: bool = False, return_geom: bool = True
     ) -> gpd.GeoDataFrame:
         """Send a request for getting data based on object IDs.
 
@@ -172,10 +188,10 @@ class AGRBase:
 
     def bygeom(
         self,
-        geom: Union[sgeom.Polygon, List[Tuple[float, float]], Tuple[float, float, float, float]],
-        geo_crs: str = DEF_CRS,
+        geom: sgeom.Polygon | list[tuple[float, float]] | tuple[float, float, float, float],
+        geo_crs: CRSTYPE = 4326,
         sql_clause: str = "",
-        distance: Optional[int] = None,
+        distance: int | None = None,
         return_m: bool = False,
         return_geom: bool = True,
     ) -> gpd.GeoDataFrame:
@@ -209,7 +225,7 @@ class AGRBase:
     def byids(
         self,
         field: str,
-        fids: Union[str, List[str]],
+        fids: str | list[str],
         return_m: bool = False,
         return_geom: bool = True,
     ) -> gpd.GeoDataFrame:
@@ -274,7 +290,7 @@ class PyGeoAPIBase:
 
     def __init__(self) -> None:
         self.base_url = ServiceURL().restful.pygeoapi
-        self.req_idx: List[Union[int, str]] = [0]
+        self.req_idx: list[int | str] = [0]
 
     def _get_url(self, operation: str) -> str:
         """Set the service url."""
@@ -282,8 +298,8 @@ class PyGeoAPIBase:
 
     @staticmethod
     def _request_body(
-        id_value: List[Dict[str, Any]]
-    ) -> List[Dict[str, Dict[str, List[Dict[str, Any]]]]]:
+        id_value: list[dict[str, Any]]
+    ) -> list[dict[str, dict[str, list[dict[str, Any]]]]]:
         """Return a valid request body."""
         return [
             {
@@ -302,7 +318,7 @@ class PyGeoAPIBase:
         ]
 
     def _get_response(
-        self, url: str, payload: List[Dict[str, Dict[str, List[Dict[str, Any]]]]]
+        self, url: str, payload: list[dict[str, dict[str, list[dict[str, Any]]]]]
     ) -> gpd.GeoDataFrame:
         """Post the request and return the response as a GeoDataFrame."""
         resp = ar.retrieve_json([url] * len(payload), payload, "POST")
@@ -325,23 +341,23 @@ class PyGeoAPIBase:
 
         gdf = gpd.GeoDataFrame(
             pd.concat((geoutils.json2geodf(r) for r in resp), keys=[self.req_idx[i] for i in idx]),
-            crs=DEF_CRS,
+            crs=4326,
         )
         drop_cols = ["level_1", "spatial_ref"] if "spatial_ref" in gdf else ["level_1"]
         return gdf.reset_index().rename(columns={"level_0": "req_idx"}).drop(columns=drop_cols)
 
     @staticmethod
     def _check_coords(
-        coords: Union[Tuple[float, float], List[Tuple[float, float]]],
-        crs: str,
-    ) -> List[Tuple[float, float]]:
+        coords: tuple[float, float] | list[tuple[float, float]],
+        crs: CRSTYPE,
+    ) -> list[tuple[float, float]]:
         """Check the coordinates."""
         _coords = [coords] if isinstance(coords, tuple) else coords
 
         if not isinstance(_coords, list) or any(len(c) != 2 for c in _coords):
             raise InputTypeError("coords", "tuple or list", "(lon, lat) or [(lon, lat), ...]")
 
-        return ogc_utils.match_crs(_coords, crs, DEF_CRS)
+        return ogc_utils.match_crs(_coords, crs, 4326)
 
 
 class PyGeoAPIBatch(PyGeoAPIBase):
@@ -372,7 +388,7 @@ class PyGeoAPIBatch(PyGeoAPIBase):
         if coords.crs is None:
             raise MissingCRSError
 
-        self.coords = coords.to_crs(DEF_CRS)
+        self.coords = coords.to_crs(4326)
         self.req_idx = self.coords.index.tolist()
         self.req_cols = {
             "flow_trace": ["direction"],
@@ -404,7 +420,7 @@ class PyGeoAPIBatch(PyGeoAPIBase):
         if any(self.coords.geom_type != self.geo_types[method]):
             raise InputTypeError("coords", self.geo_types[method])
 
-    def get_payload(self, method: str) -> List[Dict[str, Dict[str, List[Dict[str, Any]]]]]:
+    def get_payload(self, method: str) -> list[dict[str, dict[str, list[dict[str, Any]]]]]:
         """Return the payload for a request."""
         self.check_col(method)
         self.check_geotype(method)
@@ -443,7 +459,7 @@ class ScienceBase:
     """Access and explore files on ScienceBase."""
 
     @staticmethod
-    def get_children(item: str) -> Dict[str, Any]:
+    def get_children(item: str) -> dict[str, Any]:
         """Get children items of an item."""
         url = "https://www.sciencebase.gov/catalog/items"
         payload = {
@@ -476,7 +492,7 @@ class ScienceBase:
 
 
 def stage_nhdplus_attrs(
-    parquet_path: Optional[Union[Path, str]] = None,
+    parquet_path: Path | str | None = None,
 ) -> pd.DataFrame:
     """Stage the NHDPlus Attributes database and save to nhdplus_attrs.parquet.
 
@@ -507,7 +523,7 @@ def stage_nhdplus_attrs(
 
     main_items = dict(zip(titles, tlz.pluck("id", r["items"])))
 
-    def get_files(item: str) -> Dict[str, Tuple[str, str]]:
+    def get_files(item: str) -> dict[str, tuple[str, str]]:
         """Get all the available zip files in an item."""
         url = "https://www.sciencebase.gov/catalog/item"
         payload = {"fields": "files,downloadUri", "format": "json"}
@@ -587,14 +603,14 @@ class GeoConnex:
     """
 
     @staticmethod
-    def __get_url(url: str, kwds: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    def __get_url(url: str, kwds: dict[str, str] | None = None) -> dict[str, Any]:
         params = {"params": {**kwds, "f": "json"}} if kwds else {"params": {"f": "json"}}
         return ar.retrieve_json([url], [params])[0]
 
-    def __get_endpoints(self) -> Dict[str, EndPoints]:
+    def __get_endpoints(self) -> dict[str, EndPoints]:
         pluck = tlz.partial(tlz.pluck, seqs=self.__get_url(self.base_url)["collections"])
 
-        def get_links(links: List[Dict[str, Any]]) -> Dict[str, Union[str, List[str]]]:
+        def get_links(links: list[dict[str, Any]]) -> dict[str, str | list[str]]:
             """Get links."""
             urls = {
                 lk["rel"]: lk["href"].replace("?f=json", "")
@@ -625,24 +641,24 @@ class GeoConnex:
             for ep in eps
         }
 
-    def __init__(self, item: Optional[str] = None) -> None:
+    def __init__(self, item: str | None = None) -> None:
         self.base_url = f"{ServiceURL().restful.geoconnex}/collections"
         self.endpoints = self.__get_endpoints()
-        self.query_url: Optional[str] = None
+        self.query_url: str | None = None
         self.item = item
 
     @staticmethod
-    def __get_urls(url: str, kwds: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+    def __get_urls(url: str, kwds: list[dict[str, str]]) -> list[dict[str, Any]]:
         params = [{"params": {**kwd, "f": "json"}} for kwd in kwds]
         return ar.retrieve_json([url] * len(kwds), params)
 
     @property
-    def item(self) -> Optional[str]:
+    def item(self) -> str | None:
         """Return the name of the endpoint."""
         return self._item
 
     @item.setter
-    def item(self, value: Optional[str]) -> None:
+    def item(self, value: str | None) -> None:
         self._item = value
         if value is not None:
             if value not in self.endpoints:
@@ -653,16 +669,16 @@ class GeoConnex:
 
     def query(
         self,
-        kwds: Dict[
+        kwds: dict[
             str,
-            Union[
-                str,
-                int,
-                float,
-                Tuple[float, float, float, float],
-                sgeom.Polygon,
-                sgeom.MultiPolygon,
-            ],
+            (
+                str
+                | int
+                | float
+                | tuple[float, float, float, float]
+                | sgeom.Polygon
+                | sgeom.MultiPolygon
+            ),
         ],
         skip_geometry: bool = False,
     ) -> gpd.GeoDataFrame:
@@ -692,9 +708,7 @@ class GeoConnex:
             ]
             gdf = geoutils.json2geodf(self.__get_urls(self.query_url, param_list))
             gdf = gdf.reset_index(drop=True)
-            _, idx = gdf.sindex.query_bulk(
-                gpd.GeoSeries(geometry, crs=DEF_CRS), predicate="contains"
-            )
+            _, idx = gdf.sindex.query_bulk(gpd.GeoSeries(geometry, crs=4326), predicate="contains")
             if len(idx) == 0:
                 raise ZeroMatchedError
             gdf = gdf.iloc[idx].reset_index(drop=True)

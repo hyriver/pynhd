@@ -21,7 +21,7 @@ from .network_tools import (
     topoogical_sort,
     vector_accumulation,
 )
-from .nhdplus_derived import enhd_attrs, nhd_fcode, nhdplus_attrs, nhdplus_vaa
+from .nhdplus_derived import enhd_attrs, epa_nhd_catchments, nhd_fcode, nhdplus_attrs, nhdplus_vaa
 from .print_versions import show_versions
 from .pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData, geoconnex, pygeoapi
 
@@ -58,6 +58,7 @@ __all__ = [
     "WaterData",
     "nhd_fcode",
     "nhdplus_attrs",
+    "epa_nhd_catchments",
     "enhd_attrs",
     "nhdplus_vaa",
 ]
