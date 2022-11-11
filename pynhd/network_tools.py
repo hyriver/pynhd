@@ -348,7 +348,7 @@ def prepare_nhdplus(
 
 
 def topoogical_sort(
-    flowlines: pd.DataFrame, edge_attr: str | list[str] | None = None
+    flowlines: pd.DataFrame, edge_attr: str | list[str] | None = None, largest_only: bool = False
 ) -> tuple[list[np.int64 | NAType], pd.Series, nx.DiGraph]:
     """Topological sorting of a river network.
 
@@ -358,6 +358,8 @@ def topoogical_sort(
         A dataframe with columns ID and toID
     edge_attr : str or list, optional
         Names of the columns in the dataframe to be used as edge attributes, defaults to None.
+    largest_only : bool, optional
+        Whether to return only the largest network, defaults to ``False``.
 
     Returns
     -------
@@ -367,13 +369,16 @@ def topoogical_sort(
         and the generated networkx object. Note that the
         terminal node ID is set to pd.NA.
     """
+    flowlines[["ID", "toID"]] = flowlines[["ID", "toID"]].astype("Int64")
+    network = nhdflw2nx(flowlines, "ID", "toID", edge_attr)
+    if largest_only:
+        n_ids = max(nx.weakly_connected_components(network), key=len)
+        flowlines = flowlines[flowlines.ID.isin(n_ids)]
+        network = nhdflw2nx(flowlines, "ID", "toID", edge_attr)
+    topo_sorted = list(nx.topological_sort(network))
     up_nodes = pd.Series(
         {i: flowlines[flowlines.toID == i].ID.tolist() for i in list(flowlines.ID) + [pd.NA]}
     )
-
-    flowlines[["ID", "toID"]] = flowlines[["ID", "toID"]].astype("Int64")
-    network = nhdflw2nx(flowlines, "ID", "toID", edge_attr)
-    topo_sorted = list(nx.topological_sort(network))
     return topo_sorted, up_nodes, network
 
 
