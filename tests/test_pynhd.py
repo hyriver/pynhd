@@ -12,7 +12,6 @@ from shapely.geometry import MultiPoint, Point, box
 import pynhd as nhd
 from pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData
 
-
 has_typeguard = True if sys.modules.get("typeguard") else False
 is_ci = os.environ.get("GH_CI") == "true"
 STA_ID = "01031500"
