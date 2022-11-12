@@ -1,6 +1,7 @@
 """Tests for PyNHD package."""
 import io
 import os
+import sys
 from pathlib import Path
 
 import geopandas as gpd
@@ -11,13 +12,8 @@ from shapely.geometry import MultiPoint, Point, box
 import pynhd as nhd
 from pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData
 
-try:
-    import typeguard  # noqa: F401
-except ImportError:
-    has_typeguard = False
-else:
-    has_typeguard = True
 
+has_typeguard = True if sys.modules.get("typeguard") else False
 is_ci = os.environ.get("GH_CI") == "true"
 STA_ID = "01031500"
 station_id = f"USGS-{STA_ID}"
