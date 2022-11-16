@@ -207,10 +207,10 @@ class TestWaterData:
         assert_close(ct.areasqkm.sum(), 773.954)
 
     def test_bybox(self):
-        wd = WaterData("nhdwaterbody")
+        wd = WaterData("wbd12")
         print(wd)
-        wb_g = wd.bygeom(box(-69.7718, 45.0742, -69.3141, 45.4534), predicate="INTERSECTS", xy=True)
-        wb_b = wd.bybox((-69.7718, 45.0742, -69.3141, 45.4534))
+        wb_g = wd.bygeom(box(-118.72, 34.118, -118.31, 34.518), predicate="INTERSECTS", xy=True)
+        wb_b = wd.bybox((-118.72, 34.118, -118.31, 34.518))
         assert_close(wb_b.areasqkm.sum(), wb_g.areasqkm.sum())
 
     def test_byfilter(self):
