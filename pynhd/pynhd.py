@@ -305,16 +305,30 @@ def pygeoapi(coords: gpd.GeoDataFrame, service: str) -> gpd.GeoDataFrame:
 
 
 class WaterData:
-    """Access to `Water Data <https://labs.waterdata.usgs.gov/geoserver>`__ service.
+    """Access to `WaterData <https://labs.waterdata.usgs.gov/geoserver>`__ service.
 
     Parameters
     ----------
     layer : str
         A valid layer from the WaterData service. Valid layers are:
-        ``nhdarea``, ``nhdwaterbody``, ``catchmentsp``, ``nhdflowline_network``
-        ``gagesii``, ``huc08``, ``huc12``, ``huc12agg``, and ``huc12all``. Note that
-        the layers' worksapce for the Water Data service is ``wmadata`` which will
-        be added to the given ``layer`` argument if it is not provided.
+
+        - ``catchmentsp``
+        - ``gagesii``
+        - ``gagesii_basins``
+        - ``nhdarea``
+        - ``nhdflowline_network``
+        - ``nhdflowline_nonnetwork``
+        - ``nhdwaterbody``
+        - ``wbd02``
+        - ``wbd04``
+        - ``wbd06``
+        - ``wbd08``
+        - ``wbd10``
+        - ``wbd12``
+
+        Note that the layers' namesapce for the WaterData service is
+        ``wmadata`` and will be added to the given ``layer`` argument
+        if it is not provided.
     crs : str, int, or pyproj.CRS, optional
         The target spatial reference system, defaults to ``epsg:4326``.
     validation : bool, optional
@@ -328,6 +342,9 @@ class WaterData:
         validation: bool = True,
     ) -> None:
         self.layer = layer if ":" in layer else f"wmadata:{layer}"
+        if "wbd" in self.layer and "20201006" not in self.layer:
+            self.layer = f"{self.layer}_20201006"
+        self.geom_name = "SHAPE" if "wbd" in self.layer else "the_geom"
         self.crs = crs
         self.wfs = WFS(
             ServiceURL().wfs.waterdata,
@@ -392,7 +409,7 @@ class WaterData:
             The requested features in the given geometry.
         """
         resp: dict[str, Any] = self.wfs.getfeature_bygeom(  # type: ignore
-            geometry, geo_crs, always_xy=not xy, predicate=predicate
+            geometry, geo_crs, always_xy=not xy, predicate=predicate, geom_name=self.geom_name
         )
         return self._to_geodf(resp)
 
@@ -404,7 +421,7 @@ class WaterData:
             raise InputTypeError("coods", "tuple of length 2", "(x, y)")
 
         x, y = ogc.utils.match_crs([coords], loc_crs, self.wfs.crs)[0]
-        cql_filter = f"DWITHIN(the_geom,POINT({y:.6f} {x:.6f}),{distance},meters)"
+        cql_filter = f"DWITHIN({self.geom_name},POINT({y:.6f} {x:.6f}),{distance},meters)"
         resp: dict[str, Any] = self.wfs.getfeature_byfilter(cql_filter, "GET")  # type: ignore
         return self._to_geodf(resp)
 
