@@ -326,7 +326,7 @@ class WaterData:
         - ``wbd10``
         - ``wbd12``
 
-        Note that the layers' namesapce for the WaterData service is
+        Note that the layers' namespace for the WaterData service is
         ``wmadata`` and will be added to the given ``layer`` argument
         if it is not provided.
     crs : str, int, or pyproj.CRS, optional
@@ -344,7 +344,6 @@ class WaterData:
         self.layer = layer if ":" in layer else f"wmadata:{layer}"
         if "wbd" in self.layer and "20201006" not in self.layer:
             self.layer = f"{self.layer}_20201006"
-        self.geom_name = "SHAPE" if "wbd" in self.layer else "the_geom"
         self.crs = crs
         self.wfs = WFS(
             ServiceURL().wfs.waterdata,
@@ -355,7 +354,7 @@ class WaterData:
             validation=validation,
         )
 
-    def _to_geodf(self, resp: list[dict[str, Any]] | dict[str, Any]) -> gpd.GeoDataFrame:
+    def _to_geodf(self, resp: list[dict[str, Any]]) -> gpd.GeoDataFrame:
         """Convert a response from WaterData to a GeoDataFrame.
 
         Parameters
@@ -374,10 +373,34 @@ class WaterData:
         return features
 
     def bybox(
-        self, bbox: tuple[float, float, float, float], box_crs: CRSTYPE = 4326
+        self,
+        bbox: tuple[float, float, float, float],
+        box_crs: CRSTYPE = 4326,
+        sort_attr: str | None = None,
     ) -> gpd.GeoDataFrame:
-        """Get features within a bounding box."""
-        resp: dict[str, Any] = self.wfs.getfeature_bybox(bbox, box_crs, always_xy=True)  # type: ignore
+        """Get features within a bounding box.
+
+        Parameters
+        ----------
+        bbox : tuple of floats
+            A bounding box in the form of (minx, miny, maxx, maxy).
+        box_crs : str, int, or pyproj.CRS, optional
+            The spatial reference system of the bounding box, defaults to ``epsg:4326``.
+        sort_attr : str, optional
+            The column name in the database to sort request by, defaults
+            to the first attribute in the schema that contains ``id`` in its name.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            The requested features in a GeoDataFrames.
+        """
+        resp: list[dict[str, Any]] = self.wfs.getfeature_bybox(  # type: ignore
+            bbox,
+            box_crs,
+            always_xy=True,
+            sort_attr=sort_attr,
+        )
         return self._to_geodf(resp)
 
     def bygeom(
@@ -386,6 +409,7 @@ class WaterData:
         geo_crs: CRSTYPE = 4326,
         xy: bool = True,
         predicate: str = "INTERSECTS",
+        sort_attr: str | None = None,
     ) -> gpd.GeoDataFrame:
         """Get features within a geometry.
 
@@ -400,34 +424,77 @@ class WaterData:
         predicate : str, optional
             The geometric prediacte to use for requesting the data, defaults to
             INTERSECTS. Valid predicates are:
-            ``EQUALS``, ``DISJOINT``, ``INTERSECTS``, ``TOUCHES``, ``CROSSES``, ``WITHIN``
-            ``CONTAINS``, ``OVERLAPS``, ``RELATE``, ``BEYOND``
+
+            - ``EQUALS``
+            - ``DISJOINT``
+            - ``INTERSECTS``
+            - ``TOUCHES``
+            - ``CROSSES``
+            - ``WITHIN``
+            - ``CONTAINS``
+            - ``OVERLAPS``
+            - ``RELATE``
+            - ``BEYOND``
+
+        sort_attr : str, optional
+            The column name in the database to sort request by, defaults
+            to the first attribute in the schema that contains ``id`` in its name.
 
         Returns
         -------
         geopandas.GeoDataFrame
             The requested features in the given geometry.
         """
-        resp: dict[str, Any] = self.wfs.getfeature_bygeom(  # type: ignore
-            geometry, geo_crs, always_xy=not xy, predicate=predicate, geom_name=self.geom_name
+        resp: list[dict[str, Any]] = self.wfs.getfeature_bygeom(  # type: ignore
+            geometry, geo_crs, always_xy=not xy, predicate=predicate, sort_attr=sort_attr
         )
         return self._to_geodf(resp)
 
     def bydistance(
-        self, coords: tuple[float, float], distance: int, loc_crs: CRSTYPE = 4326
+        self,
+        coords: tuple[float, float],
+        distance: int,
+        loc_crs: CRSTYPE = 4326,
+        sort_attr: str | None = None,
     ) -> gpd.GeoDataFrame:
-        """Get features within a radius (in meters) of a point."""
+        """Get features within a radius (in meters) of a point.
+
+        Parameters
+        ----------
+        coords : tuple of float
+            The x, y coordinates of the point.
+        distance : int
+            The radius (in meters) to search within.
+        loc_crs : str, int, or pyproj.CRS, optional
+            The CRS of the input coordinates, default to epsg:4326.
+        sort_attr : str, optional
+            The column name in the database to sort request by, defaults
+            to the first attribute in the schema that contains ``id`` in its name.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            Requested features as a GeoDataFrame.
+        """
         if not (isinstance(coords, tuple) and len(coords) == 2):
             raise InputTypeError("coods", "tuple of length 2", "(x, y)")
 
         x, y = ogc.utils.match_crs([coords], loc_crs, self.wfs.crs)[0]
-        cql_filter = f"DWITHIN({self.geom_name},POINT({y:.6f} {x:.6f}),{distance},meters)"
-        resp: dict[str, Any] = self.wfs.getfeature_byfilter(cql_filter, "GET")  # type: ignore
+        geom_name = self.wfs.schema[self.layer]["geometry_column"]
+        cql_filter = f"DWITHIN({geom_name},POINT({y:.6f} {x:.6f}),{distance},meters)"
+        resp: list[dict[str, Any]] = self.wfs.getfeature_byfilter(  # type: ignore
+            cql_filter,
+            "GET",
+            sort_attr=sort_attr,
+        )
         return self._to_geodf(resp)
 
     def byid(self, featurename: str, featureids: list[int | str] | int | str) -> gpd.GeoDataFrame:
         """Get features based on IDs."""
-        resp: dict[str, Any] = self.wfs.getfeature_byid(featurename, featureids)  # type: ignore
+        resp: list[dict[str, Any]] = self.wfs.getfeature_byid(  # type: ignore
+            featurename,
+            featureids,
+        )
         features = self._to_geodf(resp)
 
         if isinstance(featureids, (str, int)):
@@ -443,9 +510,31 @@ class WaterData:
             )
         return features
 
-    def byfilter(self, cql_filter: str, method: str = "GET") -> gpd.GeoDataFrame:
-        """Get features based on a CQL filter."""
-        resp: dict[str, Any] = self.wfs.getfeature_byfilter(cql_filter, method)  # type: ignore
+    def byfilter(
+        self, cql_filter: str, method: str = "GET", sort_attr: str | None = None
+    ) -> gpd.GeoDataFrame:
+        """Get features based on a CQL filter.
+
+        Parameters
+        ----------
+        cql_filter : str
+            The CQL filter to use for requesting the data.
+        method : str, optional
+            The HTTP method to use for requesting the data, defaults to GET.
+        sort_attr : str, optional
+            The column name in the database to sort request by, defaults
+            to the first attribute in the schema that contains ``id`` in its name.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            The requested features as a GeoDataFrames.
+        """
+        resp: list[dict[str, Any]] = self.wfs.getfeature_byfilter(  # type: ignore
+            cql_filter,
+            method,
+            sort_attr,
+        )
         return self._to_geodf(resp)
 
     def __repr__(self) -> str:
@@ -552,11 +641,15 @@ class NLDI:
     def __init__(self) -> None:
         self.base_url = ServiceURL().restful.nldi
 
-        resp = self._get_url("/".join([self.base_url, "linked-data"]))
-        self.valid_fsources = {r["source"]: r["sourceName"] for r in resp}  # type: ignore
+        resp: list[dict[str, Any]] = self._get_url(  # type: ignore
+            "/".join([self.base_url, "linked-data"])
+        )
+        self.valid_fsources = {r["source"]: r["sourceName"] for r in resp}
 
-        resp = self._get_url("/".join([self.base_url, "lookups"]))
-        self.valid_chartypes = {r["type"]: r["typeName"] for r in resp}  # type: ignore
+        resp: list[dict[str, Any]] = self._get_url(  # type: ignore
+            "/".join([self.base_url, "lookups"])
+        )
+        self.valid_chartypes = {r["type"]: r["typeName"] for r in resp}
 
     @staticmethod
     def _missing_warning(n_miss: int, n_tot: int) -> None:
@@ -984,8 +1077,8 @@ class NLDI:
 
         url = valid_navigations[navigation]
 
-        r_json = self._get_url(url)
-        valid_sources = {s["source"].lower(): s["features"] for s in r_json}  # type: ignore
+        r_json: list[dict[str, Any]] = self._get_url(url)  # type: ignore
+        valid_sources = {s["source"].lower(): s["features"] for s in r_json}
         if source not in valid_sources:
             raise InputValueError("source", list(valid_sources))
 
