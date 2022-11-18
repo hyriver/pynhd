@@ -376,9 +376,7 @@ def topoogical_sort(
         flowlines = flowlines[flowlines.ID.isin(n_ids)]
         network = nhdflw2nx(flowlines, "ID", "toID", edge_attr)
     topo_sorted = list(nx.topological_sort(network))
-    up_nodes = pd.Series(
-        {i: flowlines[flowlines.toID == i].ID.tolist() for i in list(flowlines.ID) + [pd.NA]}
-    )
+    up_nodes = pd.Series({i: network.predecessors(i) for i in network})
     return topo_sorted, up_nodes, network
 
 
@@ -427,21 +425,25 @@ def vector_accumulation(
         condition in the ``attr_col``, the outflow for each river segment can be
         a scalar or an array.
     """
-    sorted_nodes, up_nodes, _ = topoogical_sort(
-        flowlines[[id_col, toid_col]].rename(columns={id_col: "ID", toid_col: "toID"})
-    )
-    topo_sorted = sorted_nodes[:-1]
+    if not isinstance(arg_cols, list):
+        raise InputTypeError("arg_cols", "list of column names")
 
-    outflow = flowlines.set_index(id_col)[attr_col].to_dict()
+    network = nhdflw2nx(flowlines, id_col, toid_col, attr_col)
+    graph = nx.relabel.convert_node_labels_to_integers(network, label_attribute="str_id")
+    m_int2str = nx.get_node_attributes(graph, "str_id")
+    m_str2int = {v: k for k, v in m_int2str.items()}
 
-    for i in topo_sorted:
-        outflow[i] = func(
-            np.sum([outflow[u] for u in up_nodes[i]], axis=0),
-            *flowlines.loc[flowlines[id_col] == i, arg_cols].to_numpy()[0],
-        )
+    topo_sorted = list(nx.topological_sort(graph))
 
-    acc = pd.Series(outflow).loc[sorted_nodes[:-1]]
-    acc = acc.rename_axis("comid").rename(f"acc_{attr_col}")
+    outflow = {m_str2int[i]: a for i, a in flowlines.set_index(id_col)[attr_col].items()}
+    attr = {m_str2int[i]: a.tolist() for i, a in flowlines.set_index(id_col)[arg_cols].iterrows()}
+
+    for n in topo_sorted:
+        if n in outflow:
+            outflow[n] = func(sum(outflow[i] for i in graph.predecessors(n)), *attr[n])
+
+    acc = pd.Series({m_int2str[i]: outflow[i] for i in topo_sorted if i in outflow})
+    acc = acc.rename_axis(id_col).rename(f"acc_{attr_col}")
     return acc
 
 
