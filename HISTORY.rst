@@ -2,6 +2,13 @@
 History
 =======
 
+0.13.8 (unreleased)
+-------------------
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Refactor ``vector_accumulation`` for significant performance improvements.
+
 0.13.7 (2022-11-04)
 -------------------
 
