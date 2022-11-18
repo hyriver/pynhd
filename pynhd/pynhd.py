@@ -480,7 +480,7 @@ class WaterData:
             raise InputTypeError("coods", "tuple of length 2", "(x, y)")
 
         x, y = ogc.utils.match_crs([coords], loc_crs, self.wfs.crs)[0]
-        geom_name = self.wfs.schema[self.layer]["geometry_column"]
+        geom_name = self.wfs.schema[self.layer].get("geometry_column", "the_geom")
         cql_filter = f"DWITHIN({geom_name},POINT({y:.6f} {x:.6f}),{distance},meters)"
         resp: list[dict[str, Any]] = self.wfs.getfeature_byfilter(  # type: ignore
             cql_filter,
