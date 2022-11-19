@@ -8,7 +8,7 @@ History
 New Features
 ~~~~~~~~~~~~
 - Add two new functions called ``mainstem_huc12_nx`` and ``enhd_flowlines_nx``.
-  These functions generate a ``networkx`` directd graph object of NHD HUC12
+  These functions generate a ``networkx`` directed graph object of NHD HUC12
   water boundaries and flowlines, respectively. They also return a dictionary
   mapping of COMID and HUC12 to the corresponding ``networkx`` node.
   Additionally, a topologically sorted list of COMIDs/HUC12s are returned.
@@ -19,6 +19,8 @@ New Features
 Internal Changes
 ~~~~~~~~~~~~~~~~
 - Refactor ``vector_accumulation`` for significant performance improvements.
+- Modify the codebase based on `Refurb <https://github.com/dosisod/refurb>`__
+  suggestions.
 
 0.13.7 (2022-11-04)
 -------------------
