@@ -288,6 +288,16 @@ def test_acc(trib):
     assert_close(diff.abs().sum(), 439.451)
 
 
+def test_enhd_nx():
+    g, m, s = nhd.enhd_flowlines_nx()
+    assert g.number_of_nodes() == len(m) and s[0] == 8318775
+
+
+def test_huc12_nx():
+    g, m, s = nhd.mainstem_huc12_nx()
+    assert g.number_of_nodes() == len(m) and s[0] == "150301040501"
+
+
 def test_fcode():
     fcode = nhd.nhd_fcode()
     assert fcode.loc[57100, "Feature Type"] == "DAM"
