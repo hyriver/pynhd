@@ -688,7 +688,7 @@ class GeoConnex:
 
         valid_keys = self.endpoints[self.item].query_fields
         invalid_key = [k for k in kwds if k not in valid_keys]
-        if len(invalid_key) > 0:
+        if invalid_key:
             keys = ", ".join(invalid_key)
             raise InputValueError(f"query: {keys}", valid_keys)
 

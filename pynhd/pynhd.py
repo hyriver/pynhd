@@ -693,7 +693,7 @@ class NLDI:
             except (ZeroMatchedErrorOGC, ZeroMatchedError, InputTypeError, ar.ServiceError):
                 not_found.append(f)
 
-        if len(resp) == 0:
+        if not resp:
             raise ZeroMatchedError
 
         resp_df = gpd.GeoDataFrame(pd.concat(dict(resp)), crs=4326)
@@ -736,7 +736,7 @@ class NLDI:
         urls = {f: ("/".join([self.base_url, "linked-data", fsource, f]), None) for f in fid}
         features, not_found = self._get_urls(urls)
 
-        if len(not_found) > 0:
+        if not_found:
             self._missing_warning(len(not_found), len(fid))
             return features, not_found
 
@@ -785,7 +785,7 @@ class NLDI:
 
         comids = comids.reset_index(drop=True)
 
-        if len(not_found_str) > 0:
+        if not_found_str:
             not_found = [
                 tuple(float(p) for p in re.sub(r"\(|\)| ", "", m).split(",")) for m in not_found_str
             ]
@@ -852,7 +852,7 @@ class NLDI:
 
     def get_basins(
         self,
-        feature_ids: str | list[str],
+        feature_ids: str | int | Sequence[str | int],
         fsource: str = "nwissite",
         split_catchment: bool = False,
         simplified: bool = True,
@@ -896,11 +896,11 @@ class NLDI:
 
         feature_ids = [feature_ids] if isinstance(feature_ids, (str, int)) else feature_ids
 
-        if len(feature_ids) == 0:
+        if not feature_ids:
             raise InputTypeError("feature_ids", "list with at least one element")
 
         if fsource == "nwissite":
-            feature_ids = [f"USGS-{fid.lower().replace('usgs-', '')}" for fid in feature_ids]
+            feature_ids = [f"USGS-{str(fid).lower().replace('usgs-', '')}" for fid in feature_ids]
 
         ftype = type(feature_ids[0])
         payload = {
@@ -921,7 +921,7 @@ class NLDI:
         not_found += basins[nulls].index.to_list()
         basins = basins[~nulls].copy()
 
-        if len(not_found) > 0:
+        if not_found:
             self._missing_warning(len(not_found), len(feature_ids))
             return basins, not_found
 
@@ -1069,7 +1069,7 @@ class NLDI:
         url = "/".join([self.base_url, "linked-data", fsource, fid, "navigation"])
 
         valid_navigations: dict[str, Any] = self._get_url(url)  # type: ignore
-        if len(valid_navigations) == 0:
+        if not valid_navigations:
             raise ZeroMatchedError
 
         if navigation not in valid_navigations:
@@ -1083,7 +1083,7 @@ class NLDI:
             raise InputValueError("source", list(valid_sources))
 
         url = valid_sources[source]
-        payload = {"distance": f"{int(distance)}", "trimStart": f"{trim_start}".lower()}
+        payload = {"distance": f"{round(distance)}", "trimStart": f"{trim_start}".lower()}
 
         return geoutils.json2geodf(self._get_url(url, payload), 4269, 4326)
 

@@ -1,5 +1,6 @@
 """Tests for PyNHD package."""
 import io
+import operator
 import os
 import sys
 from pathlib import Path
@@ -234,7 +235,7 @@ class TestGCX:
         gcx.item = "hu02"
         h2 = gcx.query({"HUC2": "02"})
         h3 = gcx.query({"HUC2": "03"})
-        assert (h2.GNIS_ID == 2730132).sum() == 1 and (h3.GNIS_ID == 2730133).sum() == 1
+        assert (h2.GNIS_ID == 2730132).sum() == (h3.GNIS_ID == 2730133).sum() == 1
 
     def test_geometry(self):
         gages = nhd.geoconnex(
@@ -274,12 +275,9 @@ def test_use_enhd(trib):
 def test_acc(trib):
     flw = nhd.prepare_nhdplus(trib, 1, 1, 1, purge_non_dendritic=True)
 
-    def routing(qin, q):
-        return qin + q
-
     qsim = nhd.vector_accumulation(
         flw[["comid", "tocomid", "lengthkm"]],
-        routing,
+        operator.add,
         "lengthkm",
         ["lengthkm"],
     )
