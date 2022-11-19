@@ -1,8 +1,10 @@
 """Access NLDI and WaterData databases."""
 from __future__ import annotations
 
+import io
 from typing import TYPE_CHECKING, Callable, Iterable
 
+import async_retriever as ar
 import cytoolz as tlz
 import geopandas as gpd
 import networkx as nx
@@ -15,6 +17,7 @@ from shapely import ops
 from shapely.geometry import LineString, MultiLineString, Point
 
 from . import nhdplus_derived as derived
+from .core import ScienceBase
 from .exceptions import MissingCRSError, MissingItemError
 
 try:
@@ -36,6 +39,8 @@ __all__ = [
     "flowline_xsection",
     "network_xsection",
     "nhdflw2nx",
+    "enhd_flowlines_nx",
+    "mainstem_huc12_nx",
 ]
 
 
@@ -428,19 +433,27 @@ def vector_accumulation(
     if not isinstance(arg_cols, list):
         raise InputTypeError("arg_cols", "list of column names")
 
-    network = nhdflw2nx(flowlines, id_col, toid_col, attr_col)
-    graph = nx.relabel.convert_node_labels_to_integers(network, label_attribute="str_id")
+    graph = nx.relabel.convert_node_labels_to_integers(
+        nx.from_pandas_edgelist(
+            flowlines,
+            source=id_col,
+            target=toid_col,
+            create_using=nx.DiGraph,
+            edge_attr=attr_col,
+        ),
+        label_attribute="str_id",
+    )
     m_int2str = nx.get_node_attributes(graph, "str_id")
     m_str2int = {v: k for k, v in m_int2str.items()}
 
     topo_sorted = list(nx.topological_sort(graph))
 
     outflow = {m_str2int[i]: a for i, a in flowlines.set_index(id_col)[attr_col].items()}
-    attr = {m_str2int[i]: a.tolist() for i, a in flowlines.set_index(id_col)[arg_cols].iterrows()}
+    attrs = {m_str2int[i]: a.tolist() for i, a in flowlines.set_index(id_col)[arg_cols].iterrows()}
 
     for n in topo_sorted:
         if n in outflow:
-            outflow[n] = func(sum(outflow[i] for i in graph.predecessors(n)), *attr[n])
+            outflow[n] = func(sum(outflow[i] for i in graph.predecessors(n)), *attrs[n])
 
     acc = pd.Series({m_int2str[i]: outflow[i] for i in topo_sorted if i in outflow})
     acc = acc.rename_axis(id_col).rename(f"acc_{attr_col}")
@@ -654,3 +667,84 @@ def network_xsection(flw: gpd.GeoDataFrame, distance: float, width: float) -> gp
     __check_flw(flw, ["comid", "levelpathi", "geometry"])
     cs = pd.concat(flowline_xsection(f, distance, width) for _, f in flw.groupby("levelpathi"))
     return gpd.GeoDataFrame(cs, crs=flw.crs).drop_duplicates().dissolve(by="comid")
+
+
+def enhd_flowlines_nx() -> tuple[nx.DiGraph, dict[int, int], list[int]]:
+    """Get a ``networkx.DiGraph`` of the entire NHD flowlines.
+
+    Notes
+    -----
+    The graph is directed and has the all the attributes of the flowlines
+    in `ENHD <https://www.sciencebase.gov/catalog/item/60c92503d34e86b9389df1c9>`__.
+    Note that COMIDs are based on the 2020 snapshot of the NHDPlusV2.1.
+
+    Returns
+    -------
+    tuple of networkx.DiGraph, dict, and list
+        The first element is the graph, the second element is a dictionary
+        mapping the COMIDs to the node IDs in the graph, and the third element
+        is a topologically sorted list of the COMIDs.
+    """
+    enhd = derived.enhd_attrs()
+    graph = nx.relabel.convert_node_labels_to_integers(
+        nx.from_pandas_edgelist(
+            enhd,
+            source="comid",
+            target="tocomid",
+            create_using=nx.DiGraph,
+            edge_attr=enhd.columns.drop(["comid", "tocomid"]).tolist(),
+        ),
+        label_attribute="str_id",
+    )
+    label2comid = nx.get_node_attributes(graph, "str_id")
+    s_map = {label2comid[i]: r for i, r in zip(nx.topological_sort(graph), range(len(graph)))}
+    onnetwork_sorted = sorted(set(enhd.comid).intersection(s_map), key=lambda i: s_map[i])
+    return graph, label2comid, onnetwork_sorted
+
+
+def mainstem_huc12_nx() -> tuple[nx.DiGraph, dict[int, str], list[str]]:
+    """Get a ``networkx.DiGraph`` of the entire mainstem HUC12s.
+
+    Notes
+    -----
+    The directed graph is generated from the ``nhdplusv2wbd.csv`` file with all
+    attributes that can be found in
+    `Mainstem <https://www.sciencebase.gov/catalog/item/60cb5edfd34e86b938a373f4>`__.
+    Note that HUC12s are based on the 2020 snapshot of the NHDPlusV2.1.
+
+    Returns
+    -------
+    tuple of networkx.DiGraph and dict
+    tuple of networkx.DiGraph, dict, and list
+        The first element is the graph, the second element is a dictionary
+        mapping the HUC12s to the node IDs in the graph, and the third element
+        is a topologically sorted list of the HUC12s which strings of length 12.
+    """
+    sb = ScienceBase()
+    files = sb.get_file_urls("60cb5edfd34e86b938a373f4")
+    resp = ar.retrieve_text([files.loc["nhdplusv2wbd.csv"].url])
+    ms = pd.read_csv(io.StringIO(resp[0]))
+    str_cols = ["HUC12", "TOHUC", "head_HUC12", "outlet_HUC12"]
+    for col in str_cols:
+        ms[col] = ms[col].astype(str)
+        ms[col] = pd.to_numeric(ms[col], errors="coerce")
+        ms[col] = ms[col].astype("Int64").fillna(0).astype(str).str.zfill(12)
+
+    int_cols = ["intersected_LevelPathI", "corrected_LevelPathI"]
+    ms[int_cols] = ms[int_cols].astype(int)
+    ms = ms[ms.HUC12 != "000000000000"].reset_index(drop=True)
+
+    graph = nx.relabel.convert_node_labels_to_integers(
+        nx.from_pandas_edgelist(
+            ms,
+            source="HUC12",
+            target="TOHUC",
+            create_using=nx.DiGraph,
+            edge_attr=ms.columns.drop(["HUC12", "TOHUC"]).tolist(),
+        ),
+        label_attribute="str_id",
+    )
+    label2huc = nx.get_node_attributes(graph, "str_id")
+    s_map = {label2huc[i]: r for i, r in zip(nx.topological_sort(graph), range(len(graph)))}
+    onnetwork_sorted = sorted(set(ms.HUC12).intersection(s_map), key=lambda i: s_map[i])
+    return graph, label2huc, onnetwork_sorted

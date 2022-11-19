@@ -12,8 +12,10 @@ from .exceptions import (
     ZeroMatchedError,
 )
 from .network_tools import (
+    enhd_flowlines_nx,
     flowline_resample,
     flowline_xsection,
+    mainstem_huc12_nx,
     network_resample,
     network_xsection,
     nhdflw2nx,
@@ -47,6 +49,8 @@ __all__ = [
     "flowline_xsection",
     "network_xsection",
     "nhdflw2nx",
+    "enhd_flowlines_nx",
+    "mainstem_huc12_nx",
     "show_versions",
     "NLDI",
     "AGRBase",
