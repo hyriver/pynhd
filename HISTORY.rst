@@ -5,6 +5,14 @@ History
 0.13.8 (unreleased)
 -------------------
 
+New Features
+~~~~~~~~~~~~
+- Add two new functions called ``mainstem_huc12_nx`` and ``enhd_flowlines_nx``.
+  These functions return a ``networkx`` graph object of the mainstem HUC12s and
+  NHD flowlines, respectively.  The generated data are useful for doing US-scale
+  network analysis and flow accumulation on the NHD network. The NHD graph has
+  about 2.7 million edges and the mainstem HUC12 graph has about 80K edges.
+
 Internal Changes
 ~~~~~~~~~~~~~~~~
 - Refactor ``vector_accumulation`` for significant performance improvements.
