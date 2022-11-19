@@ -8,10 +8,13 @@ History
 New Features
 ~~~~~~~~~~~~
 - Add two new functions called ``mainstem_huc12_nx`` and ``enhd_flowlines_nx``.
-  These functions return a ``networkx`` graph object of the mainstem HUC12s and
-  NHD flowlines, respectively.  The generated data are useful for doing US-scale
-  network analysis and flow accumulation on the NHD network. The NHD graph has
-  about 2.7 million edges and the mainstem HUC12 graph has about 80K edges.
+  These functions generate a ``networkx`` directd graph object of NHD HUC12
+  water boundaries and flowlines, respectively. They also return a dictionary
+  mapping of COMID and HUC12 to the corresponding ``networkx`` node.
+  Additionally, a topologically sorted list of COMIDs/HUC12s are returned.
+  The generated data are useful for doing US-scale network analysis and flow
+  accumulation on the NHD network. The NHD graph has about 2.7 million edges
+  and the mainstem HUC12 graph has about 80K edges.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
