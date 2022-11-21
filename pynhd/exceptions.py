@@ -1,6 +1,8 @@
 """Customized PyNHD exceptions."""
 from __future__ import annotations
 
+from typing import Generator
+
 import async_retriever as ar
 import pygeoogc as ogc
 import pygeoutils as pgu
@@ -103,6 +105,25 @@ class MissingCRSError(Exception):
 
     def __init__(self) -> None:
         self.message = "CRS of the input geometry is missing."
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return self.message
+
+
+class DependencyError(Exception):
+    """Exception raised when a dependencies are not met.
+
+    Parameters
+    ----------
+    libraries : tuple
+        List of valid inputs
+    """
+
+    def __init__(self, func: str, libraries: str | list[str] | Generator[str, None, None]) -> None:
+        libraries = [libraries] if isinstance(libraries, str) else libraries
+        self.message = f"The following dependencies are missing for running {func}:\n"
+        self.message += ", ".join(libraries)
         super().__init__(self.message)
 
     def __str__(self) -> str:
