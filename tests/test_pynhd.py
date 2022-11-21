@@ -249,10 +249,7 @@ def test_nhdphr():
     flwb = hr.bygeom((-69.77, 45.07, -69.31, 45.45))
     flwi = hr.byids("permanent_identifier", ["103455178", "103454362", "103453218"])
     flwf = hr.bysql("permanent_identifier IN ('103455178', '103454362', '103453218')")
-    assert (
-        flwb.shape[0] == 3887
-        and flwi["OBJECTID"].tolist() == flwf["OBJECTID"].tolist()
-    )
+    assert flwb.shape[0] == 3887 and flwi["OBJECTID"].tolist() == flwf["OBJECTID"].tolist()
 
 
 @pytest.mark.xfail(reason="Hydroshare is unstable.")
