@@ -15,6 +15,15 @@ New Features
   The generated data are useful for doing US-scale network analysis and flow
   accumulation on the NHD network. The NHD graph has about 2.7 million edges
   and the mainstem HUC12 graph has about 80K edges.
+- Add a new function for getting the entire NHDPlus dataset for CONUS (Lower 48),
+  called ``nhdplus_l48``. The entire NHDPlus dataset is downloaded from
+  `here <https://www.epa.gov/waterdata/nhdplus-national-data>`__.
+  This 7.3 GB file will take a while to download, depending on your internet
+  connection. The first time you run this function, the file will be downloaded
+  and stored in the ``./cache`` directory. Subsequent calls will use the cached
+  file. Moreover, there are two additional dependencies for using this function:
+  ``pyogrio`` and ``py7zr``. These dependencies can be installed using
+  ``pip install pyogrio py7zr`` or ``conda install -c conda-forge pyogrio py7zr``.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
