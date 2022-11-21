@@ -554,26 +554,26 @@ class NHDPlusHR(AGRBase):
 
     Notes
     -----
-    For more info visit: https://edits.nationalmap.gov/arcgis/rest/services/nhd/MapServer
+    For more info visit: https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer
 
     Parameters
     ----------
     layer : str, optional
         A valid service layer. Valid layers are:
 
-        - ``point``
-        - ``sink``
-        - ``flowline``
-        - ``non_network_flowline``
-        - ``flow_direction``
-        - ``line``
-        - ``wall``
-        - ``burn_line``
-        - ``burn_waterbody``
-        - ``area``
-        - ``waterbody``
-        - ``huc12``
-        - ``catchment``
+        - ``gage`` for NHDPlusGage layer
+        - ``sink`` for NHDPlusSink layer
+        - ``point`` for NHDPoint layer
+        - ``flowline`` for NetworkNHDFlowline layer
+        - ``non_network_flowline`` for NonNetworkNHDFlowline layer
+        - ``flow_direction`` for FlowDirection layer
+        - ``wall`` for NHDPlusWall layer
+        - ``line`` for NHDLine layer
+        - ``area`` for NHDArea layer
+        - ``waterbody`` for NHDWaterbody layer
+        - ``catchment`` for NHDPlusCatchment layer
+        - ``boundary_unit`` for NHDPlusBoundaryUnit layer
+        - ``huc12`` for WBDHU12 layer
 
     outfields : str or list, optional
         Target field name(s), default to "*" i.e., all the fields.
@@ -588,25 +588,25 @@ class NHDPlusHR(AGRBase):
         crs: CRSTYPE = 4326,
     ):
         self.valid_layers = {
-            "point": "NHDPoint",
+            "gage": "NHDPlusGage",
             "sink": "NHDPlusSink",
+            "point": "NHDPoint",
             "flowline": "NetworkNHDFlowline",
             "non_network_flowline": "NonNetworkNHDFlowline",
             "flow_direction": "FlowDirection",
-            "line": "NHDLine",
             "wall": "NHDPlusWall",
-            "burn_line": "NHDPlusBurnLineEvent",
-            "burn_waterbody": "NHDPlusBurnWaterbody",
+            "line": "NHDLine",
             "area": "NHDArea",
             "waterbody": "NHDWaterbody",
-            "huc12": "WBDHU12",
             "catchment": "NHDPlusCatchment",
+            "boundary_unit": "NHDPlusBoundaryUnit",
+            "huc12": "WBDHU12",
         }
         _layer = self.valid_layers.get(layer)
         if _layer is None:
             raise InputValueError("layer", list(self.valid_layers))
         super().__init__(
-            ServiceURL().restful.nhdplushr_edits,
+            ServiceURL().restful.nhdplushr,
             _layer,
             outfields,
             crs,
@@ -799,7 +799,7 @@ class NLDI:
         coords: tuple[float, float] | list[tuple[float, float]],
         loc_crs: CRSTYPE = 4326,
     ) -> gpd.GeoDataFrame | tuple[gpd.GeoDataFrame, list[tuple[float, float]]]:
-        """Get the closest ComID based on coordinates.
+        """Get the closest ComID based on coordinates using ``hydrolocation`` endpoint.
 
         Notes
         -----
@@ -833,7 +833,7 @@ class NLDI:
         coords: tuple[float, float] | list[tuple[float, float]],
         loc_crs: CRSTYPE = 4326,
     ) -> gpd.GeoDataFrame | tuple[gpd.GeoDataFrame, list[tuple[float, float]]]:
-        """Get the closest feature ID(s) based on coordinates.
+        """Get the closest feature ID(s) based on coordinates using ``postion`` endpoint.
 
         Parameters
         ----------
@@ -1098,17 +1098,23 @@ class NLDI:
     ) -> gpd.GeoDataFrame:
         """Navigate the NHDPlus database from a coordinate.
 
+        Notes
+        -----
+        This function first calls the ``feature_byloc`` function to get the
+        comid of the nearest flowline and then calls the ``navigate_byid``
+        function to get the features from the obtained ``comid``.
+
         Parameters
         ----------
         coords : tuple
             A tuple of length two (x, y).
         navigation : str, optional
             The navigation method, defaults to None which throws an exception
-            if comid_only is False.
+            if ``comid_only`` is False.
         source : str, optional
             Return the data from another source after navigating
-            the features using fsource, defaults to None which throws an exception
-            if comid_only is False.
+            the features based on ``comid``, defaults to None which throws an exception
+            if ``comid_only`` is False.
         loc_crs : str, int, or pyproj.CRS, optional
             The spatial reference of the input coordinate, defaults to EPSG:4326.
         distance : int, optional
