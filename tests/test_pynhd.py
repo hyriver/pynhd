@@ -247,11 +247,11 @@ class TestGCX:
 def test_nhdphr():
     hr = NHDPlusHR("flowline")
     flwb = hr.bygeom((-69.77, 45.07, -69.31, 45.45))
-    flwi = hr.byids("NHDFlowline.PERMANENT_IDENTIFIER", ["103455178", "103454362", "103453218"])
-    flwf = hr.bysql("NHDFlowline.PERMANENT_IDENTIFIER IN ('103455178', '103454362', '103453218')")
+    flwi = hr.byids("permanent_identifier", ["103455178", "103454362", "103453218"])
+    flwf = hr.bysql("permanent_identifier IN ('103455178', '103454362', '103453218')")
     assert (
-        flwb.shape[0] == 3892
-        and flwi["NHDFlowline.OBJECTID"].tolist() == flwf["NHDFlowline.OBJECTID"].tolist()
+        flwb.shape[0] == 3887
+        and flwi["OBJECTID"].tolist() == flwf["OBJECTID"].tolist()
     )
 
 
