@@ -3,6 +3,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from .core import AGRBase, GeoConnex
 from .exceptions import (
+    DependencyError,
     InputRangeError,
     InputTypeError,
     InputValueError,
@@ -19,6 +20,7 @@ from .network_tools import (
     network_resample,
     network_xsection,
     nhdflw2nx,
+    nhdplus_l48,
     prepare_nhdplus,
     topoogical_sort,
     vector_accumulation,
@@ -33,6 +35,7 @@ except PackageNotFoundError:
     __version__ = "999"
 
 __all__ = [
+    "DependencyError",
     "InputRangeError",
     "InputValueError",
     "InputTypeError",
@@ -51,6 +54,7 @@ __all__ = [
     "nhdflw2nx",
     "enhd_flowlines_nx",
     "mainstem_huc12_nx",
+    "nhdplus_l48",
     "show_versions",
     "NLDI",
     "AGRBase",

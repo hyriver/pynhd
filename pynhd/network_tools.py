@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import io
-from typing import TYPE_CHECKING, Callable, Iterable
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Callable, Iterable
 
 import async_retriever as ar
 import cytoolz as tlz
@@ -12,13 +13,14 @@ import numpy as np
 import pandas as pd
 import pyproj
 from loguru import logger
+from pygeoogc import RetrySession
 from pygeoutils import GeoBSpline, InputTypeError
 from shapely import ops
 from shapely.geometry import LineString, MultiLineString, Point
 
 from . import nhdplus_derived as derived
 from .core import ScienceBase
-from .exceptions import MissingCRSError, MissingItemError
+from .exceptions import DependencyError, InputValueError, MissingCRSError, MissingItemError
 
 try:
     from pandas.errors import IntCastingNaNError
@@ -41,6 +43,7 @@ __all__ = [
     "nhdflw2nx",
     "enhd_flowlines_nx",
     "mainstem_huc12_nx",
+    "nhdplus_l48",
 ]
 
 
@@ -748,3 +751,138 @@ def mainstem_huc12_nx() -> tuple[nx.DiGraph, dict[int, str], list[str]]:
     s_map = {label2huc[i]: r for i, r in zip(nx.topological_sort(graph), range(len(graph)))}
     onnetwork_sorted = sorted(set(ms.HUC12).intersection(s_map), key=lambda i: s_map[i])
     return graph, label2huc, onnetwork_sorted
+
+
+def nhdplus_l48(layer: str, data_dire: str | Path = "cache", **kwargs: Any) -> gpd.GeoDataFrame:
+    """Get the entire NHDPlus dataset.
+
+    Notes
+    -----
+    The entire NHDPlus dataset for CONUS (Lower 48) is downloaded from
+    `here <https://www.epa.gov/waterdata/nhdplus-national-data>`__.
+    This 7.3 GB file will take a while to download, depending on your internet
+    connection. The first time you run this function, the file will be downloaded
+    and stored in the ``./cache`` directory. Subsequent calls will use the cached
+    file. Moreover, there are two additional dependencies required to read the
+    file: ``pyogrio`` and ``py7zr``. These dependencies can be installed using
+    ``pip install pyogrio py7zr`` or ``conda install -c conda-forge pyogrio py7zr``.
+
+    Parameters
+    ----------
+    layer : str
+        The layer name to be returned. The available layers are:
+
+        - ``Gage``
+        - ``BurnAddLine``
+        - ``BurnAddWaterbody``
+        - ``LandSea``
+        - ``Sink``
+        - ``Wall``
+        - ``Catchment``
+        - ``CatchmentSP``
+        - ``NHDArea``
+        - ``NHDWaterbody``
+        - ``HUC12``
+        - ``NHDPlusComponentVersions``
+        - ``PlusARPointEvent``
+        - ``PlusFlowAR``
+        - ``NHDFCode``
+        - ``DivFracMP``
+        - ``BurnLineEvent``
+        - ``NHDFlowline_Network``
+        - ``NHDFlowline_NonNetwork``
+        - ``GeoNetwork_Junctions``
+        - ``PlusFlow``
+        - ``N_1_Desc``
+        - ``N_1_EDesc``
+        - ``N_1_EStatus``
+        - ``N_1_ETopo``
+        - ``N_1_FloDir``
+        - ``N_1_JDesc``
+        - ``N_1_JStatus``
+        - ``N_1_JTopo``
+        - ``N_1_JTopo2``
+        - ``N_1_Props``
+
+    data_dire : str or pathlib.Path
+        Directory to store the downloaded file and use in subsequent calls,
+        defaults to ``./cache``.
+
+    **kwargs
+        Keyword arguments are passed to ``pyogrio.read_dataframe``.
+        For more information, visit
+        `pyogrio <https://pyogrio.readthedocs.io/en/latest/introduction.html>`__.
+
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        A dataframe with all the NHDPlus data.
+    """
+    try:
+        import py7zr
+        import pyogrio
+    except ImportError as ex:
+        raise DependencyError("nhdplus_full", ["pyogrio", "py7zr"]) from ex
+
+    layers = [
+        "Gage",
+        "BurnAddLine",
+        "BurnAddWaterbody",
+        "LandSea",
+        "Sink",
+        "Wall",
+        "Catchment",
+        "CatchmentSP",
+        "NHDArea",
+        "NHDWaterbody",
+        "HUC12",
+        "NHDPlusComponentVersions",
+        "PlusARPointEvent",
+        "PlusFlowAR",
+        "NHDFCode",
+        "DivFracMP",
+        "BurnLineEvent",
+        "NHDFlowline_Network",
+        "NHDFlowline_NonNetwork",
+        "GeoNetwork_Junctions",
+        "PlusFlow",
+        "N_1_Desc",
+        "N_1_EDesc",
+        "N_1_EStatus",
+        "N_1_ETopo",
+        "N_1_FloDir",
+        "N_1_JDesc",
+        "N_1_JStatus",
+        "N_1_JTopo",
+        "N_1_JTopo2",
+        "N_1_Props",
+    ]
+    if layer not in layers:
+        raise InputValueError("layer", layers)
+
+    root = data_dire or Path("cache")
+    nhdfile = Path(
+        root, "NHDPlusNationalData", "NHDPlusV21_National_Seamless_Flattened_Lower48.gdb"
+    )
+    if not nhdfile.exists():
+        url = "/".join(
+            (
+                "https://edap-ow-data-commons.s3.amazonaws.com/NHDPlusV21/Data",
+                "NationalData/NHDPlusV21_NationalData_Seamless_Geodatabase_Lower48_07.7z",
+            )
+        )
+        session = RetrySession(disable=True)
+        resp = session.get(url, stream=True)
+        fsize = int(resp.headers["Content-Length"])
+        nhd7z = Path(root, Path(url).name)
+        chunksize = int(fsize / 100)
+        if not nhd7z.exists() or nhd7z.stat().st_size != fsize:
+            with nhd7z.open("wb") as f:
+                f.writelines(resp.iter_content(chunksize))
+        session.close()
+        with py7zr.SevenZipFile(nhd7z, mode="r") as z:
+            z.extractall(path=root)
+        nhd7z.unlink()
+
+    pyogrio.set_gdal_config_options({"OGR_ORGANIZE_POLYGONS": "CCW_INNER_JUST_AFTER_CW_OUTER"})
+    return gpd.read_file(nhdfile, engine="pyogrio", layer=layer, **kwargs)
