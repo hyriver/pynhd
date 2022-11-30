@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import pyproj
 from loguru import logger
-from pygeoogc import RetrySession
+from pygeoogc import streaming_download
 from pygeoutils import GeoBSpline, InputTypeError
 from shapely import ops
 from shapely.geometry import LineString, MultiLineString, Point
@@ -871,15 +871,8 @@ def nhdplus_l48(layer: str, data_dire: str | Path = "cache", **kwargs: Any) -> g
                 "NationalData/NHDPlusV21_NationalData_Seamless_Geodatabase_Lower48_07.7z",
             )
         )
-        session = RetrySession(disable=True)
-        resp = session.get(url, stream=True)
-        fsize = int(resp.headers["Content-Length"])
         nhd7z = Path(root, Path(url).name)
-        chunksize = int(fsize / 100)
-        if not nhd7z.exists() or nhd7z.stat().st_size != fsize:
-            with nhd7z.open("wb") as f:
-                f.writelines(resp.iter_content(chunksize))
-        session.close()
+        _ = streaming_download(url, fnames=nhd7z)
         with py7zr.SevenZipFile(nhd7z, mode="r") as z:
             z.extractall(path=root)
         nhd7z.unlink()
