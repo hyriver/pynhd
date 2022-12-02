@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-import re
 import sys
 from pathlib import Path
 from typing import Any, Iterator, NamedTuple, Union
@@ -50,7 +49,7 @@ else:
     logger.disable("pynhd")
 
 CRSTYPE = Union[int, str, pyproj.CRS]
-__all__ = ["AGRBase", "ScienceBase", "stage_nhdplus_attrs", "GeoConnex"]
+__all__ = ["AGRBase", "ScienceBase", "GeoConnex"]
 
 
 def get_parquet(parquet_path: Path | str) -> Path:
@@ -489,102 +488,6 @@ class ScienceBase:
         )
         files = pd.DataFrame(urls, columns=["name", "url", "metadata_url"])
         return files.set_index("name")
-
-
-def stage_nhdplus_attrs(
-    parquet_path: Path | str | None = None,
-) -> pd.DataFrame:
-    """Stage the NHDPlus Attributes database and save to nhdplus_attrs.parquet.
-
-    More info can be found `here <https://www.sciencebase.gov/catalog/item/5669a79ee4b08895842a1d47>`_.
-
-    Parameters
-    ----------
-    parquet_path : str or Path
-        Path to a file with ``.parquet`` extension for saving the processed to disk for
-        later use.
-
-    Returns
-    -------
-    pandas.DataFrame
-        The staged data as a DataFrame.
-    """
-    if parquet_path is None:
-        output = get_parquet(Path("cache", "nhdplus_attrs.parquet"))
-    else:
-        output = get_parquet(parquet_path)
-
-    sb = ScienceBase()
-    r = sb.get_children("5669a79ee4b08895842a1d47")
-
-    titles = tlz.pluck("title", r["items"])
-    titles = tlz.concat(tlz.map(tlz.partial(re.findall, "Select(.*?)Attributes"), titles))
-    titles = tlz.map(str.strip, titles)
-
-    main_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-
-    def get_files(item: str) -> dict[str, tuple[str, str]]:
-        """Get all the available zip files in an item."""
-        url = "https://www.sciencebase.gov/catalog/item"
-        payload = {"fields": "files,downloadUri", "format": "json"}
-        resp = ar.retrieve_json(
-            [f"{url}/{item}"],
-            [{"params": payload}],
-        )
-        files_url = zip(tlz.pluck("name", resp[0]["files"]), tlz.pluck("url", resp[0]["files"]))
-        meta = list(tlz.pluck("metadataHtmlViewUri", resp[0]["files"], default=""))[-1]
-        return {f.replace("_CONUS.zip", ""): (u, meta) for f, u in files_url if ".zip" in f}
-
-    files = {}
-    soil = main_items.pop("Soil")
-    for i, item in main_items.items():
-        r = sb.get_children(item)
-
-        titles = tlz.pluck("title", r["items"])
-        titles = tlz.map(lambda s: s.split(":")[1].strip() if ":" in s else s, titles)
-
-        child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-        files[i] = {t: get_files(c) for t, c in child_items.items()}
-
-    r = sb.get_children(soil)
-    titles = tlz.pluck("title", r["items"])
-    titles = tlz.map(lambda s: s.split(":")[1].strip() if ":" in s else s, titles)
-
-    child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-    stat = child_items.pop("STATSGO Soil Characteristics")
-    ssur = child_items.pop("SSURGO Soil Characteristics")
-    files["Soil"] = {t: get_files(c) for t, c in child_items.items()}
-
-    r = sb.get_children(stat)
-    titles = tlz.pluck("title", r["items"])
-    titles = tlz.map(lambda s: s.split(":")[1].split(",")[1].strip(), titles)
-    child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-    files["STATSGO"] = {t: get_files(c) for t, c in child_items.items()}
-
-    r = sb.get_children(ssur)
-    titles = tlz.pluck("title", r["items"])
-    titles = tlz.map(lambda s: s.split(":")[1].strip(), titles)
-    child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-    files["SSURGO"] = {t: get_files(c) for t, c in child_items.items()}
-
-    chars = []
-    types = {"CAT": "local", "TOT": "upstream_acc", "ACC": "div_routing"}
-    for t, dd in files.items():
-        for d, fd in dd.items():
-            for f, u in fd.items():
-                chars.append(
-                    {
-                        "name": f,
-                        "type": types.get(f[-3:], "other"),
-                        "theme": t,
-                        "description": d,
-                        "url": u[0],
-                        "meta": u[1],
-                    }
-                )
-    char_df = pd.DataFrame(chars)
-    char_df.to_parquet(output)
-    return char_df
 
 
 class GeoConnex:
