@@ -187,14 +187,11 @@ class TestNLDI:
         assert len(missing) == 1
 
 
-@pytest.mark.xfail(reason="ScienceBase is unstable.")
 def test_nhd_attrs():
-    meta = nhd.nhdplus_attrs(parquet_path="nhdplus_attrs.parquet")
-    _ = nhd.nhdplus_attrs("RECHG")
-    cat = nhd.nhdplus_attrs("RECHG")
-    Path("nhdplus_attrs.parquet").unlink()
-    assert_close(cat[cat.COMID > 0].CAT_RECHG.sum(), 143215331.64)
-    assert len(meta) == 609
+    meta = nhd.nhdplus_attrs()
+    cat = nhd.nhdplus_attrs("CAT_RECHG")
+    assert_close(cat[cat.index > 0].CAT_RECHG.sum(), 143215331.64)
+    assert len(meta) == 4281
 
 
 class TestWaterData:
