@@ -1,6 +1,7 @@
 """Access NLDI and WaterData databases."""
 from __future__ import annotations
 
+import contextlib
 import io
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -207,7 +208,8 @@ def nhdplus_attrs(attr_names: str | list[str] | None = None, nodata: bool = Fals
         cols = ["COMID"] + cols
         if nodata:
             ds_columns = ds.schema.names
-            cols.append(next(c for c in ds_columns if "NODATA" in c))
+            with contextlib.suppress(StopIteration):
+                cols.append(next(c for c in ds_columns if "NODATA" in c))
         return ds.to_table(columns=cols).to_pandas().set_index("COMID")
 
     return pd.concat((to_pandas(ds, c, nodata) for ds, c in zip(datasets, ids.values())), axis=1)
