@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 import async_retriever as ar
 import cytoolz as tlz
 import pandas as pd
-import pyarrow.dataset as ds
+import pyarrow.dataset as pds
 from pyarrow import fs
 
 from .core import ScienceBase, get_parquet
@@ -200,7 +200,7 @@ def nhdplus_attrs(attr_names: str | list[str] | None = None, nodata: bool = Fals
     ids = tlz.merge_with(list, ({urls[c]: c} for c in attr_names))
 
     s3 = fs.S3FileSystem(anonymous=True, region="us-west-2")
-    get_dataset = tlz.partial(ds.dataset, filesystem=s3, format="parquet")
+    get_dataset = tlz.partial(pds.dataset, filesystem=s3, format="parquet")
     datasets = (get_dataset(f"{bucket}/{i}/{i}_{c[0][:3].lower()}.parquet") for i, c in ids.items())
 
     def to_pandas(ds: FileSystemDataset, cols: list[str], nodata: bool) -> pd.DataFrame:
@@ -212,7 +212,7 @@ def nhdplus_attrs(attr_names: str | list[str] | None = None, nodata: bool = Fals
                 cols.append(next(c for c in ds_columns if "NODATA" in c))
         return ds.to_table(columns=cols).to_pandas().set_index("COMID")
 
-    return pd.concat((to_pandas(ds, c, nodata) for ds, c in zip(datasets, ids.values())), axis=1)
+    return pd.concat((to_pandas(d, c, nodata) for d, c in zip(datasets, ids.values())), axis=1)
 
 
 def nhd_fcode() -> pd.DataFrame:
