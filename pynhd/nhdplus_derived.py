@@ -3,13 +3,19 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import async_retriever as ar
+import cytoolz as tlz
 import pandas as pd
+import pyarrow.dataset as ds
+from pyarrow import fs
 
-from .core import ScienceBase, get_parquet, stage_nhdplus_attrs
+from .core import ScienceBase, get_parquet
 from .exceptions import InputValueError
+
+if TYPE_CHECKING:
+    from pyarrow.dataset import FileSystemDataset
 
 __all__ = ["enhd_attrs", "nhdplus_vaa", "nhdplus_attrs", "nhd_fcode"]
 
@@ -155,42 +161,56 @@ def nhdplus_vaa(
     return vaa
 
 
-def nhdplus_attrs(
-    name: str | None = None,
-    parquet_path: Path | str | None = None,
-) -> pd.DataFrame:
-    """Access NHDPlus V2.1 Attributes from ScienceBase over CONUS.
+def nhdplus_attrs(attr_names: str | list[str] | None = None, nodata: bool = False) -> pd.DataFrame:
+    """Access NHDPlus V2.1 derived attributes over CONUS.
 
+    Notes
+    -----
     More info can be found `here <https://www.sciencebase.gov/catalog/item/5669a79ee4b08895842a1d47>`_.
 
     Parameters
     ----------
-    name : str, optional
-        Name of the NHDPlus attribute, defaults to None which returns a dataframe containing
-        metadata of all the available attributes in the database.
-    parquet_path : str or Path, optional
-        Path to a file with ``.parquet`` extension for saving the processed to disk for
-        later use. Defaults to ``./cache/nhdplus_attrs.parquet``.
+    attr_names : str or list of str, optional
+        Names of NHDPlus attribute(s) to return, defaults to None, i.e.,
+        only return a metadata dataframe that includes the attribute names
+        and their description and units.
+    nodata : bool
+        Whether to include NODATA percentages, default is False.
 
     Returns
     -------
     pandas.DataFrame
-        Either a dataframe containing the database metadata or the requested attribute over CONUS.
+        A dataframe of requested NHDPlus attributes.
     """
-    if parquet_path is not None and Path(parquet_path).exists():
-        char_df = pd.read_parquet(parquet_path)
-    else:
-        char_df = stage_nhdplus_attrs(parquet_path)
+    bucket = "prod-is-usgs-sb-prod-publish"
+    meta_url = "/".join(
+        (f"https://{bucket}.s3.amazonaws.com", "5669a79ee4b08895842a1d47/metadata_table.tsv")
+    )
+    resp = ar.retrieve_text([meta_url])
+    meta = pd.read_csv(io.StringIO(resp[0]), delimiter="\t")
+    if attr_names is None:
+        return meta
 
-    if name is None:
-        return char_df
+    urls = meta.set_index("ID").datasetURL.str.rsplit("/", n=1).str[-1].to_dict()
 
-    try:
-        url = char_df[char_df.name == name].url.values[0]
-    except IndexError as ex:
-        raise InputValueError("name", char_df.name.unique()) from ex
-    resp = ar.retrieve_binary([url])
-    return pd.read_csv(io.BytesIO(resp[0]), compression="zip")
+    attr_names = attr_names if isinstance(attr_names, (list, tuple)) else [attr_names]
+    if any(a not in urls for a in attr_names):
+        raise InputValueError("attr_names", list(urls))
+    ids = tlz.merge_with(list, ({urls[c]: c} for c in attr_names))
+
+    s3 = fs.S3FileSystem(anonymous=True, region="us-west-2")
+    get_dataset = tlz.partial(ds.dataset, filesystem=s3, format="parquet")
+    datasets = (get_dataset(f"{bucket}/{i}/{i}_{c[0][:3].lower()}.parquet") for i, c in ids.items())
+
+    def to_pandas(ds: FileSystemDataset, cols: list[str], nodata: bool) -> pd.DataFrame:
+        """Convert a pyarrow dataset to a pandas dataframe."""
+        cols = ["COMID"] + cols
+        if nodata:
+            ds_columns = ds.schema.names
+            cols.append(next(c for c in ds_columns if "NODATA" in c))
+        return ds.to_table(columns=cols).to_pandas().set_index("COMID")
+
+    return pd.concat((to_pandas(ds, c, nodata) for ds, c in zip(datasets, ids.values())), axis=1)
 
 
 def nhd_fcode() -> pd.DataFrame:
