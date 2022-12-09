@@ -187,11 +187,22 @@ class TestNLDI:
         assert len(missing) == 1
 
 
-def test_nhd_attrs():
-    meta = nhd.nhdplus_attrs()
-    cat = nhd.nhdplus_attrs("CAT_RECHG")
-    assert_close(cat[cat.index > 0].CAT_RECHG.sum(), 143215331.64)
-    assert len(meta) == 4281
+class TestNHDAttrs:
+    def test_meta_s3(self):
+        meta = nhd.nhdplus_attrs_s3()
+        assert len(meta) == 4281
+
+    def test_s3(self):
+        attr = nhd.nhdplus_attrs_s3("CAT_RECHG")
+        assert_close(attr[attr.CAT_RECHG > 0].CAT_RECHG.mean(), 132.5881)
+
+    def test_meta(self):
+        meta = nhd.nhdplus_attrs()
+        assert len(meta) == 609
+
+    def test_sb(self):
+        attr = nhd.nhdplus_attrs("BANKFULL")
+        assert_close(attr[attr.BANKFULL_WIDTH > 0].BANKFULL_WIDTH.mean(), 13.6633)
 
 
 class TestWaterData:
