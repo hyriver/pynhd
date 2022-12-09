@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -10,6 +11,7 @@ import async_retriever as ar
 import cytoolz as tlz
 import pandas as pd
 import pyarrow.dataset as pds
+import pygeoogc as ogc
 from pyarrow import fs
 
 from .core import ScienceBase, get_parquet
@@ -18,7 +20,14 @@ from .exceptions import InputValueError
 if TYPE_CHECKING:
     from pyarrow.dataset import FileSystemDataset
 
-__all__ = ["enhd_attrs", "nhdplus_vaa", "nhdplus_attrs", "nhd_fcode"]
+__all__ = [
+    "enhd_attrs",
+    "nhdplus_vaa",
+    "nhdplus_attrs",
+    "nhdplus_attrs_s3",
+    "nhd_fcode",
+    "epa_nhd_catchments",
+]
 
 
 def enhd_attrs(
@@ -29,7 +38,7 @@ def enhd_attrs(
     Notes
     -----
     This downloads a 160 MB ``parquet`` file from
-    `here <https://www.sciencebase.gov/catalog/item/60c92503d34e86b9389df1c9>`__ .
+    `here <https://www.sciencebase.gov/catalog/item/60c92503d34e86b9389df1c9>`__.
     Although this dataframe does not include geometry, it can be linked to other geospatial
     NHDPlus dataframes through ComIDs.
 
@@ -162,7 +171,109 @@ def nhdplus_vaa(
     return vaa
 
 
-def nhdplus_attrs(attr_names: str | list[str] | None = None, nodata: bool = False) -> pd.DataFrame:
+def nhdplus_attrs(attr_name: str | None = None) -> pd.DataFrame:
+    """Stage the NHDPlus Attributes database and save to nhdplus_attrs.parquet.
+
+    Notes
+    -----
+    More info can be found `here <https://www.sciencebase.gov/catalog/item/5669a79ee4b08895842a1d47>`_.
+
+    Parameters
+    ----------
+    attr_names : str , optional
+        Name of NHDPlus attribute to return, defaults to None, i.e.,
+        only return a metadata dataframe that includes the attribute names
+        and their description and units.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The staged data as a DataFrame.
+    """
+    sb = ScienceBase()
+    r = sb.get_children("5669a79ee4b08895842a1d47")
+
+    titles = tlz.pluck("title", r["items"])
+    titles = tlz.concat(tlz.map(tlz.partial(re.findall, "Select(.*?)Attributes"), titles))
+    titles = tlz.map(str.strip, titles)
+
+    main_items = dict(zip(titles, tlz.pluck("id", r["items"])))
+
+    def get_files(item: str) -> dict[str, tuple[str, str]]:
+        """Get all the available zip files in an item."""
+        url = "https://www.sciencebase.gov/catalog/item"
+        payload = {"fields": "files,downloadUri", "format": "json"}
+        resp = ar.retrieve_json(
+            [f"{url}/{item}"],
+            [{"params": payload}],
+        )
+        files_url = zip(tlz.pluck("name", resp[0]["files"]), tlz.pluck("url", resp[0]["files"]))
+        meta = list(tlz.pluck("metadataHtmlViewUri", resp[0]["files"], default=""))[-1]
+        return {f.replace("_CONUS.zip", ""): (u, meta) for f, u in files_url if ".zip" in f}
+
+    files = {}
+    soil = main_items.pop("Soil")
+    for i, item in main_items.items():
+        r = sb.get_children(item)
+
+        titles = tlz.pluck("title", r["items"])
+        titles = tlz.map(lambda s: s.split(":")[1].strip() if ":" in s else s, titles)
+
+        child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
+        files[i] = {t: get_files(c) for t, c in child_items.items()}
+
+    r = sb.get_children(soil)
+    titles = tlz.pluck("title", r["items"])
+    titles = tlz.map(lambda s: s.split(":")[1].strip() if ":" in s else s, titles)
+
+    child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
+    stat = child_items.pop("STATSGO Soil Characteristics")
+    ssur = child_items.pop("SSURGO Soil Characteristics")
+    files["Soil"] = {t: get_files(c) for t, c in child_items.items()}
+
+    r = sb.get_children(stat)
+    titles = tlz.pluck("title", r["items"])
+    titles = tlz.map(lambda s: s.split(":")[1].split(",")[1].strip(), titles)
+    child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
+    files["STATSGO"] = {t: get_files(c) for t, c in child_items.items()}
+
+    r = sb.get_children(ssur)
+    titles = tlz.pluck("title", r["items"])
+    titles = tlz.map(lambda s: s.split(":")[1].strip(), titles)
+    child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
+    files["SSURGO"] = {t: get_files(c) for t, c in child_items.items()}
+
+    chars = []
+    types = {"CAT": "local", "TOT": "upstream_acc", "ACC": "div_routing"}
+    for t, dd in files.items():
+        for d, fd in dd.items():
+            for f, u in fd.items():
+                chars.append(
+                    {
+                        "name": f,
+                        "type": types.get(f[-3:], "other"),
+                        "theme": t,
+                        "description": d,
+                        "url": u[0],
+                        "meta": u[1],
+                    }
+                )
+    meta = pd.DataFrame(chars)
+    if attr_name is None:
+        return meta
+
+    try:
+        url = meta[meta.name == attr_name].url.values[0]
+    except IndexError as ex:
+        raise InputValueError("name", meta.name.unique()) from ex
+
+    fname = ogc.streaming_download(url, file_extention="zip")
+    return pd.read_csv(fname, engine="pyarrow")
+
+
+def nhdplus_attrs_s3(
+    attr_names: str | list[str] | None = None, nodata: bool = False
+) -> pd.DataFrame:
     """Access NHDPlus V2.1 derived attributes over CONUS.
 
     Notes
