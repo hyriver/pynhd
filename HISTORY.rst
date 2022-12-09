@@ -2,16 +2,18 @@
 History
 =======
 
-0.13.8 (unreleased)
+0.13.8 (2022-12-09)
 -------------------
 
 New Features
 ~~~~~~~~~~~~
-- The ``nhdplus_attrs`` now provides access to the recently released NHDPlus
-  derived attributes on USGS's S3 bucket. The attributes are now provided
-  in parquet files, so getting them is faster than before. Also, you
-  can request for multiple attributes at once whereas before you had to
-  request for each attribute one at a time.
+- Add a new function, called ``nhdplus_attrs_s3``, for accessing the recently
+  released NHDPlus derived attributes on a USGS's S3 bucket. The attributes are
+  provided in parquet files, so getting them is faster than ``nhdplus_attrs``.
+  Also, you can request for multiple attributes at once whereas in ``nhdplus_attrs``
+  you had to request for each attribute one at a time. This function will replace
+  ``nhdplus_attrs`` in a future release, as soon as all data that are available
+  on the ScienceBase version are also accessible from the S3 bucket.
 - Add two new functions called ``mainstem_huc12_nx`` and ``enhd_flowlines_nx``.
   These functions generate a ``networkx`` directed graph object of NHD HUC12
   water boundaries and flowlines, respectively. They also return a dictionary
