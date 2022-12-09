@@ -455,7 +455,7 @@ class PyGeoAPIBatch(PyGeoAPIBase):
 
 
 class ScienceBase:
-    """Access and explore files on ScienceBase."""
+    """Access and explore items on USGS's ScienceBase."""
 
     @staticmethod
     def get_children(item: str) -> dict[str, Any]:
