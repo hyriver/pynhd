@@ -1,7 +1,7 @@
 """Top-level package for PyNHD."""
 from importlib.metadata import PackageNotFoundError, version
 
-from .core import AGRBase, GeoConnex
+from .core import AGRBase, GeoConnex, ScienceBase
 from .exceptions import (
     DependencyError,
     InputRangeError,
@@ -25,7 +25,14 @@ from .network_tools import (
     topoogical_sort,
     vector_accumulation,
 )
-from .nhdplus_derived import enhd_attrs, epa_nhd_catchments, nhd_fcode, nhdplus_attrs, nhdplus_vaa
+from .nhdplus_derived import (
+    enhd_attrs,
+    epa_nhd_catchments,
+    nhd_fcode,
+    nhdplus_attrs,
+    nhdplus_attrs_s3,
+    nhdplus_vaa,
+)
 from .print_versions import show_versions
 from .pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData, geoconnex, pygeoapi
 
@@ -59,6 +66,7 @@ __all__ = [
     "NLDI",
     "AGRBase",
     "GeoConnex",
+    "ScienceBase",
     "NHDPlusHR",
     "NHD",
     "PyGeoAPI",
@@ -66,6 +74,7 @@ __all__ = [
     "WaterData",
     "nhd_fcode",
     "nhdplus_attrs",
+    "nhdplus_attrs_s3",
     "epa_nhd_catchments",
     "enhd_attrs",
     "nhdplus_vaa",
