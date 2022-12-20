@@ -2,6 +2,16 @@
 History
 =======
 
+0.13.9 (unreleased)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Add support for the new EPA's StreamCat RestFull API with over 500 NHDPlus
+  catchment level metrics. One class is added for getting the service
+  properties such as valid metrics, called ``StreamCat``. You can use
+  ``streamcat`` function to get the metrics as a ``pandas.DataFrame``.
+
 0.13.8 (2022-12-09)
 -------------------
 
