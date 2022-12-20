@@ -37,6 +37,8 @@ from .nhdplus_derived import (
     nhdplus_attrs,
     nhdplus_attrs_s3,
     nhdplus_vaa,
+    StreamCat,
+    streamcat,
 )
 from .print_versions import show_versions
 from .pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData, geoconnex, pygeoapi
@@ -67,6 +69,8 @@ __all__ = [
     "enhd_flowlines_nx",
     "mainstem_huc12_nx",
     "nhdplus_l48",
+    "StreamCat",
+    "streamcat",
     "show_versions",
     "NLDI",
     "AGRBase",
