@@ -309,4 +309,4 @@ def test_fcode():
 def test_show_versions():
     f = io.StringIO()
     nhd.show_versions(file=f)
-    assert "INSTALLED VERSIONS" in f.getvalue()
+    assert "SYS INFO" in f.getvalue()
