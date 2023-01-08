@@ -13,13 +13,15 @@ New Features
   catchment level metrics. One class is added for getting the service
   properties such as valid metrics, called ``StreamCat``. You can use
   ``streamcat`` function to get the metrics as a ``pandas.DataFrame``.
-- Refactor the ``show_versions`` function now to improve performance and
+- Refactor the ``show_versions`` function to improve performance and
   print the output in a nicer table-like format.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
 - Skip 0.13.9 version so the minor version of all HyRiver packages become
   the same.
+- Modify the codebase based on the latest changes in ``geopandas`` related
+  to empty dataframes.
 
 0.13.8 (2022-12-09)
 -------------------
