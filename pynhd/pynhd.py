@@ -15,7 +15,7 @@ import shapely.geometry as sgeom
 from loguru import logger
 from pygeoogc import WFS, InputValueError, ServiceUnavailableError, ServiceURL
 from pygeoogc import ZeroMatchedError as ZeroMatchedErrorOGC
-from pygeoutils import InputTypeError
+from pygeoutils import EmptyResponseError, InputTypeError
 
 from .core import AGRBase, GeoConnex, PyGeoAPIBase, PyGeoAPIBatch
 from .exceptions import InputRangeError, MissingItemError, ZeroMatchedError
@@ -367,7 +367,11 @@ class WaterData:
         geopandas.GeoDataFrame
             The requested features in a GeoDataFrames.
         """
-        features = geoutils.json2geodf(resp, self.wfs.crs, self.crs)
+        try:
+            features = geoutils.json2geodf(resp, self.wfs.crs, self.crs)
+        except EmptyResponseError:
+            raise ZeroMatchedError
+
         if features.empty:
             raise ZeroMatchedError
         return features
@@ -690,7 +694,13 @@ class NLDI:
             try:
                 rjson = self._get_url(u, p)
                 resp.append((f, geoutils.json2geodf(rjson, 4269, 4326)))
-            except (ZeroMatchedErrorOGC, ZeroMatchedError, InputTypeError, ar.ServiceError):
+            except (
+                ZeroMatchedErrorOGC,
+                ZeroMatchedError,
+                InputTypeError,
+                ar.ServiceError,
+                EmptyResponseError,
+            ):
                 not_found.append(f)
 
         if not resp:
@@ -1084,8 +1094,10 @@ class NLDI:
 
         url = valid_sources[source]
         payload = {"distance": f"{round(distance)}", "trimStart": f"{trim_start}".lower()}
-
-        return geoutils.json2geodf(self._get_url(url, payload), 4269, 4326)
+        try:
+            return geoutils.json2geodf(self._get_url(url, payload), 4269, 4326)
+        except EmptyResponseError:
+            raise ZeroMatchedError
 
     def navigate_byloc(
         self,

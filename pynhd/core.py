@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import Any, Iterator, NamedTuple, Union
+from typing import TYPE_CHECKING, Any, Iterator, NamedTuple, Union
 
 import async_retriever as ar
 import cytoolz as tlz
@@ -16,6 +16,7 @@ import shapely.geometry as sgeom
 from loguru import logger
 from pygeoogc import ArcGISRESTful, ServiceURL
 from pygeoogc import utils as ogc_utils
+from pygeoutils import EmptyResponseError
 
 from .exceptions import (
     InputRangeError,
@@ -48,7 +49,9 @@ if os.environ.get("HYRIVER_VERBOSE", "false").lower() == "true":
 else:
     logger.disable("pynhd")
 
-CRSTYPE = Union[int, str, pyproj.CRS]
+if TYPE_CHECKING:
+    CRSTYPE = Union[int, str, pyproj.CRS]
+
 __all__ = ["AGRBase", "ScienceBase", "GeoConnex"]
 
 
@@ -181,9 +184,12 @@ class AGRBase:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrame.
         """
-        return geoutils.json2geodf(
-            self.client.get_features(oids, return_m, return_geom), self.client.client.crs
-        )
+        try:
+            return geoutils.json2geodf(
+                self.client.get_features(oids, return_m, return_geom), self.client.client.crs
+            )
+        except EmptyResponseError:
+            raise ZeroMatchedError
 
     def bygeom(
         self,
@@ -337,11 +343,15 @@ class PyGeoAPIBase:
                     ]
                 )
             )
-
-        gdf = gpd.GeoDataFrame(
-            pd.concat((geoutils.json2geodf(r) for r in resp), keys=[self.req_idx[i] for i in idx]),
-            crs=4326,
-        )
+        try:
+            gdf = gpd.GeoDataFrame(
+                pd.concat(
+                    (geoutils.json2geodf(r) for r in resp), keys=[self.req_idx[i] for i in idx]
+                ),
+                crs=4326,
+            )
+        except EmptyResponseError:
+            raise ZeroMatchedError
         drop_cols = ["level_1", "spatial_ref"] if "spatial_ref" in gdf else ["level_1"]
         return gdf.reset_index().rename(columns={"level_0": "req_idx"}).drop(columns=drop_cols)
 
@@ -609,14 +619,23 @@ class GeoConnex:
             param_list = [
                 {**kwds, "bbox": ",".join(f"{c:.6f}" for c in g.bounds)} for g in geometry  # type: ignore[arg-type]
             ]
-            gdf = geoutils.json2geodf(self.__get_urls(self.query_url, param_list))
+
+            try:
+                gdf = geoutils.json2geodf(self.__get_urls(self.query_url, param_list))
+            except EmptyResponseError:
+                raise ZeroMatchedError
+
             gdf = gdf.reset_index(drop=True)
             _, idx = gdf.sindex.query_bulk(gpd.GeoSeries(geometry, crs=4326), predicate="contains")
             if len(idx) == 0:
                 raise ZeroMatchedError
             gdf = gdf.iloc[idx].reset_index(drop=True)
         else:
-            gdf = geoutils.json2geodf(self.__get_url(self.query_url, kwds))  # type: ignore[arg-type]
+            try:
+                gdf = geoutils.json2geodf(self.__get_url(self.query_url, kwds))  # type: ignore
+            except EmptyResponseError:
+                raise ZeroMatchedError
+
             if len(gdf) == 0:
                 raise ZeroMatchedError
 
