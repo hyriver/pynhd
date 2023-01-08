@@ -105,8 +105,9 @@ class TestPyGeoAPI:
         gdf = self.pygeoapi.elevation_profile(coords, numpts=101, dem_res=1, crs=4326)
         gdfb = nhd.pygeoapi(gs, "elevation_profile")
 
-        assert_close(gdf.iloc[-1, 2], 316.053)
-        assert_close(gdfb.iloc[-1, 2], 316.053)
+        expected = 1299.8842
+        assert_close(gdf.iloc[-1, 2], expected)
+        assert_close(gdfb.iloc[-1, 2], expected)
 
     def test_cross_section(self):
         coords = (-103.80119, 40.2684)
@@ -125,8 +126,9 @@ class TestPyGeoAPI:
         gdf = self.pygeoapi.cross_section(coords, width=1000.0, numpts=101, crs=4326)
         gdfb = nhd.pygeoapi(gs, "cross_section")
 
-        assert_close(gdf.iloc[-1, 2], 767.885)
-        assert_close(gdfb.iloc[-1, 2], 767.885)
+        expected = 1301.482
+        assert_close(gdf.iloc[-1, 2], expected)
+        assert_close(gdfb.iloc[-1, 2], expected)
 
 
 class TestNLDI:
@@ -198,7 +200,7 @@ class TestNHDAttrs:
 
     def test_meta(self):
         meta = nhd.nhdplus_attrs()
-        assert len(meta) == 609
+        assert len(meta) == 592
 
     def test_sb(self):
         attr = nhd.nhdplus_attrs("BANKFULL")

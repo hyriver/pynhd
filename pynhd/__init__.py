@@ -31,13 +31,13 @@ from .network_tools import (
     vector_accumulation,
 )
 from .nhdplus_derived import (
+    StreamCat,
     enhd_attrs,
     epa_nhd_catchments,
     nhd_fcode,
     nhdplus_attrs,
     nhdplus_attrs_s3,
     nhdplus_vaa,
-    StreamCat,
     streamcat,
 )
 from .print_versions import show_versions
