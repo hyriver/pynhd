@@ -2,15 +2,24 @@
 History
 =======
 
-0.13.9 (unreleased)
--------------------
+0.13.10 (unreleased)
+--------------------
 
 New Features
 ~~~~~~~~~~~~
-- Add support for the new EPA's StreamCat RestFull API with over 500 NHDPlus
+- Add support for the new EPA's
+  `StreamCat <https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset>`__
+  RestFull API with over 500 NHDPlus
   catchment level metrics. One class is added for getting the service
   properties such as valid metrics, called ``StreamCat``. You can use
   ``streamcat`` function to get the metrics as a ``pandas.DataFrame``.
+- Refactor the ``show_versions`` function now to improve performance and
+  print the output in a nicer table-like format.
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Skip 0.13.9 version so the minor version of all HyRiver packages become
+  the same.
 
 0.13.8 (2022-12-09)
 -------------------
