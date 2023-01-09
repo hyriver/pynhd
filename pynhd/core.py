@@ -188,8 +188,8 @@ class AGRBase:
             return geoutils.json2geodf(
                 self.client.get_features(oids, return_m, return_geom), self.client.client.crs
             )
-        except EmptyResponseError:
-            raise ZeroMatchedError
+        except EmptyResponseError as ex:
+            raise ZeroMatchedError from ex
 
     def bygeom(
         self,
@@ -350,8 +350,8 @@ class PyGeoAPIBase:
                 ),
                 crs=4326,
             )
-        except EmptyResponseError:
-            raise ZeroMatchedError
+        except EmptyResponseError as ex:
+            raise ZeroMatchedError from ex
         drop_cols = ["level_1", "spatial_ref"] if "spatial_ref" in gdf else ["level_1"]
         return gdf.reset_index().rename(columns={"level_0": "req_idx"}).drop(columns=drop_cols)
 
@@ -622,8 +622,8 @@ class GeoConnex:
 
             try:
                 gdf = geoutils.json2geodf(self.__get_urls(self.query_url, param_list))
-            except EmptyResponseError:
-                raise ZeroMatchedError
+            except EmptyResponseError as ex:
+                raise ZeroMatchedError from ex
 
             gdf = gdf.reset_index(drop=True)
             _, idx = gdf.sindex.query_bulk(gpd.GeoSeries(geometry, crs=4326), predicate="contains")
@@ -633,8 +633,8 @@ class GeoConnex:
         else:
             try:
                 gdf = geoutils.json2geodf(self.__get_url(self.query_url, kwds))  # type: ignore
-            except EmptyResponseError:
-                raise ZeroMatchedError
+            except EmptyResponseError as ex:
+                raise ZeroMatchedError from ex
 
             if len(gdf) == 0:
                 raise ZeroMatchedError

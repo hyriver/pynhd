@@ -369,8 +369,8 @@ class WaterData:
         """
         try:
             features = geoutils.json2geodf(resp, self.wfs.crs, self.crs)
-        except EmptyResponseError:
-            raise ZeroMatchedError
+        except EmptyResponseError as ex:
+            raise ZeroMatchedError from ex
 
         if features.empty:
             raise ZeroMatchedError
@@ -1096,8 +1096,8 @@ class NLDI:
         payload = {"distance": f"{round(distance)}", "trimStart": f"{trim_start}".lower()}
         try:
             return geoutils.json2geodf(self._get_url(url, payload), 4269, 4326)
-        except EmptyResponseError:
-            raise ZeroMatchedError
+        except EmptyResponseError as ex:
+            raise ZeroMatchedError from ex
 
     def navigate_byloc(
         self,
