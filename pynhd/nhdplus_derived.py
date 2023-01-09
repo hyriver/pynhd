@@ -66,7 +66,7 @@ def enhd_attrs(
     sb = ScienceBase()
     files = sb.get_file_urls("60c92503d34e86b9389df1c9")
 
-    ar.stream_write([files.loc["enhd_nhdplusatts.parquet"].url], [output])
+    _ = ogc.streaming_download(files.loc["enhd_nhdplusatts.parquet"].url, fnames=output)
     enhd = pd.read_parquet(output)
     enhd["comid"] = enhd["comid"].astype("int32")
     enhd["gnis_id"] = enhd["gnis_id"].astype("Int32")
@@ -165,7 +165,7 @@ def nhdplus_vaa(
     fpath = "data/contents/nhdplusVAA.parquet"
     url = f"https://www.hydroshare.org/resource/{rid}/{fpath}"
 
-    ar.stream_write([url], [output])
+    _ = ogc.streaming_download(url, fnames=output)
     vaa = pd.read_parquet(output)
     vaa = vaa.astype(dtypes, errors="ignore")
     output.unlink()
