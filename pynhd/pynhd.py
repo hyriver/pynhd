@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Mapping, Sequence, Union
+from typing import TYPE_CHECKING, Any, Mapping, Sequence, Union
 
 import async_retriever as ar
 import geopandas as gpd
@@ -11,7 +11,6 @@ import pandas as pd
 import pygeoogc as ogc
 import pygeoutils as geoutils
 import pyproj
-import shapely.geometry as sgeom
 from loguru import logger
 from pygeoogc import WFS, InputValueError, ServiceUnavailableError, ServiceURL
 from pygeoogc import ZeroMatchedError as ZeroMatchedErrorOGC
@@ -20,7 +19,10 @@ from pygeoutils import EmptyResponseError, InputTypeError
 from .core import AGRBase, GeoConnex, PyGeoAPIBase, PyGeoAPIBatch
 from .exceptions import InputRangeError, MissingItemError, ZeroMatchedError
 
-CRSTYPE = Union[int, str, pyproj.CRS]
+if TYPE_CHECKING:
+    from shapely.geometry import MultiPolygon, Polygon
+
+    CRSTYPE = Union[int, str, pyproj.CRS]
 
 
 class NHD(AGRBase):
@@ -126,10 +128,10 @@ class PyGeoAPI(PyGeoAPIBase):
         >>> print(gdf.comid.iloc[0])  # doctest: +SKIP
         22294818
         """
-        lon, lat = self._check_coords(coord, crs)[0]
-        url = self._get_url("flowtrace")
-        payload = self._request_body([{"lat": lat, "lon": lon, "direction": direction}])
-        return self._get_response(url, payload)
+        lon, lat = self.check_coords(coord, crs)[0]
+        url = self.get_url("flowtrace")
+        payload = self.request_body([{"lat": lat, "lon": lon, "direction": direction}])
+        return self.get_response(url, payload)
 
     def split_catchment(
         self, coord: tuple[float, float], crs: CRSTYPE = 4326, upstream: bool = False
@@ -159,10 +161,10 @@ class PyGeoAPI(PyGeoAPIBase):
         >>> print(gdf.catchmentID.iloc[0])  # doctest: +SKIP
         22294818
         """
-        lon, lat = self._check_coords(coord, crs)[0]
-        url = self._get_url("splitcatchment")
-        payload = self._request_body([{"lat": lat, "lon": lon, "upstream": upstream}])
-        return self._get_response(url, payload)
+        lon, lat = self.check_coords(coord, crs)[0]
+        url = self.get_url("splitcatchment")
+        payload = self.request_body([{"lat": lat, "lon": lon, "upstream": upstream}])
+        return self.get_response(url, payload)
 
     def elevation_profile(
         self,
@@ -177,7 +179,7 @@ class PyGeoAPI(PyGeoAPIBase):
         ----------
         coords : list
             A list of two coordinates to trace as a list of tuples, e.g.,
-            [(lon1, lat1), (lon2, lat2)].
+            [(x1, y1), (x2, y2)].
         numpts : int
             The number of points to extract the elevation profile from the DEM.
         dem_res : int
@@ -200,16 +202,13 @@ class PyGeoAPI(PyGeoAPIBase):
         >>> print(gdf.iloc[-1, 1])  # doctest: +SKIP
         411.5906
         """
-        if not isinstance(coords, list) or any(len(c) != 2 for c in coords):
-            raise InputTypeError("coords", "list", "[(lon1, lat1), (lon2, lat2)]")
+        lons, lats = zip(*self.check_coords(coords, crs))
 
-        lons, lats = zip(*self._check_coords(coords, crs))
-
-        url = self._get_url("xsatendpts")
-        payload = self._request_body(
-            [{"lat": list(lats), "lon": list(lons), "numpts": numpts, "3dep_res": dem_res}]
+        url = self.get_url("xsatendpts")
+        payload = self.request_body(
+            [{"lat": lats, "lon": lons, "numpts": numpts, "3dep_res": dem_res}]
         )
-        return self._get_response(url, payload)
+        return self.get_response(url, payload)
 
     def cross_section(
         self, coord: tuple[float, float], width: float, numpts: int, crs: CRSTYPE = 4326
@@ -240,10 +239,10 @@ class PyGeoAPI(PyGeoAPIBase):
         >>> print(gdf.iloc[-1, 1])  # doctest: +SKIP
         1000.0
         """
-        lon, lat = self._check_coords(coord, crs)[0]
-        url = self._get_url("xsatpoint")
-        payload = self._request_body([{"lat": lat, "lon": lon, "width": width, "numpts": numpts}])
-        return self._get_response(url, payload)
+        lon, lat = self.check_coords(coord, crs)[0]
+        url = self.get_url("xsatpoint")
+        payload = self.request_body([{"lat": lat, "lon": lon, "width": width, "numpts": numpts}])
+        return self.get_response(url, payload)
 
 
 def pygeoapi(coords: gpd.GeoDataFrame, service: str) -> gpd.GeoDataFrame:
@@ -284,7 +283,7 @@ def pygeoapi(coords: gpd.GeoDataFrame, service: str) -> gpd.GeoDataFrame:
     ...             "none",
     ...         ]
     ...     },
-    ...     geometry=[sgeom.Point((1774209.63, 856381.68))],
+    ...     geometry=[Point((1774209.63, 856381.68))],
     ...     crs="ESRI:102003",
     ... )
     >>> trace = nhd.pygeoapi(gdf, "flow_trace")
@@ -292,9 +291,9 @@ def pygeoapi(coords: gpd.GeoDataFrame, service: str) -> gpd.GeoDataFrame:
     22294818
     """
     pgab = PyGeoAPIBatch(coords)
-    url = pgab._get_url(pgab.service[service])
+    url = pgab.get_url(pgab.service[service])
     payload = pgab.get_payload(service)
-    gdf = pgab._get_response(url, payload)
+    gdf = pgab.get_response(url, payload)
     if service == "flow_trace":
         gdf["comid"] = gdf["comid"].astype("Int64")
         feat = gdf[~gdf.comid.isna()].set_index("req_idx")
@@ -409,7 +408,7 @@ class WaterData:
 
     def bygeom(
         self,
-        geometry: sgeom.Polygon | sgeom.MultiPolygon,
+        geometry: Polygon | MultiPolygon,
         geo_crs: CRSTYPE = 4326,
         xy: bool = True,
         predicate: str = "INTERSECTS",
@@ -1161,14 +1160,7 @@ def geoconnex(
     | (
         dict[
             str,
-            (
-                str
-                | int
-                | float
-                | tuple[float, float, float, float]
-                | sgeom.Polygon
-                | sgeom.MultiPolygon
-            ),
+            (str | int | float | tuple[float, float, float, float] | Polygon | MultiPolygon),
         ]
     ) = None,
     skip_geometry: bool = False,
