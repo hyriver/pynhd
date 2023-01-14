@@ -5,7 +5,7 @@ import contextlib
 import io
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import async_retriever as ar
 import cytoolz as tlz
@@ -394,6 +394,8 @@ def epa_nhd_catchments(
             for comid in clist
         ]
     )
+    urls = cast("list[str]", urls)
+    kwds = cast("list[dict[str, Any]]", kwds)
     resp = ar.retrieve_json(urls, kwds)
     info = pd.DataFrame.from_dict(
         {i: pd.Series(r["metadata"]) for i, r in zip(clist, resp)}, orient="index"
@@ -436,7 +438,7 @@ class StreamCat:
         self.valid_counties = pd.DataFrame.from_dict(params["county"]["options"], orient="index")
         self.valid_aois = params["areaOfInterest"]["options"]
 
-    def _validate(
+    def validate(
         self,
         name: list[str] | None = None,
         region: list[str] | None = None,
@@ -460,7 +462,7 @@ class StreamCat:
         if aoi and not set(aoi).issubset(self.valid_aois):
             raise InputValueError("metric_areas", self.valid_aois)
 
-    def _id_kwds(
+    def id_kwds(
         self,
         comids: int | list[int] | None = None,
         regions: str | list[str] | None = None,
@@ -482,11 +484,11 @@ class StreamCat:
             )
         elif regions is not None:
             ids = [regions] if isinstance(regions, str) else regions
-            self._validate(region=ids)
+            self.validate(region=ids)
             params["region"] = ",".join(ids)
         elif states is not None:
             ids = [states.upper()] if isinstance(states, str) else [s.upper() for s in states]
-            self._validate(state=ids)
+            self.validate(state=ids)
             params["state"] = ",".join(ids)
         elif conus:
             params["conus"] = "true"
@@ -563,17 +565,17 @@ def streamcat(
     """
     sc = StreamCat()
     name = [metric_names] if isinstance(metric_names, str) else metric_names
-    sc._validate(name=name)
+    sc.validate(name=name)
     params = {"name": ",".join(name)}
     key_count = len(",".join(params["name"]))
 
     if metric_areas:
         aoi = [metric_areas] if isinstance(metric_areas, str) else metric_areas
-        sc._validate(aoi=aoi)
+        sc.validate(aoi=aoi)
         params["areaOfInterest"] = ",".join(aoi)
         key_count += len(",".join(params["areaOfInterest"]))
 
-    ids = sc._id_kwds(comids, regions, states, counties, conus)
+    ids = sc.id_kwds(comids, regions, states, counties, conus)
     if ids:
         params.update(ids)
         key_count += len(",".join(next(iter(ids.values()))))
