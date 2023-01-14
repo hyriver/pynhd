@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterator, NamedTuple, Union
+from typing import TYPE_CHECKING, Any, Iterator, NamedTuple, Union, cast
 
 import async_retriever as ar
 import cytoolz as tlz
@@ -50,6 +50,8 @@ else:
     logger.disable("pynhd")
 
 if TYPE_CHECKING:
+    from shapely.geometry import MultiPolygon, Polygon
+
     CRSTYPE = Union[int, str, pyproj.CRS]
 
 __all__ = ["AGRBase", "ScienceBase", "GeoConnex"]
@@ -193,7 +195,7 @@ class AGRBase:
 
     def bygeom(
         self,
-        geom: sgeom.Polygon | list[tuple[float, float]] | tuple[float, float, float, float],
+        geom: Polygon | list[tuple[float, float]] | tuple[float, float, float, float],
         geo_crs: CRSTYPE = 4326,
         sql_clause: str = "",
         distance: int | None = None,
@@ -297,12 +299,12 @@ class PyGeoAPIBase:
         self.base_url = ServiceURL().restful.pygeoapi
         self.req_idx: list[int | str] = [0]
 
-    def _get_url(self, operation: str) -> str:
+    def get_url(self, operation: str) -> str:
         """Set the service url."""
         return f"{self.base_url}/nldi-{operation}/execution"
 
     @staticmethod
-    def _request_body(
+    def request_body(
         id_value: list[dict[str, Any]]
     ) -> list[dict[str, dict[str, list[dict[str, Any]]]]]:
         """Return a valid request body."""
@@ -313,7 +315,7 @@ class PyGeoAPIBase:
                         {
                             "id": f"{i}",
                             "type": "text/plain",
-                            "value": v if isinstance(v, list) else f"{v}",
+                            "value": list(v) if isinstance(v, (list, tuple)) else f"{v}",
                         }
                         for i, v in iv.items()
                     ]
@@ -322,17 +324,20 @@ class PyGeoAPIBase:
             for iv in id_value
         ]
 
-    def _get_response(
+    def get_response(
         self, url: str, payload: list[dict[str, dict[str, list[dict[str, Any]]]]]
     ) -> gpd.GeoDataFrame:
         """Post the request and return the response as a GeoDataFrame."""
         resp = ar.retrieve_json([url] * len(payload), payload, "POST")
         nfeat = len(resp)
-        idx, resp = zip(*[(i, r) for i, r in enumerate(resp) if "code" not in r])
-
-        if len(resp) == 0:
+        try:
+            idx, resp = zip(*((i, r) for i, r in enumerate(resp) if "code" not in r))
+        except ValueError:
             msg = "Invalid inpute parameters, check them and retry."
             raise ServiceError(msg)
+
+        idx = cast("tuple[int]", idx)
+        resp = cast("tuple[dict[str, Any]]", resp)
 
         if len(resp) < nfeat:
             logger.warning(
@@ -356,17 +361,28 @@ class PyGeoAPIBase:
         return gdf.reset_index().rename(columns={"level_0": "req_idx"}).drop(columns=drop_cols)
 
     @staticmethod
-    def _check_coords(
+    def check_coords(
         coords: tuple[float, float] | list[tuple[float, float]],
         crs: CRSTYPE,
     ) -> list[tuple[float, float]]:
         """Check the coordinates."""
-        _coords = [coords] if isinstance(coords, tuple) else coords
+        try:
+            mps = sgeom.MultiPoint(coords)
+        except TypeError:
+            try:
+                mps = sgeom.MultiPoint([coords])
+            except ValueError as ex:
+                raise InputTypeError(
+                    "coords", "tuple or list of them", "(x, y) or [(x, y), ...]"
+                ) from ex
+        except ValueError as ex:
+            raise InputTypeError(
+                "coords", "tuple or list of them", "(x, y) or [(x, y), ...]"
+            ) from ex
 
-        if not isinstance(_coords, list) or any(len(c) != 2 for c in _coords):
-            raise InputTypeError("coords", "tuple or list", "(lon, lat) or [(lon, lat), ...]")
-
-        return ogc_utils.match_crs(_coords, crs, 4326)
+        _coords = [(p.x, p.y) for p in mps.geoms]
+        _coords = [(round(x, 6), round(y, 6)) for x, y in ogc_utils.match_crs(_coords, crs, 4326)]
+        return _coords
 
 
 class PyGeoAPIBatch(PyGeoAPIBase):
@@ -448,7 +464,7 @@ class PyGeoAPIBatch(PyGeoAPIBase):
             if any(len(g.geoms) != 2 for g in coords.geometry):
                 raise InputTypeError("coords", "MultiPoint of length 2")
 
-            return self._request_body(
+            return self.request_body(
                 [
                     {
                         "lat": [g.y for g in mp.geoms],
@@ -459,7 +475,7 @@ class PyGeoAPIBatch(PyGeoAPIBase):
                 ]
             )
 
-        return self._request_body(
+        return self.request_body(
             [{"lat": g.y, "lon": g.x, **dict(zip(attrs, list(u)))} for g, *u in geo_iter]
         )
 
@@ -516,12 +532,12 @@ class GeoConnex:
     """
 
     @staticmethod
-    def __get_url(url: str, kwds: dict[str, str] | None = None) -> dict[str, Any]:
+    def _get_url(url: str, kwds: dict[str, str] | None = None) -> dict[str, Any]:
         params = {"params": {**kwds, "f": "json"}} if kwds else {"params": {"f": "json"}}
         return ar.retrieve_json([url], [params])[0]
 
-    def __get_endpoints(self) -> dict[str, EndPoints]:
-        pluck = tlz.partial(tlz.pluck, seqs=self.__get_url(self.base_url)["collections"])
+    def _get_endpoints(self) -> dict[str, EndPoints]:
+        pluck = tlz.partial(tlz.pluck, seqs=self._get_url(self.base_url)["collections"])
 
         def get_links(links: list[dict[str, Any]]) -> dict[str, str | list[str]]:
             """Get links."""
@@ -530,7 +546,7 @@ class GeoConnex:
                 for lk in links
                 if lk["type"] == "application/json"
             }
-            fields = list(self.__get_url(urls["queryables"])["properties"])
+            fields = list(self._get_url(urls["queryables"])["properties"])
             if "geom" in fields:
                 fields.remove("geom")
                 if "geometry" not in fields:
@@ -556,12 +572,12 @@ class GeoConnex:
 
     def __init__(self, item: str | None = None) -> None:
         self.base_url = f"{ServiceURL().restful.geoconnex}/collections"
-        self.endpoints = self.__get_endpoints()
+        self.endpoints = self._get_endpoints()
         self.query_url: str | None = None
         self.item = item
 
     @staticmethod
-    def __get_urls(url: str, kwds: list[dict[str, str]]) -> list[dict[str, Any]]:
+    def _get_urls(url: str, kwds: list[dict[str, Any]]) -> list[dict[str, Any]]:
         params = [{"params": {**kwd, "f": "json"}} for kwd in kwds]
         return ar.retrieve_json([url] * len(kwds), params)
 
@@ -584,14 +600,7 @@ class GeoConnex:
         self,
         kwds: dict[
             str,
-            (
-                str
-                | int
-                | float
-                | tuple[float, float, float, float]
-                | sgeom.Polygon
-                | sgeom.MultiPolygon
-            ),
+            (str | int | float | tuple[float, float, float, float] | Polygon | MultiPolygon),
         ],
         skip_geometry: bool = False,
     ) -> gpd.GeoDataFrame:
@@ -621,7 +630,7 @@ class GeoConnex:
             ]
 
             try:
-                gdf = geoutils.json2geodf(self.__get_urls(self.query_url, param_list))
+                gdf = geoutils.json2geodf(self._get_urls(self.query_url, param_list))
             except EmptyResponseError as ex:
                 raise ZeroMatchedError from ex
 
@@ -632,7 +641,7 @@ class GeoConnex:
             gdf = gdf.iloc[idx].reset_index(drop=True)
         else:
             try:
-                gdf = geoutils.json2geodf(self.__get_url(self.query_url, kwds))  # type: ignore
+                gdf = geoutils.json2geodf(self._get_url(self.query_url, kwds))  # type: ignore
             except EmptyResponseError as ex:
                 raise ZeroMatchedError from ex
 
