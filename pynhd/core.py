@@ -332,29 +332,27 @@ class PyGeoAPIBase:
         nfeat = len(resp)
         try:
             idx, resp = zip(*((i, r) for i, r in enumerate(resp) if "code" not in r))
-        except ValueError:
-            msg = "Invalid inpute parameters, check them and retry."
-            raise ServiceError(msg)
+            idx = cast("tuple[int]", idx)
+            resp = cast("tuple[dict[str, Any]]", resp)
 
-        idx = cast("tuple[int]", idx)
-        resp = cast("tuple[dict[str, Any]]", resp)
-
-        if len(resp) < nfeat:
-            logger.warning(
-                " ".join(
-                    [
-                        f"There was {nfeat - len(resp)} requests that",
-                        "didn't return any features. Check their parameters and retry.",
-                    ]
+            if len(resp) < nfeat:
+                logger.warning(
+                    " ".join(
+                        [
+                            f"There are {nfeat - len(resp)} requests that",
+                            "didn't return any feature. Check their parameters and retry.",
+                        ]
+                    )
                 )
-            )
-        try:
             gdf = gpd.GeoDataFrame(
                 pd.concat(
                     (geoutils.json2geodf(r) for r in resp), keys=[self.req_idx[i] for i in idx]
                 ),
                 crs=4326,
             )
+        except ValueError as ex:
+            msg = "Invalid inpute parameters, check them and retry."
+            raise ServiceError(msg) from ex
         except EmptyResponseError as ex:
             raise ZeroMatchedError from ex
         drop_cols = ["level_1", "spatial_ref"] if "spatial_ref" in gdf else ["level_1"]
@@ -596,6 +594,12 @@ class GeoConnex:
         else:
             self.query_url = None
 
+    def _get_geodf(self, kwds: list[dict[str, Any]]) -> gpd.GeoDataFrame:
+        try:
+            return geoutils.json2geodf(self._get_urls(self.query_url, kwds))
+        except EmptyResponseError as ex:
+            raise ZeroMatchedError from ex
+
     def query(
         self,
         kwds: dict[
@@ -619,31 +623,23 @@ class GeoConnex:
 
         if "geometry" in kwds:
             geometry = geoutils.geometry_list(kwds["geometry"])
-
             extent = self.endpoints[self.item].extent
             if not all(g.within(sgeom.box(*extent)) for g in geometry):
                 raise InputRangeError("geometry", f"within {extent}")
-
             _ = kwds.pop("geometry")
+
             param_list = [
-                {**kwds, "bbox": ",".join(f"{c:.6f}" for c in g.bounds)} for g in geometry  # type: ignore[arg-type]
+                {**kwds, "bbox": ",".join(f"{c:.6f}" for c in g.bounds)} for g in geometry
             ]
 
-            try:
-                gdf = geoutils.json2geodf(self._get_urls(self.query_url, param_list))
-            except EmptyResponseError as ex:
-                raise ZeroMatchedError from ex
-
+            gdf = self._get_geodf(param_list)
             gdf = gdf.reset_index(drop=True)
             _, idx = gdf.sindex.query_bulk(gpd.GeoSeries(geometry, crs=4326), predicate="contains")
             if len(idx) == 0:
                 raise ZeroMatchedError
             gdf = gdf.iloc[idx].reset_index(drop=True)
         else:
-            try:
-                gdf = geoutils.json2geodf(self._get_url(self.query_url, kwds))  # type: ignore
-            except EmptyResponseError as ex:
-                raise ZeroMatchedError from ex
+            gdf = self._get_geodf([kwds])
 
             if len(gdf) == 0:
                 raise ZeroMatchedError
