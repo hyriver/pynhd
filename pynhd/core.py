@@ -594,9 +594,9 @@ class GeoConnex:
         else:
             self.query_url = None
 
-    def _get_geodf(self, kwds: list[dict[str, Any]]) -> gpd.GeoDataFrame:
+    def _get_geodf(self, url: str, kwds: list[dict[str, Any]]) -> gpd.GeoDataFrame:
         try:
-            return geoutils.json2geodf(self._get_urls(self.query_url, kwds))
+            return geoutils.json2geodf(self._get_urls(url, kwds))
         except EmptyResponseError as ex:
             raise ZeroMatchedError from ex
 
@@ -632,14 +632,14 @@ class GeoConnex:
                 {**kwds, "bbox": ",".join(f"{c:.6f}" for c in g.bounds)} for g in geometry
             ]
 
-            gdf = self._get_geodf(param_list)
+            gdf = self._get_geodf(self.query_url, param_list)
             gdf = gdf.reset_index(drop=True)
             _, idx = gdf.sindex.query_bulk(gpd.GeoSeries(geometry, crs=4326), predicate="contains")
             if len(idx) == 0:
                 raise ZeroMatchedError
             gdf = gdf.iloc[idx].reset_index(drop=True)
         else:
-            gdf = self._get_geodf([kwds])
+            gdf = self._get_geodf(self.query_url, [kwds])
 
             if len(gdf) == 0:
                 raise ZeroMatchedError
