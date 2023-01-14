@@ -257,9 +257,14 @@ class TestGCX:
 def test_nhdphr():
     hr = NHDPlusHR("flowline")
     flwb = hr.bygeom((-69.77, 45.07, -69.31, 45.45))
-    flwi = hr.byids("permanent_identifier", ["103455178", "103454362", "103453218"])
-    flwf = hr.bysql("permanent_identifier IN ('103455178', '103454362', '103453218')")
-    assert flwb.shape[0] == 3887 and flwi["OBJECTID"].tolist() == flwf["OBJECTID"].tolist()
+    ids = ["103453218", "103454362", "103455178"]
+    flwi = hr.byids("permanent_identifier", ids)
+    ids_str = ", ".join([f"'{i}'" for i in ids])
+    flwf = hr.bysql(f"permanent_identifier IN ({ids_str})")
+    assert (
+        flwb.shape[0] == 3887
+        and sorted(flwi["permanent_identifier"]) == sorted(flwf["permanent_identifier"]) == ids
+    )
 
 
 @pytest.mark.xfail(reason="Hydroshare is unstable.")
