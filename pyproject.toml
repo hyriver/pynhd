@@ -55,3 +55,20 @@ target-version = ['py38']
 [tool.refurb]
 quiet = true
 python_version = "3.10"
+
+[tool.pyright]
+include = ["pynhd"]
+exclude = [
+    ".nox/",
+    "**/__pycache__",
+    "**/__init__.py",
+    "tests/",
+]
+typeCheckingMode = "strict"
+reportMissingTypeStubs = false
+reportUnknownVariableType = false
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportUnknownLambdaType = false
+reportUnknownParameterType = false
+reportUnnecessaryIsInstance = false
