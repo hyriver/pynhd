@@ -18,9 +18,9 @@ from pygeoutils import GeoBSpline, InputTypeError
 from shapely import ops
 from shapely.geometry import LineString, MultiLineString, Point
 
-from . import nhdplus_derived as derived
-from .core import ScienceBase
-from .exceptions import DependencyError, InputValueError, MissingCRSError, MissingItemError
+from pynhd import nhdplus_derived as derived
+from pynhd.core import ScienceBase
+from pynhd.exceptions import DependencyError, InputValueError, MissingCRSError, MissingItemError
 
 try:
     from pandas.errors import IntCastingNaNError

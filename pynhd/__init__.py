@@ -6,8 +6,8 @@ if int(version("shapely").split(".")[0]) > 1:
 
     os.environ["USE_PYGEOS"] = "0"
 
-from .core import AGRBase, GeoConnex, ScienceBase
-from .exceptions import (
+from pynhd.core import AGRBase, GeoConnex, ScienceBase
+from pynhd.exceptions import (
     DependencyError,
     InputRangeError,
     InputTypeError,
@@ -17,7 +17,7 @@ from .exceptions import (
     MissingItemError,
     ZeroMatchedError,
 )
-from .network_tools import (
+from pynhd.network_tools import (
     enhd_flowlines_nx,
     flowline_resample,
     flowline_xsection,
@@ -30,7 +30,7 @@ from .network_tools import (
     topoogical_sort,
     vector_accumulation,
 )
-from .nhdplus_derived import (
+from pynhd.nhdplus_derived import (
     StreamCat,
     enhd_attrs,
     epa_nhd_catchments,
@@ -40,8 +40,8 @@ from .nhdplus_derived import (
     nhdplus_vaa,
     streamcat,
 )
-from .print_versions import show_versions
-from .pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData, geoconnex, pygeoapi
+from pynhd.print_versions import show_versions
+from pynhd.pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData, geoconnex, pygeoapi
 
 try:
     __version__ = version("pynhd")

@@ -14,8 +14,8 @@ import pyarrow.dataset as pds
 import pygeoogc as ogc
 from pyarrow import fs
 
-from .core import ScienceBase, get_parquet
-from .exceptions import InputValueError, ServiceError
+from pynhd.core import ScienceBase, get_parquet
+from pynhd.exceptions import InputValueError, ServiceError
 
 if TYPE_CHECKING:
     from pyarrow.dataset import FileSystemDataset

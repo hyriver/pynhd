@@ -16,8 +16,8 @@ from pygeoogc import WFS, InputValueError, ServiceUnavailableError, ServiceURL
 from pygeoogc import ZeroMatchedError as ZeroMatchedErrorOGC
 from pygeoutils import EmptyResponseError, InputTypeError
 
-from .core import AGRBase, GeoConnex, PyGeoAPIBase, PyGeoAPIBatch
-from .exceptions import InputRangeError, MissingItemError, ZeroMatchedError
+from pynhd.core import AGRBase, GeoConnex, PyGeoAPIBase, PyGeoAPIBatch
+from pynhd.exceptions import InputRangeError, MissingItemError, ZeroMatchedError
 
 if TYPE_CHECKING:
     from shapely.geometry import MultiPolygon, Polygon

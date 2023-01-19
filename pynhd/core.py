@@ -18,7 +18,7 @@ from pygeoogc import ArcGISRESTful, ServiceURL
 from pygeoogc import utils as ogc_utils
 from pygeoutils import EmptyResponseError
 
-from .exceptions import (
+from pynhd.exceptions import (
     InputRangeError,
     InputTypeError,
     InputValueError,
