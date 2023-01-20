@@ -2,7 +2,7 @@
 import io
 import operator
 import os
-import sys
+import importlib.util
 from pathlib import Path
 
 import geopandas as gpd
@@ -13,7 +13,7 @@ from shapely.geometry import MultiPoint, Point, box
 import pynhd as nhd
 from pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData
 
-has_typeguard = True if sys.modules.get("typeguard") else False
+has_typeguard = True if importlib.util.find_spec("typeguard") else False
 is_ci = os.environ.get("GH_CI") == "true"
 STA_ID = "01031500"
 station_id = f"USGS-{STA_ID}"
@@ -200,7 +200,7 @@ class TestNHDAttrs:
 
     def test_meta(self):
         meta = nhd.nhdplus_attrs()
-        assert len(meta) == 592
+        assert len(meta) == 603
 
     def test_sb(self):
         attr = nhd.nhdplus_attrs("BANKFULL")
@@ -275,13 +275,18 @@ def test_nhdplus_vaa():
     assert_close(vaa.slope.max(), 4.6)
 
 
-def test_use_enhd(trib):
-    org_attrs = nhd.prepare_nhdplus(trib, 0, 0, 0, use_enhd_attrs=False)
-    enhd_attrs_na = nhd.prepare_nhdplus(trib, 0, 0, 0, use_enhd_attrs=False, terminal2nan=False)
-    enhd_attrs = nhd.prepare_nhdplus(trib, 0, 0, 0, use_enhd_attrs=True, terminal2nan=True)
-    assert (enhd_attrs.tocomid != org_attrs.tocomid).sum() and (
-        enhd_attrs_na.tocomid != enhd_attrs.tocomid
-    ).sum()
+class TestENHD:
+    def test_wo_enhd_w_nan(self, trib: gpd.GeoDataFrame):
+        attrs = nhd.prepare_nhdplus(trib, 0, 0, 0, use_enhd_attrs=False, terminal2nan=True)
+        assert attrs.tocomid.isna().sum() == 1
+
+    def test_wo_enhd_wo_nan(self, trib: gpd.GeoDataFrame):
+        attrs = nhd.prepare_nhdplus(trib, 0, 0, 0, use_enhd_attrs=False, terminal2nan=False)
+        assert attrs.tocomid.isna().sum() == 0
+
+    def test_w_enhd_w_nan(self, trib: gpd.GeoDataFrame):
+        attrs = nhd.prepare_nhdplus(trib, 0, 0, 0, use_enhd_attrs=True, terminal2nan=True)
+        assert attrs.tocomid.isna().sum() == 1
 
 
 def test_acc(trib):
