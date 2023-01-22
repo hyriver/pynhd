@@ -29,6 +29,7 @@ except ImportError:
 
 if TYPE_CHECKING:
     from pandas._libs.missing import NAType
+    from pandas.core.groupby.generic import DataFrameGroupBy
     from pygeoutils.pygeoutils import Spline
 
 
@@ -144,7 +145,7 @@ class NHDTools:
         self.check_requirements(req_cols, self.flw)
         try:
             self.flw[req_cols] = self.flw[req_cols].astype("int64")
-        except (TypeError, IntCastingNaNError):
+        except (ValueError, TypeError, IntCastingNaNError):
             self.flw[req_cols] = self.flw[req_cols].astype("Int64")
 
     def to_linestring(self) -> None:
@@ -212,17 +213,14 @@ class NHDTools:
         """Remove isolated flowlines."""
         req_cols = ["comid", "tocomid"]
         self.check_requirements(req_cols, self.flw)
-        if self.flw.tocomid.isna().sum() > 0:
-            enhd_attrs = derived.enhd_attrs()
-            self.flw = self.flw.reset_index().set_index("comid")
-            self.flw["tocomid"] = enhd_attrs.set_index("comid")["tocomid"]
-            self.flw = self.flw.reset_index().set_index("index")
+        tocomid_na = self.flw.tocomid.isna()
+        if tocomid_na.any():
+            self.flw.loc[tocomid_na, "tocomid"] = -self.flw.loc[tocomid_na, "comid"]
 
-        zeros = self.flw.tocomid == 0
-        if zeros.sum() > 0:
-            self.flw.loc[zeros, "tocomid"] = -self.flw.loc[zeros, "comid"]
         comids = max(nx.weakly_connected_components(nhdflw2nx(self.flw)), key=len)
         self.flw = self.flw[self.flw.comid.isin(comids)].copy()
+        self.flw.loc[self.flw.tocomid < 0, "tocomid"] = pd.NA
+        self.flw = self.flw.reset_index(drop=True)
 
     def add_tocomid(self) -> None:
         """Find the downstream comid(s) of each comid in NHDPlus flowline database.
@@ -236,26 +234,24 @@ class NHDTools:
         self.check_requirements(req_cols, self.flw)
         try:
             self.flw[req_cols] = self.flw[req_cols].astype("int64")
-        except (TypeError, IntCastingNaNError):
+        except (ValueError, TypeError, IntCastingNaNError):
             self.flw[req_cols] = self.flw[req_cols].astype("Int64")
 
         if "tocomid" in self.flw:
             self.flw = self.flw.drop(columns="tocomid")
 
-        def tocomid(grp: pd.core.groupby.generic.DataFrameGroupBy) -> pd.Series:
-            def toid(tonode: pd.DataFrame) -> pd.NaT | pd.Int64Dtype:
-                try:
-                    return grp[grp.fromnode == tonode].comid.iloc[0]
-                except IndexError:
-                    return pd.NA
-
-            return pd.Series(
-                {i: toid(n) for i, n in grp[["comid", "tonode"]].itertuples(index=False, name=None)}
+        def tocomid(grp: DataFrameGroupBy) -> pd.DataFrame:
+            g_merged = pd.merge(
+                grp[["comid", "tonode"]],
+                grp[["comid", "fromnode"]].rename(columns={"comid": "tocomid"}),
+                left_on="tonode",
+                right_on="fromnode",
             )
+            g_merged = g_merged[["comid", "tocomid"]].astype("Int64")
+            return grp.merge(g_merged, on="comid", how="left")
 
-        toid = pd.concat(tocomid(g) for _, g in self.flw[req_cols].groupby("terminalpa"))
-        toid = toid.reset_index().rename(columns={"index": "comid", 0: "tocomid"})
-        self.flw = self.flw.merge(toid, on="comid")
+        self.flw = pd.concat(tocomid(g) for _, g in self.flw.groupby("terminalpa"))
+        self.flw = self.flw.reset_index(drop=True)
 
     @staticmethod
     def check_requirements(reqs: Iterable[str], cols: Iterable[str]) -> None:
