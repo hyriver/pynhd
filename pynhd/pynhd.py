@@ -482,7 +482,7 @@ class WaterData:
         if not (isinstance(coords, tuple) and len(coords) == 2):
             raise InputTypeError("coods", "tuple of length 2", "(x, y)")
 
-        x, y = ogc.utils.match_crs([coords], loc_crs, self.wfs.crs)[0]
+        x, y = ogc.match_crs([coords], loc_crs, self.wfs.crs)[0]
         geom_name = self.wfs.schema[self.layer].get("geometry_column", "the_geom")
         cql_filter = f"DWITHIN({geom_name},POINT({y:.6f} {x:.6f}),{distance},meters)"
         resp: list[dict[str, Any]] = self.wfs.getfeature_byfilter(  # type: ignore
@@ -782,7 +782,7 @@ class NLDI:
         if not isinstance(_coords, list) or any(len(c) != 2 for c in _coords):
             raise InputTypeError("coords", "list or tuple")
 
-        _coords = ogc.utils.match_crs(_coords, loc_crs, 4326)
+        _coords = ogc.match_crs(_coords, loc_crs, 4326)
 
         urls = {
             f"{(lon, lat)}": (base_url, {"coords": f"POINT({lon} {lat})"}) for lon, lat in _coords
@@ -1016,7 +1016,7 @@ class NLDI:
             raise InputValueError("char", list(self.valid_chartypes))
 
         resp = self._get_url("/".join([self.base_url, "lookups", char_type, "characteristics"]))
-        c_list = ogc.utils.traverse_json(resp, ["characteristicMetadata", "characteristic"])
+        c_list = ogc.traverse_json(resp, ["characteristicMetadata", "characteristic"])
         return pd.DataFrame.from_dict(
             {c.pop("characteristic_id"): c for c in c_list}, orient="index"
         )
