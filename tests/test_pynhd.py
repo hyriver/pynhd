@@ -1,8 +1,8 @@
 """Tests for PyNHD package."""
+import importlib.util
 import io
 import operator
 import os
-import importlib.util
 from pathlib import Path
 
 import geopandas as gpd
