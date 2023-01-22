@@ -5,10 +5,20 @@ History
 0.13.12 (unreleased)
 --------------------
 
+New Features
+~~~~~~~~~~~~
+- Modify ``prepare_nhdplus``, so it can work with both NHDPlus HR in
+  addition to NHDPlus MR. Just note that this function expects a ``comid``
+  column, so since NHDPlus HR has a ``nhdplusid`` column, you need to
+  rename it to ``comid`` before using this function, like so:
+  ``flw_hr = flw_hr.rename(columns={'nhdplusid': 'comid'})``.
+
 Internal Changes
 ~~~~~~~~~~~~~~~~
 - Fully migrate ``setup.cfg`` and ``setup.py`` to ``pyproject.toml``.
 - Convert relative imports to absolute with ``absolufy-imports``.
+- Improve performance of ``prepare_nhdplus`` by using ``pandas.merge``
+  instead of applying a function to each row of the dataframe.
 
 0.13.10 (2023-01-08)
 --------------------
