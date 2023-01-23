@@ -71,10 +71,18 @@ def nhdflw2nx(
     Returns
     -------
     nx.DiGraph
-        Networkx directed graph of the NHDPlus flowlines.
+        Networkx directed graph of the NHDPlus flowlines. Note that all elements of
+        the ``toid_col`` are replaced with negative values of their corresponding
+        ``id_cl`` values if they are ``NaN`` or 0. This is to ensure that the generated
+        nodes in the graph are unique.
     """
+    flw = flowlines.copy()
+    tocomid_na = flw[toid_col].isna() | (flw[toid_col] == 0)
+    if tocomid_na.any():
+        flw.loc[tocomid_na, toid_col] = -flw.loc[tocomid_na, id_col]
+
     return nx.from_pandas_edgelist(
-        flowlines,
+        flw,
         source=id_col,
         target=toid_col,
         create_using=nx.DiGraph,
@@ -104,7 +112,7 @@ class NHDTools:
         flowlines: gpd.GeoDataFrame,
     ):
         self.flw: gpd.GeoDataFrame = flowlines.copy()
-        self.nrows: int = flowlines.shape[0]
+        self.nrows = flowlines.shape[0]
         self.crs = flowlines.crs
 
     def clean_flowlines(self, use_enhd_attrs: bool, terminal2nan: bool) -> None:
@@ -213,7 +221,7 @@ class NHDTools:
         """Remove isolated flowlines."""
         req_cols = ["comid", "tocomid"]
         self.check_requirements(req_cols, self.flw)
-        tocomid_na = self.flw.tocomid.isna()
+        tocomid_na = self.flw.tocomid.isna() | (self.flw.tocomid == 0)
         if tocomid_na.any():
             self.flw.loc[tocomid_na, "tocomid"] = -self.flw.loc[tocomid_na, "comid"]
 
@@ -282,7 +290,7 @@ def prepare_nhdplus(
     use_enhd_attrs: bool = False,
     terminal2nan: bool = True,
 ) -> gpd.GeoDataFrame:
-    """Clean up and fix common issues of NHDPlus flowline database.
+    """Clean up and fix common issues of NHDPlus MR and HR flowlines.
 
     Ported from `nhdplusTools <https://github.com/USGS-R/nhdplusTools>`__.
 
@@ -302,18 +310,20 @@ def prepare_nhdplus(
         Drainage basins with an outlet drainage area smaller than
         this value will be removed. Defaults to 0.
     purge_non_dendritic : bool, optional
-        Whether to remove non dendritic paths, defaults to False.
+        Whether to remove non dendritic paths, defaults to ``False``.
     remove_isolated : bool, optional
-        Whether to remove isolated flowlines, defaults to False. If True,
-        ``terminal2nan`` will be set to False.
+        Whether to remove isolated flowlines, i.e., keep only the largest
+        connected component of the flowlines. Defaults to ``False``.
     use_enhd_attrs : bool, optional
-        Whether to replace the attributes with the ENHD attributes, defaults to False.
-        For more information, see
+        Whether to replace the attributes with the ENHD attributes, defaults
+        to ``False``. Note that this only works for NHDPlus mid-resolution (MR) and
+        does not work for NHDPlus high-resolution (HR). For more information, see
         `this <https://www.sciencebase.gov/catalog/item/60c92503d34e86b9389df1c9>`__.
     terminal2nan : bool, optional
         Whether to replace the COMID of the terminal flowline of the network with NaN,
-        defaults to True. If False, the terminal COMID will be set from the
-        ENHD attributes i.e. use_enhd_attrs will be set to True.
+        defaults to ``True``. If ``False``, the terminal COMID will be set from the
+        ENHD attributes i.e. ``use_enhd_attrs`` will be set to ``True`` which is only
+        applicable to NUHDPlus mid-resolution (MR).
 
     Returns
     -------
@@ -351,8 +361,27 @@ def prepare_nhdplus(
     return nhd.flw
 
 
+def _create_subgraph(graph: nx.DiGraph, nodes: list[int]) -> nx.DiGraph:
+    """Create a subgraph from a list of nodes."""
+    subgraph = graph.__class__()
+    subgraph.add_nodes_from((n, graph.nodes[n]) for n in nodes)
+    subgraph.add_edges_from(
+        (n, nbr, d)
+        for n, nbrs in graph.adj.items()
+        if n in nodes
+        for nbr, d in nbrs.items()
+        if nbr in nodes
+    )
+    subgraph.graph.update(graph.graph)
+    return subgraph
+
+
 def topoogical_sort(
-    flowlines: pd.DataFrame, edge_attr: str | list[str] | None = None, largest_only: bool = False
+    flowlines: pd.DataFrame,
+    edge_attr: str | list[str] | None = None,
+    largest_only: bool = False,
+    id_col: str = "ID",
+    toid_col: str = "toID",
 ) -> tuple[list[np.int64 | NAType], pd.Series, nx.DiGraph]:
     """Topological sorting of a river network.
 
@@ -364,6 +393,10 @@ def topoogical_sort(
         Names of the columns in the dataframe to be used as edge attributes, defaults to None.
     largest_only : bool, optional
         Whether to return only the largest network, defaults to ``False``.
+    id_col : str, optional
+        Name of the column containing the node ID, defaults to "ID".
+    toid_col : str, optional
+        Name of the column containing the downstream node ID, defaults to "toID".
 
     Returns
     -------
@@ -373,12 +406,11 @@ def topoogical_sort(
         and the generated networkx object. Note that the
         terminal node ID is set to pd.NA.
     """
-    flowlines[["ID", "toID"]] = flowlines[["ID", "toID"]].astype("Int64")
-    network = nhdflw2nx(flowlines, "ID", "toID", edge_attr)
+    flowlines[[id_col, toid_col]] = flowlines[[id_col, toid_col]].astype("Int64")
+    network = nhdflw2nx(flowlines, id_col, toid_col, edge_attr)
     if largest_only:
-        n_ids = max(nx.weakly_connected_components(network), key=len)
-        flowlines = flowlines[flowlines.ID.isin(n_ids)]
-        network = nhdflw2nx(flowlines, "ID", "toID", edge_attr)
+        nodes = max(nx.weakly_connected_components(network), key=len)
+        network = _create_subgraph(network, nodes)
     topo_sorted = list(nx.topological_sort(network))
     up_nodes = pd.Series({i: network.predecessors(i) for i in network})
     return topo_sorted, up_nodes, network
@@ -432,9 +464,15 @@ def vector_accumulation(
     if not isinstance(arg_cols, list):
         raise InputTypeError("arg_cols", "list of column names")
 
+    flw = flowlines.copy()
+    flw[[id_col, toid_col]] = flw[[id_col, toid_col]].astype("Int64")
+    toid_na = flw[toid_col].isna() | (flw[toid_col] == 0)
+    if toid_na.any():
+        flw.loc[toid_na, toid_col] = -flw.loc[toid_na, id_col]
+
     graph = nx.relabel.convert_node_labels_to_integers(
         nx.from_pandas_edgelist(
-            flowlines,
+            flw,
             source=id_col,
             target=toid_col,
             create_using=nx.DiGraph,
@@ -447,8 +485,8 @@ def vector_accumulation(
 
     topo_sorted = list(nx.topological_sort(graph))
 
-    outflow = {m_str2int[i]: a for i, a in flowlines.set_index(id_col)[attr_col].items()}
-    attrs = {m_str2int[i]: a.tolist() for i, a in flowlines.set_index(id_col)[arg_cols].iterrows()}
+    outflow = {m_str2int[i]: a for i, a in flw.set_index(id_col)[attr_col].items()}
+    attrs = {m_str2int[i]: a.tolist() for i, a in flw.set_index(id_col)[arg_cols].iterrows()}
 
     for n in topo_sorted:
         if n in outflow:
