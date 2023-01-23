@@ -323,7 +323,7 @@ def prepare_nhdplus(
         Whether to replace the COMID of the terminal flowline of the network with NaN,
         defaults to ``True``. If ``False``, the terminal COMID will be set from the
         ENHD attributes i.e. ``use_enhd_attrs`` will be set to ``True`` which is only
-        applicable to NUHDPlus mid-resolution (MR).
+        applicable to NHDPlus mid-resolution (MR).
 
     Returns
     -------
