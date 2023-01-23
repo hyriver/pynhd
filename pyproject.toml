@@ -85,7 +85,8 @@ skip = "__pycache__,_build,.mypy_cache,.git,./htmlcov,.nox"
 
 [tool.coverage.report]
 exclude_lines = [
-  'raise ServiceUnavailableError'
+  'raise ServiceUnavailableError',
+  "if TYPE_CHECKING:",
 ]
 ignore_errors = true
 
@@ -93,6 +94,10 @@ ignore_errors = true
 branch = true
 parallel = true
 source = ['pynhd']
+omit =[
+    "**/__init__.py",
+    "**/print_versions.py",
+]
 
 [tool.isort]
 default_section = "THIRDPARTY"
