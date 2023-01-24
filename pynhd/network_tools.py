@@ -114,10 +114,14 @@ class NHDTools:
         self.flw: gpd.GeoDataFrame = flowlines.copy()
         self.nrows = flowlines.shape[0]
         self.crs = flowlines.crs
+        self.is_hr = "nhdplusid" in flowlines
 
     def clean_flowlines(self, use_enhd_attrs: bool, terminal2nan: bool) -> None:
         """Clean up flowlines."""
         self.flw.columns = self.flw.columns.str.lower()
+
+        if self.is_hr:
+            self.flw = self.flw.rename(columns={"nhdplusid": "comid"})
 
         if not ("fcode" in self.flw and "ftype" in self.flw):
             raise MissingItemError(["fcode", "ftype"])
@@ -332,8 +336,18 @@ def prepare_nhdplus(
     """
     nhd = NHDTools(flowlines)
 
-    if not nhd.flw.geom_type.eq("LineString").all():
+    if "geometry" in nhd.flw and not nhd.flw.geom_type.eq("LineString").all():
         nhd.to_linestring()
+
+    if nhd.is_hr and use_enhd_attrs:
+        msg = ". ".join(
+            (
+                "ENHD attributes are not available for NHDPlus HR.",
+                "So, use_enhd_attrs is set to False.",
+            )
+        )
+        logger.warning(msg)
+        use_enhd_attrs = False
 
     nhd.clean_flowlines(use_enhd_attrs, terminal2nan)
 
