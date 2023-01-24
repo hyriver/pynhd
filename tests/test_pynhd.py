@@ -132,7 +132,6 @@ class TestPyGeoAPI:
 
 
 class TestNLDI:
-    """Test NLDI service"""
 
     nldi: NLDI = NLDI()
 
