@@ -2,13 +2,14 @@
 History
 =======
 
-0.13.12 (unreleased)
+0.13.12 (2023-01-24)
 --------------------
 
 New Features
 ~~~~~~~~~~~~
-- Modify ``prepare_nhdplus``, so it can work with NHDPlus HR in addition
-  to NHDPlus MR. The function now renames ``nhdplusid`` column to ``comid``.
+- The ``prepare_nhdplus`` now supports NHDPlus HR in addition
+  to NHDPlus MR. It automatically detects the NHDPlus version based on
+  the ID column name: ``nhdplusid`` for HR and ``comid`` for MR.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
