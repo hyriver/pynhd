@@ -842,7 +842,7 @@ class NLDI:
         coords: tuple[float, float] | list[tuple[float, float]],
         loc_crs: CRSTYPE = 4326,
     ) -> gpd.GeoDataFrame | tuple[gpd.GeoDataFrame, list[tuple[float, float]]]:
-        """Get the closest feature ID(s) based on coordinates using ``postion`` endpoint.
+        """Get the closest feature ID(s) based on coordinates using ``position`` endpoint.
 
         Parameters
         ----------
