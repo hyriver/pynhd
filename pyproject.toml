@@ -2,10 +2,13 @@
 build-backend = "setuptools.build_meta"
 requires = [
   "setuptools>=42",
-  "setuptools-scm>=7"
+  "setuptools-scm>=7",
 ]
 
 [project]
+name = "pynhd"
+description = "Access and navigate NHDPlus V2 via various web services, e.g., NLDI and WaterData."
+[project.readme]
 authors = [{name = "Taher Chegini", email = "cheginit@gmail.com"}]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -24,6 +27,7 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Hydrology",
   "Typing :: Typed"
 ]
+content-type = "text/x-rst"
 dependencies = [
   "async-retriever>=0.3.10",
   "cytoolz",
@@ -31,45 +35,43 @@ dependencies = [
   "loguru",
   "networkx",
   "numpy>=1.17",
-  "pandas>=1.0",
+  "pandas>=1",
   "pyarrow>=1.0.1",
   "pygeoogc>=0.13.10",
   "pygeoutils>=0.13.11",
   "shapely>=1.8"
 ]
-description = "Access and navigate NHDPlus V2 via various web services, e.g., NLDI and WaterData."
-dynamic = ["version"]
+dynamic = [
+  "version"
+]
+file = "README.rst"
 license = {text = "MIT"}
-name = "pynhd"
 requires-python = ">=3.8"
 
 [project.optional-dependencies]
 nhdplus = [
   "py7zr",
-  "pyogrio"
+  "pyogrio",
 ]
 test = [
   "coverage[toml]",
   "pytest-cov",
-  "pytest-xdist[psutil]"
+  "pytest-xdist[psutil]",
 ]
 typeguard = [
   "coverage[toml]",
   "pygments",
   "pytest-cov",
   "pytest-xdist[psutil]",
-  "typeguard"
+  "typeguard",
 ]
-
-[project.readme]
-content-type = "text/x-rst"
-file = "README.rst"
 
 [project.urls]
 CI = "https://github.com/hyriver/pynhd/actions"
 Changelog = "https://docs.hyriver.io/changelogs/pynhd.html"
 Homepage = "https://docs.hyriver.io/readme/pynhd.html"
 Issues = "https://github.com/hyriver/pynhd/issues"
+
 
 [tool.bandit]
 targets = [
