@@ -7,11 +7,8 @@ History
 
 New Features
 ~~~~~~~~~~~~
-- Modify ``prepare_nhdplus``, so it can work with both NHDPlus HR in
-  addition to NHDPlus MR. Just note that this function expects a ``comid``
-  column, so since NHDPlus HR has a ``nhdplusid`` column, you need to
-  rename it to ``comid`` before using this function, like so:
-  ``flw_hr = flw_hr.rename(columns={'nhdplusid': 'comid'})``.
+- Modify ``prepare_nhdplus``, so it can work with NHDPlus HR in addition
+  to NHDPlus MR. The function now renames ``nhdplusid`` column to ``comid``.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
@@ -27,7 +24,7 @@ New Features
 ~~~~~~~~~~~~
 - Add support for the new EPA's
   `StreamCat <https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset>`__
-  RestFull API with over 500 NHDPlus
+  Restful API with around 600 NHDPlus
   catchment level metrics. One class is added for getting the service
   properties such as valid metrics, called ``StreamCat``. You can use
   ``streamcat`` function to get the metrics as a ``pandas.DataFrame``.
