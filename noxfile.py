@@ -3,7 +3,11 @@ import textwrap
 from pathlib import Path
 
 import nox
-import tomli
+
+try:
+    import tomllib as tomli
+except ImportError:
+    import tomli
 
 
 def get_package_name() -> str:
