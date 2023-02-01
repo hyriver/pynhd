@@ -132,7 +132,6 @@ class TestPyGeoAPI:
 
 
 class TestNLDI:
-
     nldi: NLDI = NLDI()
 
     def test_navigate(self):
