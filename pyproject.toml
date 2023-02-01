@@ -12,22 +12,6 @@ readme = "README.rst"
 license = {text = "MIT"}
 authors = [{name = "Taher Chegini", email = "cheginit@gmail.com"}]
 requires-python = ">=3.8"
-dependencies = [
-  "async-retriever>=0.3.10",
-  "cytoolz",
-  "geopandas>=0.10",
-  "loguru",
-  "networkx",
-  "numpy>=1.17",
-  "pandas>=1",
-  "pyarrow>=1.0.1",
-  "pygeoogc>=0.13.10",
-  "pygeoutils>=0.13.11",
-  "shapely>=1.8",
-]
-dynamic = [
-  "version",
-]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: Science/Research",
@@ -44,6 +28,22 @@ classifiers = [
   "Topic :: Scientific/Engineering :: GIS",
   "Topic :: Scientific/Engineering :: Hydrology",
   "Typing :: Typed"
+]
+dynamic = [
+  "version",
+]
+dependencies = [
+  "async-retriever>=0.3.10",
+  "cytoolz",
+  "geopandas>=0.10",
+  "loguru",
+  "networkx",
+  "numpy>=1.17",
+  "pandas>=1",
+  "pyarrow>=1.0.1",
+  "pygeoogc>=0.13.10",
+  "pygeoutils>=0.13.11",
+  "shapely>=1.8",
 ]
 [project.optional-dependencies]
 nhdplus = [
