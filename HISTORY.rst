@@ -2,6 +2,13 @@
 History
 =======
 
+0.13.12 (unreleased)
+--------------------
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Update the link to version 2.0 of the ENHD dataset in ``enhd_attrs``.
+
 0.13.11 (2023-01-24)
 --------------------
 
