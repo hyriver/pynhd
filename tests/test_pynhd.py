@@ -190,7 +190,7 @@ class TestNLDI:
 class TestNHDAttrs:
     def test_meta_s3(self):
         meta = nhd.nhdplus_attrs_s3()
-        assert len(meta) == 4281
+        assert len(meta) == 14538
 
     def test_s3(self):
         attr = nhd.nhdplus_attrs_s3("CAT_RECHG")
