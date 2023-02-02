@@ -35,14 +35,14 @@ __all__ = [
 def enhd_attrs(
     parquet_path: Path | str | None = None,
 ) -> pd.DataFrame:
-    """Get updated NHDPlus attributes from ENHD.
+    """Get updated NHDPlus attributes from ENHD V2.0.
 
     Notes
     -----
     This downloads a 160 MB ``parquet`` file from
-    `here <https://www.sciencebase.gov/catalog/item/60c92503d34e86b9389df1c9>`__.
-    Although this dataframe does not include geometry, it can be linked to other geospatial
-    NHDPlus dataframes through ComIDs.
+    `here <https://doi.org/10.5066/P976XCVT>`__.
+    Although this dataframe does not include geometry, it can be
+    linked to other geospatial NHDPlus dataframes through ComIDs.
 
     Parameters
     ----------
@@ -64,7 +64,7 @@ def enhd_attrs(
         return pd.read_parquet(output)
 
     sb = ScienceBase()
-    files = sb.get_file_urls("60c92503d34e86b9389df1c9")
+    files = sb.get_file_urls("63cb311ed34e06fef14f40a3")
 
     _ = ogc.streaming_download(files.loc["enhd_nhdplusatts.parquet"].url, fnames=output)
     enhd = pd.read_parquet(output)
