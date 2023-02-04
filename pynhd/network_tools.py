@@ -855,7 +855,6 @@ def nhdplus_l48(layer: str, data_dire: str | Path = "cache", **kwargs: Any) -> g
     data_dire : str or pathlib.Path
         Directory to store the downloaded file and use in subsequent calls,
         defaults to ``./cache``.
-
     **kwargs
         Keyword arguments are passed to ``pyogrio.read_dataframe``.
         For more information, visit
@@ -926,4 +925,4 @@ def nhdplus_l48(layer: str, data_dire: str | Path = "cache", **kwargs: Any) -> g
         nhd7z.unlink()
 
     pyogrio.set_gdal_config_options({"OGR_ORGANIZE_POLYGONS": "CCW_INNER_JUST_AFTER_CW_OUTER"})
-    return gpd.read_file(nhdfile, engine="pyogrio", layer=layer, **kwargs)
+    return gpd.read_file(nhdfile, layer=layer, engine="pyogrio", **kwargs)
