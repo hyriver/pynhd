@@ -8,6 +8,8 @@ History
 Internal Changes
 ~~~~~~~~~~~~~~~~
 - Update the link to version 2.0 of the ENHD dataset in ``enhd_attrs``.
+- Improve columns data types in ``enhd_attrs`` and ``nhdplus_vaa`` by using
+  ``int32`` instead of ``Int64``.
 
 0.13.11 (2023-01-24)
 --------------------
