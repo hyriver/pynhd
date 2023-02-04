@@ -31,6 +31,55 @@ __all__ = [
     "streamcat",
 ]
 
+NHDP_DTYPES = {
+    "comid": "int32",
+    "tocomid": "int32",
+    "streamleve": "int8",
+    "streamorde": "int8",
+    "streamcalc": "int8",
+    "fromnode": "int32",
+    "tonode": "int32",
+    "hydroseq": "int32",
+    "levelpathi": "int32",
+    "pathlength": "int32",
+    "terminalpa": "int32",
+    "arbolatesu": "int32",
+    "divergence": "int8",
+    "startflag": "int8",
+    "terminalfl": "int8",
+    "dnlevel": "int32",
+    "thinnercod": "int8",
+    "uplevelpat": "int32",
+    "uphydroseq": "int32",
+    "dnlevelpat": "int32",
+    "dnminorhyd": "int32",
+    "dndraincou": "int32",
+    "dnhydroseq": "int32",
+    "frommeas": "f8",
+    "tomeas": "f8",
+    "reachcode": str,
+    "lengthkm": "f8",
+    "fcode": "int32",
+    "vpuin": "int8",
+    "vpuout": "int8",
+    "areasqkm": "f8",
+    "totdasqkm": "f8",
+    "divdasqkm": "f8",
+    "totma": "f8",
+    "wbareatype": str,
+    "pathtimema": "f8",
+    "slope": "f8",
+    "slopelenkm": "f8",
+    "ftype": str,
+    "gnis_name": str,
+    "gnis_id": "int32",
+    "wbareacomi": "int32",
+    "hwnodesqkm": "f8",
+    "rpuid": str,
+    "vpuid": str,
+    "roughness": "f8",
+}
+
 
 def enhd_attrs(
     parquet_path: Path | str | None = None,
@@ -60,18 +109,13 @@ def enhd_attrs(
     else:
         output = get_parquet(parquet_path)
 
-    if output.exists():
-        return pd.read_parquet(output)
-
     sb = ScienceBase()
     files = sb.get_file_urls("63cb311ed34e06fef14f40a3")
-
     _ = ogc.streaming_download(files.loc["enhd_nhdplusatts.parquet"].url, fnames=output)
+
     enhd = pd.read_parquet(output)
-    enhd["comid"] = enhd["comid"].astype("int32")
-    enhd["gnis_id"] = enhd["gnis_id"].astype("Int32")
-    enhd["dnlevelpat"] = enhd["dnlevelpat"].astype("int32")
-    output.unlink()
+    dtype = {k: v for k, v in NHDP_DTYPES.items() if k in enhd.columns}
+    enhd = enhd.astype(dtype, errors="ignore")
     enhd.to_parquet(output)
     return enhd
 
@@ -110,65 +154,14 @@ def nhdplus_vaa(
     else:
         output = get_parquet(parquet_path)
 
-    if output.exists():
-        return pd.read_parquet(output)
-
-    dtypes = {
-        "comid": "Int64",
-        "streamleve": "Int8",
-        "streamorde": "Int8",
-        "streamcalc": "Int8",
-        "fromnode": "Int64",
-        "tonode": "Int64",
-        "hydroseq": "Int64",
-        "levelpathi": "Int64",
-        "pathlength": "Int64",
-        "terminalpa": "Int64",
-        "arbolatesu": "Int64",
-        "divergence": "Int8",
-        "startflag": "Int8",
-        "terminalfl": "Int8",
-        "dnlevel": "Int16",
-        "thinnercod": "Int8",
-        "uplevelpat": "Int64",
-        "uphydroseq": "Int64",
-        "dnlevelpat": "Int64",
-        "dnminorhyd": "Int64",
-        "dndraincou": "Int64",
-        "dnhydroseq": "Int64",
-        "frommeas": "f8",
-        "tomeas": "f8",
-        "reachcode": str,
-        "lengthkm": "f8",
-        "fcode": "Int32",
-        "vpuin": "Int8",
-        "vpuout": "Int8",
-        "areasqkm": "f8",
-        "totdasqkm": "f8",
-        "divdasqkm": "f8",
-        "totma": "f8",
-        "wbareatype": str,
-        "pathtimema": "f8",
-        "slope": "f8",
-        "slopelenkm": "f8",
-        "ftype": str,
-        "gnis_name": str,
-        "gnis_id": str,
-        "wbareacomi": "Int64",
-        "hwnodesqkm": "f8",
-        "rpuid": str,
-        "vpuid": str,
-        "roughness": "f8",
-    }
-
     rid = "6092c8a62fac45be97a09bfd0b0bf726"
     fpath = "data/contents/nhdplusVAA.parquet"
     url = f"https://www.hydroshare.org/resource/{rid}/{fpath}"
-
     _ = ogc.streaming_download(url, fnames=output)
+
     vaa = pd.read_parquet(output)
-    vaa = vaa.astype(dtypes, errors="ignore")
-    output.unlink()
+    dtype = {k: v for k, v in NHDP_DTYPES.items() if k in vaa.columns}
+    vaa = vaa.astype(dtype, errors="ignore")
     vaa.to_parquet(output)
     return vaa
 
