@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterator, NamedTuple, Union, cast
 
 import async_retriever as ar
-import cytoolz as tlz
+import cytoolz.curried as tlz
 import geopandas as gpd
 import pandas as pd
 import pygeoutils as geoutils

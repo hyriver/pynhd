@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any, Mapping, Sequence, Union
+from typing import TYPE_CHECKING, Any, Mapping, Sequence, Union, cast
 
 import async_retriever as ar
 import geopandas as gpd
@@ -23,6 +23,9 @@ if TYPE_CHECKING:
     from shapely.geometry import MultiPolygon, Polygon
 
     CRSTYPE = Union[int, str, pyproj.CRS]
+
+
+__all__ = ["NHD", "PyGeoAPI", "pygeoapi", "WaterData", "NHDPlusHR", "NLDI", "geoconnex"]
 
 
 class NHD(AGRBase):
@@ -492,12 +495,15 @@ class WaterData:
         )
         return self._to_geodf(resp)
 
-    def byid(self, featurename: str, featureids: list[int | str] | int | str) -> gpd.GeoDataFrame:
+    def byid(
+        self, featurename: str, featureids: Sequence[int | str] | int | str
+    ) -> gpd.GeoDataFrame:
         """Get features based on IDs."""
-        resp: list[dict[str, Any]] = self.wfs.getfeature_byid(  # type: ignore
+        resp = self.wfs.getfeature_byid(
             featurename,
             featureids,
         )
+        resp = cast("list[dict[str, Any]]", resp)
         features = self._to_geodf(resp)
 
         if isinstance(featureids, (str, int)):

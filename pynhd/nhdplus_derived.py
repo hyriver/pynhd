@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import async_retriever as ar
-import cytoolz as tlz
+import cytoolz.curried as tlz
 import pandas as pd
 import pyarrow.dataset as pds
 import pygeoogc as ogc
