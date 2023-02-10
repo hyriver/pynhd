@@ -36,7 +36,6 @@ dependencies = [
   "async-retriever>=0.3.10",
   "cytoolz",
   "geopandas>=0.10",
-  "loguru",
   "networkx",
   "numpy>=1.17",
   "pandas>=1",
