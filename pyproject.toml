@@ -33,15 +33,15 @@ dynamic = [
   "version",
 ]
 dependencies = [
-  "async-retriever>=0.3.10",
+  "async-retriever>=0.3.12",
   "cytoolz",
   "geopandas>=0.10",
   "networkx",
-  "numpy>=1.17",
+  "numpy>=1.21",
   "pandas>=1",
   "pyarrow>=1.0.1",
-  "pygeoogc>=0.13.10",
-  "pygeoutils>=0.13.11",
+  "pygeoogc>=0.13.12",
+  "pygeoutils>=0.13.12",
   "shapely>=1.8",
 ]
 [project.optional-dependencies]
