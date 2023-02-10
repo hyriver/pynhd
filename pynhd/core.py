@@ -1,8 +1,7 @@
 """Base classes for PyNHD functions."""
 from __future__ import annotations
 
-import os
-import sys
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterator, NamedTuple, Union, cast
 
@@ -13,7 +12,6 @@ import pandas as pd
 import pygeoutils as geoutils
 import pyproj
 import shapely.geometry as sgeom
-from loguru import logger
 from pygeoogc import ArcGISRESTful, ServiceURL
 from pygeoogc import utils as ogc_utils
 from pygeoutils import EmptyResponseError
@@ -28,26 +26,6 @@ from pynhd.exceptions import (
     ServiceError,
     ZeroMatchedError,
 )
-
-logger.configure(
-    handlers=[
-        {
-            "sink": sys.stdout,
-            "colorize": True,
-            "format": " | ".join(
-                [
-                    "{time:YYYY-MM-DD at HH:mm:ss}",  # noqa: FS003
-                    "{name: ^15}.{function: ^15}:{line: >3}",  # noqa: FS003
-                    "{message}",  # noqa: FS003
-                ]
-            ),
-        }
-    ]
-)
-if os.environ.get("HYRIVER_VERBOSE", "false").lower() == "true":
-    logger.enable("pynhd")
-else:
-    logger.disable("pynhd")
 
 if TYPE_CHECKING:
     from shapely.geometry import MultiPolygon, Polygon
@@ -167,6 +145,7 @@ class AGRBase:
             A dictionary of valid layers.
         """
         rjson = ar.retrieve_json([url], [{"params": {"f": "json"}}])
+        rjson = cast("list[dict[str, Any]]", rjson)
         return {lyr["name"].lower(): int(lyr["id"]) for lyr in rjson[0]["layers"]}
 
     def _getfeatures(
@@ -329,6 +308,7 @@ class PyGeoAPIBase:
     ) -> gpd.GeoDataFrame:
         """Post the request and return the response as a GeoDataFrame."""
         resp = ar.retrieve_json([url] * len(payload), payload, "POST")
+        resp = cast("list[dict[str, Any]]", resp)
         nfeat = len(resp)
         try:
             idx, resp = zip(*((i, r) for i, r in enumerate(resp) if "code" not in r))
@@ -336,13 +316,14 @@ class PyGeoAPIBase:
             resp = cast("tuple[dict[str, Any]]", resp)
 
             if len(resp) < nfeat:
-                logger.warning(
+                warnings.warn(
                     " ".join(
                         [
                             f"There are {nfeat - len(resp)} requests that",
                             "didn't return any feature. Check their parameters and retry.",
                         ]
-                    )
+                    ),
+                    UserWarning,
                 )
             gdf = gpd.GeoDataFrame(
                 pd.concat(
@@ -490,10 +471,8 @@ class ScienceBase:
             "fields": "title,id",
             "format": "json",
         }
-        resp = ar.retrieve_json(
-            [url],
-            [{"params": payload}],
-        )
+        resp = ar.retrieve_json([url], [{"params": payload}])
+        resp = cast("list[dict[str, Any]]", resp)
         return resp[0]
 
     @staticmethod
@@ -501,10 +480,8 @@ class ScienceBase:
         """Get download and meta URLs of all the available files for an item."""
         url = "https://www.sciencebase.gov/catalog/item"
         payload = {"fields": "files,downloadUri", "format": "json"}
-        resp = ar.retrieve_json(
-            [f"{url}/{item}"],
-            [{"params": payload}],
-        )
+        resp = ar.retrieve_json([f"{url}/{item}"], [{"params": payload}])
+        resp = cast("list[dict[str, Any]]", resp)
         urls = zip(
             tlz.pluck("name", resp[0]["files"]),
             tlz.pluck("url", resp[0]["files"]),
@@ -532,7 +509,9 @@ class GeoConnex:
     @staticmethod
     def _get_url(url: str, kwds: dict[str, str] | None = None) -> dict[str, Any]:
         params = {"params": {**kwds, "f": "json"}} if kwds else {"params": {"f": "json"}}
-        return ar.retrieve_json([url], [params])[0]
+        resp = ar.retrieve_json([url], [params])
+        resp = cast("list[dict[str, Any]]", resp)
+        return resp[0]
 
     def _get_endpoints(self) -> dict[str, EndPoints]:
         pluck = tlz.partial(tlz.pluck, seqs=self._get_url(self.base_url)["collections"])
@@ -577,7 +556,9 @@ class GeoConnex:
     @staticmethod
     def _get_urls(url: str, kwds: list[dict[str, Any]]) -> list[dict[str, Any]]:
         params = [{"params": {**kwd, "f": "json"}} for kwd in kwds]
-        return ar.retrieve_json([url] * len(kwds), params)
+        resp = ar.retrieve_json([url] * len(kwds), params)
+        resp = cast("list[dict[str, Any]]", resp)
+        return resp
 
     @property
     def item(self) -> str | None:

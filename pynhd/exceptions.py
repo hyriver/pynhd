@@ -111,6 +111,17 @@ class MissingCRSError(Exception):
         return self.message
 
 
+class NoTerminalError(Exception):
+    """Exception raised when no terminal COMID is found."""
+
+    def __init__(self) -> None:
+        self.message = "No terminal COMID was found."
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return self.message
+
+
 class DependencyError(Exception):
     """Exception raised when a dependencies are not met.
 

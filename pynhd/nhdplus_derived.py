@@ -96,13 +96,14 @@ def enhd_attrs(
     Parameters
     ----------
     parquet_path : str or Path, optional
-        Path to a file with ``.parquet`` extension for storing the file, defaults to
-        ``./cache/enhd_attrs.parquet``.
+        Path to a file with ``.parquet`` extension for storing the file,
+        defaults to ``./cache/enhd_attrs.parquet``.
 
     Returns
     -------
     pandas.DataFrame
-        A dataframe that includes ComID-level attributes for 2.7 million NHDPlus flowlines.
+        A dataframe that includes ComID-level attributes for
+        2.7 million NHDPlus flowlines.
     """
     if parquet_path is None:
         output = get_parquet(Path("cache", "enhd_attrs.parquet"))
@@ -123,14 +124,14 @@ def enhd_attrs(
 def nhdplus_vaa(
     parquet_path: Path | str | None = None,
 ) -> pd.DataFrame:
-    """Get NHDPlus Value Added Attributes with ComID-level roughness and slope values.
+    """Get NHDPlus Value Added Attributes including roughness.
 
     Notes
     -----
     This function downloads a 245 MB ``parquet`` file from
     `here <https://www.hydroshare.org/resource/6092c8a62fac45be97a09bfd0b0bf726>`__ .
-    Although this dataframe does not include geometry, it can be linked to other geospatial
-    NHDPlus dataframes through ComIDs.
+    Although this dataframe does not include geometry, it can be linked
+    to other geospatial NHDPlus dataframes through ComIDs.
 
     Parameters
     ----------
@@ -141,13 +142,8 @@ def nhdplus_vaa(
     Returns
     -------
     pandas.DataFrame
-        A dataframe that includes ComID-level attributes for 2.7 million NHDPlus flowlines.
-
-    Examples
-    --------
-    >>> vaa = nhdplus_vaa() # doctest: +SKIP
-    >>> print(vaa.slope.max()) # doctest: +SKIP
-    4.6
+        A dataframe that includes ComID-level attributes for 2.7 million
+        NHDPlus flowlines.
     """
     if parquet_path is None:
         output = get_parquet(Path("cache", "nldplus_vaa.parquet"))
@@ -198,10 +194,8 @@ def nhdplus_attrs(attr_name: str | None = None) -> pd.DataFrame:
         """Get all the available zip files in an item."""
         url = "https://www.sciencebase.gov/catalog/item"
         payload = {"fields": "files,downloadUri", "format": "json"}
-        resp = ar.retrieve_json(
-            [f"{url}/{item}"],
-            [{"params": payload}],
-        )
+        resp = ar.retrieve_json([f"{url}/{item}"], [{"params": payload}])
+        resp = cast("list[dict[str, Any]]", resp)
         files_url = zip(tlz.pluck("name", resp[0]["files"]), tlz.pluck("url", resp[0]["files"]))
         meta = list(tlz.pluck("metadataHtmlViewUri", resp[0]["files"], default=""))[-1]
         return {f.replace("_CONUS.zip", ""): (u, meta) for f, u in files_url if ".zip" in f}
@@ -390,6 +384,7 @@ def epa_nhd_catchments(
     urls = cast("list[str]", urls)
     kwds = cast("list[dict[str, Any]]", kwds)
     resp = ar.retrieve_json(urls, kwds)
+    resp = cast("list[dict[str, Any]]", resp)
     info = pd.DataFrame.from_dict(
         {i: pd.Series(r["metadata"]) for i, r in zip(clist, resp)}, orient="index"
     )
@@ -424,6 +419,7 @@ class StreamCat:
     def __init__(self) -> None:
         self.base_url = "https://java.epa.gov/StreamCAT/metrics"
         resp = ar.retrieve_json([self.base_url])
+        resp = cast("list[dict[str, Any]]", resp)
         params = resp[0]["parameters"]
         self.valid_names = params["name"]["options"]
         self.valid_regions = params["region"]["options"]

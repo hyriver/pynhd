@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import warnings
 from typing import TYPE_CHECKING, Any, Mapping, Sequence, Union, cast
 
 import async_retriever as ar
@@ -11,7 +12,6 @@ import pandas as pd
 import pygeoogc as ogc
 import pygeoutils as geoutils
 import pyproj
-from loguru import logger
 from pygeoogc import WFS, InputValueError, ServiceUnavailableError, ServiceURL
 from pygeoogc import ZeroMatchedError as ZeroMatchedErrorOGC
 from pygeoutils import EmptyResponseError, InputTypeError
@@ -401,12 +401,13 @@ class WaterData:
         geopandas.GeoDataFrame
             The requested features in a GeoDataFrames.
         """
-        resp: list[dict[str, Any]] = self.wfs.getfeature_bybox(  # type: ignore
+        resp = self.wfs.getfeature_bybox(
             bbox,
             box_crs,
             always_xy=True,
             sort_attr=sort_attr,
         )
+        resp = cast("list[dict[str, Any]]", resp)
         return self._to_geodf(resp)
 
     def bygeom(
@@ -451,9 +452,10 @@ class WaterData:
         geopandas.GeoDataFrame
             The requested features in the given geometry.
         """
-        resp: list[dict[str, Any]] = self.wfs.getfeature_bygeom(  # type: ignore
+        resp = self.wfs.getfeature_bygeom(
             geometry, geo_crs, always_xy=not xy, predicate=predicate, sort_attr=sort_attr
         )
+        resp = cast("list[dict[str, Any]]", resp)
         return self._to_geodf(resp)
 
     def bydistance(
@@ -488,11 +490,12 @@ class WaterData:
         x, y = ogc.match_crs([coords], loc_crs, self.wfs.crs)[0]
         geom_name = self.wfs.schema[self.layer].get("geometry_column", "the_geom")
         cql_filter = f"DWITHIN({geom_name},POINT({y:.6f} {x:.6f}),{distance},meters)"
-        resp: list[dict[str, Any]] = self.wfs.getfeature_byfilter(  # type: ignore
+        resp = self.wfs.getfeature_byfilter(
             cql_filter,
             "GET",
             sort_attr=sort_attr,
         )
+        resp = cast("list[dict[str, Any]]", resp)
         return self._to_geodf(resp)
 
     def byid(
@@ -513,9 +516,10 @@ class WaterData:
         missing = set(fids).difference(set(features[featurename].astype(str)))
         if missing:
             verb = "ID was" if len(missing) == 1 else "IDs were"
-            logger.warning(
+            warnings.warn(
                 f"The following requested feature {verb} not found in WaterData:\n"
-                + ", ".join(missing)
+                + ", ".join(missing),
+                UserWarning,
             )
         return features
 
@@ -539,11 +543,12 @@ class WaterData:
         geopandas.GeoDataFrame
             The requested features as a GeoDataFrames.
         """
-        resp: list[dict[str, Any]] = self.wfs.getfeature_byfilter(  # type: ignore
+        resp = self.wfs.getfeature_byfilter(
             cql_filter,
             method,
             sort_attr,
         )
+        resp = cast("list[dict[str, Any]]", resp)
         return self._to_geodf(resp)
 
     def __repr__(self) -> str:
@@ -627,7 +632,7 @@ class NLDI:
 
     def _get_url(
         self, url: str, payload: dict[str, str] | None = None
-    ) -> list[dict[str, Any]] | dict[str, Any]:
+    ) -> dict[str, Any] | list[dict[str, Any]]:
         """Send a request to the service using GET method."""
         if payload is None:
             payload = {"f": "json"}
@@ -641,35 +646,34 @@ class NLDI:
         except ConnectionError as ex:
             raise ServiceUnavailableError(self.base_url) from ex
         else:
-            if isinstance(resp[0], dict) and resp[0].get("type", "") == "error":
-                raise ZeroMatchedError(resp[0].get("description", "Feature not found"))
             if resp[0] is None:  # type: ignore
                 raise ZeroMatchedError
+            if isinstance(resp[0], dict) and resp[0].get("type") == "error":
+                raise ZeroMatchedError(resp[0].get("description", "Feature not found"))
             return resp[0]
 
     def __init__(self) -> None:
         self.base_url = ServiceURL().restful.nldi
 
-        resp: list[dict[str, Any]] = self._get_url(  # type: ignore
-            "/".join([self.base_url, "linked-data"])
-        )
+        resp = self._get_url("/".join([self.base_url, "linked-data"]))
+        resp = cast("list[dict[str, Any]]", resp)
         self.valid_fsources = {r["source"]: r["sourceName"] for r in resp}
 
-        resp: list[dict[str, Any]] = self._get_url(  # type: ignore
-            "/".join([self.base_url, "lookups"])
-        )
+        resp = self._get_url("/".join([self.base_url, "lookups"]))
+        resp = cast("list[dict[str, Any]]", resp)
         self.valid_chartypes = {r["type"]: r["typeName"] for r in resp}
 
     @staticmethod
     def _missing_warning(n_miss: int, n_tot: int) -> None:
         """Show a warning if there are missing features."""
-        logger.warning(
+        warnings.warn(
             " ".join(
                 [
                     f"{n_miss} of {n_tot} inputs didn't return any features.",
                     "They are returned as a list.",
                 ]
-            )
+            ),
+            UserWarning,
         )
 
     def _validate_fsource(self, fsource: str) -> None:
@@ -993,8 +997,9 @@ class NLDI:
 
         for comid in comids:
             url = "/".join([self.base_url, "linked-data", "comid", f"{comid}", char_type])
-            rjson: dict[str, Any] = self._get_url(url, payload)  # type: ignore
-            char = pd.DataFrame.from_dict(rjson["characteristics"], orient="columns").T
+            resp = self._get_url(url, payload)
+            resp = cast("dict[str, Any]", resp)
+            char = pd.DataFrame.from_dict(resp["characteristics"], orient="columns").T
             char.columns = char.iloc[0]
             char = char.drop(index="characteristic_id")
 
@@ -1083,7 +1088,8 @@ class NLDI:
 
         url = "/".join([self.base_url, "linked-data", fsource, fid, "navigation"])
 
-        valid_navigations: dict[str, Any] = self._get_url(url)  # type: ignore
+        valid_navigations = self._get_url(url)
+        valid_navigations = cast("dict[str, Any]", valid_navigations)
         if not valid_navigations:
             raise ZeroMatchedError
 
@@ -1092,17 +1098,19 @@ class NLDI:
 
         url = valid_navigations[navigation]
 
-        r_json: list[dict[str, Any]] = self._get_url(url)  # type: ignore
-        valid_sources = {s["source"].lower(): s["features"] for s in r_json}
+        resp = self._get_url(url)
+        resp = cast("list[dict[str, Any]]", resp)
+        valid_sources = {s["source"].lower(): s["features"] for s in resp}
         if source not in valid_sources:
             raise InputValueError("source", list(valid_sources))
 
         url = valid_sources[source]
         payload = {"distance": f"{round(distance)}", "trimStart": f"{trim_start}".lower()}
         try:
-            return geoutils.json2geodf(self._get_url(url, payload), 4269, 4326)
+            resp = self._get_url(url, payload)
         except EmptyResponseError as ex:
             raise ZeroMatchedError from ex
+        return geoutils.json2geodf(resp, 4269, 4326)
 
     def navigate_byloc(
         self,
@@ -1197,7 +1205,6 @@ def geoconnex(
     """
     gcx = GeoConnex(item)
     if item is None or query is None:
-        print(gcx)
         return None
 
     return gcx.query(query, skip_geometry)

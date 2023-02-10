@@ -15,6 +15,7 @@ from pynhd.exceptions import (
     MissingColumnError,
     MissingCRSError,
     MissingItemError,
+    NoTerminalError,
     ZeroMatchedError,
 )
 from pynhd.network_tools import (
@@ -57,6 +58,7 @@ __all__ = [
     "MissingColumnError",
     "MissingCRSError",
     "ZeroMatchedError",
+    "NoTerminalError",
     "prepare_nhdplus",
     "geoconnex",
     "topoogical_sort",

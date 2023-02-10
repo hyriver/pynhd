@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable
 
@@ -12,7 +13,6 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import pyproj
-from loguru import logger
 from pygeoogc import streaming_download
 from pygeoutils import GeoBSpline, InputTypeError
 from shapely import ops
@@ -20,7 +20,13 @@ from shapely.geometry import LineString, MultiLineString, Point
 
 from pynhd import nhdplus_derived as derived
 from pynhd.core import ScienceBase
-from pynhd.exceptions import DependencyError, InputValueError, MissingCRSError, MissingItemError
+from pynhd.exceptions import (
+    DependencyError,
+    InputValueError,
+    MissingCRSError,
+    MissingItemError,
+    NoTerminalError,
+)
 
 try:
     from pandas.errors import IntCastingNaNError
@@ -127,8 +133,6 @@ class NHDTools:
             raise MissingItemError(["fcode", "ftype"])
 
         if use_enhd_attrs or not terminal2nan:
-            if not terminal2nan and not use_enhd_attrs:
-                logger.info("The use_enhd_attrs is set to True, so all attrs will be updated.")
             enhd_attrs = derived.enhd_attrs().set_index("comid")
             self.flw["tocomid"] = self.flw["comid"].astype("Int64")
             self.flw = self.flw.reset_index().set_index("comid")
@@ -346,14 +350,14 @@ def prepare_nhdplus(
                 "So, use_enhd_attrs is set to False.",
             )
         )
-        logger.warning(msg)
+        warnings.warn(msg, UserWarning)
         use_enhd_attrs = False
 
     nhd.clean_flowlines(use_enhd_attrs, terminal2nan)
 
     if not any(nhd.flw.terminalfl == 1):
         if len(nhd.flw.terminalpa.unique()) != 1:
-            logger.error("Found no terminal flag in the dataframe.")
+            raise NoTerminalError
 
         nhd.flw.loc[nhd.flw.hydroseq == nhd.flw.hydroseq.min(), "terminalfl"] = 1
 
@@ -365,7 +369,9 @@ def prepare_nhdplus(
     nhd.remove_tinynetworks(min_path_size, min_path_length, min_network_size)
 
     if (nhd.nrows - nhd.flw.shape[0]) > 0:
-        logger.info(f"Removed {nhd.nrows - nhd.flw.shape[0]} segments from the flowlines.")
+        warnings.warn(
+            f"Removed {nhd.nrows - nhd.flw.shape[0]} segments from the flowlines.", UserWarning
+        )
 
     if nhd.flw.shape[0] > 0 and ("tocomid" not in nhd.flw or terminal2nan):
         nhd.add_tocomid()
