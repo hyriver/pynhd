@@ -5,11 +5,15 @@ History
 0.13.12 (2023-02-10)
 --------------------
 
+New Features
+~~~~~~~~~~~~
+- Update the link to version 2.0 of the ENHD dataset in ``enhd_attrs``.
+
 Internal Changes
 ~~~~~~~~~~~~~~~~
-- Update the link to version 2.0 of the ENHD dataset in ``enhd_attrs``.
 - Improve columns data types in ``enhd_attrs`` and ``nhdplus_vaa`` by using
   ``int32`` instead of ``Int64``, where applicable.
+- Sync all patch versions of HyRiver packages to x.x.12.
 
 0.13.11 (2023-01-24)
 --------------------
