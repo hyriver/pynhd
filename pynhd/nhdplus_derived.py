@@ -426,6 +426,8 @@ class StreamCat:
         self.valid_states = pd.DataFrame.from_dict(params["state"]["options"], orient="index")
         self.valid_counties = pd.DataFrame.from_dict(params["county"]["options"], orient="index")
         self.valid_aois = params["areaOfInterest"]["options"]
+        url_vars = f"{self.base_url}/variable_info.csv"
+        self.metrics_df = pd.read_csv(io.StringIO(ar.retrieve_text([url_vars])[0]))
 
     def validate(
         self,
@@ -508,7 +510,8 @@ def streamcat(
     metric_names : str or list of str
         Metric name(s) to retrieve. There are 567 metrics available.
         to get a full list instantiate the ``StreamCat`` class and check its
-        ``valid_names`` attribute.
+        ``valid_names`` attribute. To get a description of each metric, check the
+        ``metrics_df`` attribute.
     metric_areas : str or list of str, optional
         Areas to return the metrics for, defaults to ``None``, i.e. all areas.
         Valid options are: ``catchment``, ``watershed``, ``riparian_catchment``,
