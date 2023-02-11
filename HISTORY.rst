@@ -2,6 +2,14 @@
 History
 =======
 
+0.13.13 (unreleased)
+--------------------
+
+New Features
+~~~~~~~~~~~~
+- Add a new property to ``StreamCat``, called ``metrics_df`` that gets
+  a dataframe of metric names and their description.
+
 0.13.12 (2023-02-10)
 --------------------
 
