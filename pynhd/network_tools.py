@@ -370,7 +370,9 @@ def prepare_nhdplus(
 
     if (nhd.nrows - nhd.flw.shape[0]) > 0:
         warnings.warn(
-            f"Removed {nhd.nrows - nhd.flw.shape[0]} segments from the flowlines.", UserWarning, stacklevel=2
+            f"Removed {nhd.nrows - nhd.flw.shape[0]} segments from the flowlines.",
+            UserWarning,
+            stacklevel=2,
         )
 
     if nhd.flw.shape[0] > 0 and ("tocomid" not in nhd.flw or terminal2nan):
