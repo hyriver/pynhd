@@ -720,7 +720,7 @@ class NLDI:
         return resp_df, not_found
 
     def getfeature_byid(
-        self, fsource: str, fid: str | list[str]
+        self, fsource: str, fids: str | list[str]
     ) -> gpd.GeoDataFrame | tuple[gpd.GeoDataFrame, list[str]]:
         """Get feature(s) based ID(s).
 
@@ -751,12 +751,12 @@ class NLDI:
             a list of missing ID(s) are returned as well.
         """
         self._validate_fsource(fsource)
-        fid = fid if isinstance(fid, list) else [fid]
-        urls = {f: ("/".join([self.base_url, "linked-data", fsource, f]), None) for f in fid}
+        fids = [fids] if isinstance(fids, (int, str)) else list(fids)
+        urls = {f: ("/".join([self.base_url, "linked-data", fsource, f]), None) for f in fids}
         features, not_found = self._get_urls(urls)
 
         if not_found:
-            self._missing_warning(len(not_found), len(fid))
+            self._missing_warning(len(not_found), len(fids))
             return features, not_found
 
         return features
@@ -787,10 +787,15 @@ class NLDI:
         endpoint = "comid/position" if source == "feature" else "hydrolocation"
         base_url = "/".join([self.base_url, "linked-data", endpoint])
 
-        _coords = [coords] if isinstance(coords, tuple) else coords
-
-        if not isinstance(_coords, list) or any(len(c) != 2 for c in _coords):
+        if not isinstance(coords, (list, tuple)):
             raise InputTypeError("coords", "list or tuple")
+
+        if isinstance(coords[0], (int, float)) and len(coords) == 2:
+            _coords = [coords]
+        elif all(len(c) == 2 for c in coords):  # type: ignore
+            _coords = coords
+        else:
+            raise InputTypeError("coords", "list of tuples or a tuple")
 
         _coords = ogc.match_crs(_coords, loc_crs, 4326)
 
@@ -980,13 +985,13 @@ class NLDI:
             valids = [f'"{s}" for {d}' for s, d in self.valid_chartypes.items()]
             raise InputValueError("char", valids)
 
-        comids = comids if isinstance(comids, list) else [comids]
+        comids = [comids] if isinstance(comids, (str, int)) else list(comids)
         v_dict, nd_dict = {}, {}
 
         if char_ids == "all":
             payload = None
         else:
-            _char_ids = char_ids if isinstance(char_ids, list) else [char_ids]
+            _char_ids = [char_ids] if isinstance(char_ids, str) else list(char_ids)
             valid_charids = self.get_validchars(char_type)
 
             idx = valid_charids.index
