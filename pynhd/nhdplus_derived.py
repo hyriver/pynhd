@@ -9,13 +9,14 @@ from typing import TYPE_CHECKING, Any, cast
 
 import async_retriever as ar
 import cytoolz.curried as tlz
+import numpy as np
 import pandas as pd
 import pyarrow.dataset as pds
 import pygeoogc as ogc
-from pyarrow import fs
+from pyarrow import ArrowInvalid, fs
 
 from pynhd.core import ScienceBase, get_parquet
-from pynhd.exceptions import InputValueError, ServiceError
+from pynhd.exceptions import InputTypeError, InputValueError, ServiceError
 
 if TYPE_CHECKING:
     from pyarrow.dataset import FileSystemDataset
@@ -88,7 +89,7 @@ def enhd_attrs(
 
     Notes
     -----
-    This downloads a 160 MB ``parquet`` file from
+    This function downloads a 160 MB ``parquet`` file from
     `here <https://doi.org/10.5066/P976XCVT>`__.
     Although this dataframe does not include geometry, it can be
     linked to other geospatial NHDPlus dataframes through ComIDs.
@@ -112,11 +113,14 @@ def enhd_attrs(
 
     sb = ScienceBase()
     files = sb.get_file_urls("63cb311ed34e06fef14f40a3")
-    _ = ogc.streaming_download(files.loc["enhd_nhdplusatts.parquet"].url, fnames=output)
+    url = files.loc["enhd_nhdplusatts.parquet"].url
+    fname = ogc.streaming_download(url, file_extention=".parquet")
 
-    enhd = pd.read_parquet(output)
+    enhd = pd.read_parquet(fname)
     dtype = {k: v for k, v in NHDP_DTYPES.items() if k in enhd.columns}
     enhd = enhd.astype(dtype, errors="ignore")
+    if output.exists():
+        output.unlink()
     enhd.to_parquet(output)
     return enhd
 
@@ -153,11 +157,13 @@ def nhdplus_vaa(
     rid = "6092c8a62fac45be97a09bfd0b0bf726"
     fpath = "data/contents/nhdplusVAA.parquet"
     url = f"https://www.hydroshare.org/resource/{rid}/{fpath}"
-    _ = ogc.streaming_download(url, fnames=output)
+    fname = ogc.streaming_download(url, file_extention=".parquet")
 
-    vaa = pd.read_parquet(output)
+    vaa = pd.read_parquet(fname)
     dtype = {k: v for k, v in NHDP_DTYPES.items() if k in vaa.columns}
     vaa = vaa.astype(dtype, errors="ignore")
+    if output.exists():
+        output.unlink()
     vaa.to_parquet(output)
     return vaa
 
@@ -414,20 +420,68 @@ def epa_nhd_catchments(
 
 
 class StreamCat:
-    """Get StreamCat API's properties."""
+    """Get StreamCat API's properties.
+
+    Attributes
+    ----------
+    base_url : str
+        The base URL of the API.
+    valid_names : list of str
+        The valid names of the metrics.
+    alt_names : dict of str
+        The alternative names of some metrics.
+    valid_regions : list of str
+        The valid hydro regions.
+    valid_states : pandas.DataFrame
+        The valid two letter states' abbreviations.
+    valid_counties : pandas.DataFrame
+        The valid counties' FIPS codes.
+    valid_aois : list of str
+        The valid types of areas of interest.
+    metrics_df : pandas.DataFrame
+        The metrics' metadata such as description and units.
+    valid_years : dict
+        A dictionary of the valid years for annual metrics.
+    """
 
     def __init__(self) -> None:
         self.base_url = "https://java.epa.gov/StreamCAT/metrics"
         resp = ar.retrieve_json([self.base_url])
         resp = cast("list[dict[str, Any]]", resp)
         params = resp[0]["parameters"]
-        self.valid_names = params["name"]["options"]
+        self.valid_names = cast("list[str]", params["name"]["options"])
+        self.alt_names = {
+            n.replace("_", ""): n for n in self.valid_names if n.split("_")[-1].isdigit()
+        }
+        self.alt_names.update(
+            {
+                "precip2008": "precip08",
+                "precip2009": "precip09",
+                "tmean2008": "tmean08",
+                "tmean2009": "tmean09",
+            }
+        )
         self.valid_regions = params["region"]["options"]
         self.valid_states = pd.DataFrame.from_dict(params["state"]["options"], orient="index")
         self.valid_counties = pd.DataFrame.from_dict(params["county"]["options"], orient="index")
         self.valid_aois = params["areaOfInterest"]["options"]
         url_vars = f"{self.base_url}/variable_info.csv"
         self.metrics_df = pd.read_csv(io.StringIO(ar.retrieve_text([url_vars])[0]))
+        self.metrics_df["METRIC_NAME"] = self.metrics_df["METRIC_NAME"].str.replace(
+            "[AOI]", "", regex=False
+        )
+        years = self.metrics_df.set_index("METRIC_NAME").YEAR.dropna()
+        self.valid_years = {
+            str(v): list(range(*(int(y) for y in yrs.split("-"))))
+            if "-" in yrs
+            else [int(y) for y in yrs.split(",")]
+            for v, yrs in years.items()
+        }
+
+
+class StreamCatValidator(StreamCat):
+    def __init__(self) -> None:
+        super().__init__()
 
     def validate(
         self,
@@ -470,9 +524,13 @@ class StreamCat:
 
         params = {}
         if comids is not None:
-            params["comid"] = (
-                str(comids) if isinstance(comids, (str, int)) else ",".join(str(i) for i in comids)
-            )
+            try:
+                comid_arr = np.array(
+                    [comids] if isinstance(comids, (str, int)) else comids, dtype=int
+                )
+                params["comid"] = ",".join(comid_arr.astype(str))
+            except (ValueError, TypeError) as ex:
+                raise InputTypeError("comids", "int or digists (str) or list of them") from ex
         elif regions is not None:
             ids = [regions] if isinstance(regions, str) else regions
             self.validate(region=ids)
@@ -509,35 +567,36 @@ def streamcat(
     ----------
     metric_names : str or list of str
         Metric name(s) to retrieve. There are 567 metrics available.
-        to get a full list instantiate the ``StreamCat`` class and check its
-        ``valid_names`` attribute. To get a description of each metric, check the
-        ``metrics_df`` attribute.
+        to get a full list check out :meth:`StreamCat.valid_names`.
+        To get a description of each metric, check out
+        :meth:`StreamCat.metrics_df`. Some metrics require a year to
+        be specified, which have ``[Year]`` in their name. For convenience
+        all these variables and their years are converted to a dict
+        that can be accessed via :meth:`StreamCat.valid_years`.
     metric_areas : str or list of str, optional
         Areas to return the metrics for, defaults to ``None``, i.e. all areas.
         Valid options are: ``catchment``, ``watershed``, ``riparian_catchment``,
         ``riparian_watershed``, ``other``.
     comids : int or list of int, optional
         NHDPlus COMID(s), defaults to ``None``. Either ``comids``, ``regions``,
-        ``states``, ``counties``, or ``conus`` must be passed. They are mutually
-        exclusive.
+        ``states``, ``counties``, or ``conus`` must be passed. They are
+        mutually exclusive.
     regions : str or list of str, optional
-        Hydro region(s) to retrieve metrics for, defaults to ``None``. For a full list
-        of valid regions, instantiate the ``StreamCat`` class and check its
-        ``valid_regions`` attribute. Either ``comids``, ``regions``,
-        ``states``, ``counties``, or ``conus`` must be passed. They are mutually
-        exclusive.
+        Hydro region(s) to retrieve metrics for, defaults to ``None``. For a
+        full list of valid regions check out :meth:`StreamCat.valid_regions`
+        Either ``comids``, ``regions``, ``states``, ``counties``, or ``conus``
+        must be passed. They are mutually exclusive.
     states : str or list of str, optional
-        Two letter state abbreviation(s) to retrieve metrics for, defaults to ``None``.
-        For a full list of valid states, instantiate the ``StreamCat`` class and check
-        its ``valid_states`` attribute. Either ``comids``, ``regions``,
-        ``states``, ``counties``, or ``conus`` must be passed. They are mutually
-        exclusive.
+        Two letter state abbreviation(s) to retrieve metrics for, defaults to
+        ``None``. For a full list of valid states check out
+        :meth:`StreamCat.valid_states` Either ``comids``, ``regions``,
+        ``states``, ``counties``, or ``conus`` must be passed. They are
+        mutually exclusive.
     counties : str or list of str, optional
-        County FIPS codes(s) to retrieve metrics for, defaults to ``None``. For a full
-        list of valid county codes, instantiate the ``StreamCat`` class and check its
-        ``valid_counties`` attribute. Either ``comids``, ``regions``,
-        ``states``, ``counties``, or ``conus`` must be passed. They are mutually
-        exclusive.
+        County FIPS codes(s) to retrieve metrics for, defaults to ``None``. For
+        a full list of valid county codes check out :meth:`StreamCat.valid_counties`
+        Either ``comids``, ``regions``, ``states``, ``counties``, or ``conus`` must
+        be passed. They are mutually exclusive.
     conus : bool, optional
         If ``True``, ``metric_names`` of all NHDPlus COMIDs are retrieved,
         defaults ``False``. Either ``comids``, ``regions``,
@@ -547,30 +606,28 @@ def streamcat(
         If ``True``, return the percent of each area of interest covered by
         the metric.
     area_sqkm : bool, optional
-        If ``True``, return the Returns the area in square kilometers of a given
-        area of interest.
+        If ``True``, return the area in square kilometers.
 
     Returns
     -------
     pandas.DataFrame
         A dataframe with the requested metrics.
     """
-    sc = StreamCat()
-    name = [metric_names] if isinstance(metric_names, str) else metric_names
-    sc.validate(name=name)
-    params = {"name": ",".join(name)}
-    key_count = len(",".join(params["name"]))
+    sc = StreamCatValidator()
+    names = [metric_names] if isinstance(metric_names, str) else metric_names
+    lower = (n.lower() for n in names)
+    names = [sc.alt_names[s] if s in sc.alt_names else s for s in lower]
+    sc.validate(name=names)
+    params = {"name": ",".join(n for n in names)}
 
     if metric_areas:
         aoi = [metric_areas] if isinstance(metric_areas, str) else metric_areas
         sc.validate(aoi=aoi)
         params["areaOfInterest"] = ",".join(aoi)
-        key_count += len(",".join(params["areaOfInterest"]))
 
     ids = sc.id_kwds(comids, regions, states, counties, conus)
     if ids:
         params.update(ids)
-        key_count += len(",".join(next(iter(ids.values()))))
 
     if percent_full:
         params["showPctFull"] = "true"
@@ -578,9 +635,13 @@ def streamcat(
     if area_sqkm:
         params["showAreaSqKm"] = "true"
 
-    method = "get" if key_count < 7000 else "post"
-    resp = ar.retrieve_text([sc.base_url], [{"params": params}], request_method=method)
-    metric_df = pd.read_csv(io.StringIO(resp[0]), engine="pyarrow")
-    if len(metric_df) == 0:
-        raise ServiceError(resp[0])
-    return metric_df
+    params_str = "&".join(f"{k}={v}" for k, v in params.items())
+    if len(params_str) < 7000:
+        resp = ar.retrieve_text([f"{sc.base_url}?{params_str}"])
+    else:
+        resp = ar.retrieve_text([sc.base_url], [{"data": params_str}], request_method="post")
+
+    try:
+        return pd.read_csv(io.StringIO(resp[0]), engine="pyarrow")
+    except ArrowInvalid as ex:
+        raise ServiceError(resp[0]) from ex
