@@ -449,6 +449,7 @@ class StreamCat:
         resp = ar.retrieve_json([self.base_url])
         resp = cast("list[dict[str, Any]]", resp)
         params = resp[0]["parameters"]
+
         self.valid_names = cast("list[str]", params["name"]["options"])
         self.alt_names = {
             n.replace("_", ""): n for n in self.valid_names if n.split("_")[-1].isdigit()
@@ -465,12 +466,29 @@ class StreamCat:
         self.valid_states = pd.DataFrame.from_dict(params["state"]["options"], orient="index")
         self.valid_counties = pd.DataFrame.from_dict(params["county"]["options"], orient="index")
         self.valid_aois = params["areaOfInterest"]["options"]
-        url_vars = f"{self.base_url}/variable_info.csv"
-        self.metrics_df = pd.read_csv(io.StringIO(ar.retrieve_text([url_vars])[0]))
-        self.metrics_df["METRIC_NAME"] = self.metrics_df["METRIC_NAME"].str.replace(
-            "[AOI]", "", regex=False
+        self.valid_slopes = tlz.merge_with(
+            list,
+            (
+                {s[:-9]: f"slp{slp}" for s in self.valid_names if f"slp{slp}" in s}
+                for slp in (10, 20)
+            ),
         )
-        years = self.metrics_df.set_index("METRIC_NAME").YEAR.dropna()
+
+        url_vars = f"{self.base_url}/variable_info.csv"
+        names = pd.read_csv(io.StringIO(ar.retrieve_text([url_vars])[0]))
+        names["METRIC_NAME"] = names["METRIC_NAME"].str.replace(r"\[AOI\]|Slp[12]0", "", regex=True)
+        names["SLOPE"] = [
+            ", ".join(self.valid_slopes.get(m.replace("[Year]", "").lower(), []))
+            for m in names.METRIC_NAME
+        ]
+        names.loc[names["SLOPE"] == "", "SLOPE"] = np.nan
+        slp = ~names["SLOPE"].isna()
+        names.loc[slp, "METRIC_NAME"] = [f"{n}[Slope]" for n in names.loc[slp, "METRIC_NAME"]]
+        names = names.drop_duplicates("METRIC_NAME").reset_index(drop=True)
+        names = names.drop(columns="WEBTOOL_NAME")
+        self.metrics_df = names
+
+        years = names.set_index("METRIC_NAME").YEAR.dropna()
         self.valid_years = {
             str(v): list(range(*(int(y) for y in yrs.split("-"))))
             if "-" in yrs
@@ -569,10 +587,11 @@ def streamcat(
         Metric name(s) to retrieve. There are 567 metrics available.
         to get a full list check out :meth:`StreamCat.valid_names`.
         To get a description of each metric, check out
-        :meth:`StreamCat.metrics_df`. Some metrics require a year to
-        be specified, which have ``[Year]`` in their name. For convenience
-        all these variables and their years are converted to a dict
-        that can be accessed via :meth:`StreamCat.valid_years`.
+        :meth:`StreamCat.metrics_df`. Some metrics require year and/or slope
+        to be specified, which have ``[Year]`` and/or ``[Slope]`` in their name.
+        For convenience all these variables and their years/slopes are converted
+        to a dict that can be accessed via :meth:`StreamCat.valid_years` and
+        :meth:`StreamCat.valid_slopes`.
     metric_areas : str or list of str, optional
         Areas to return the metrics for, defaults to ``None``, i.e. all areas.
         Valid options are: ``catchment``, ``watershed``, ``riparian_catchment``,
