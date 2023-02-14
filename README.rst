@@ -154,19 +154,19 @@ through two sources:
 - Select Attributes for NHDPlus Version 2.1 Reach Catchments from an item on
   `ScienceBase <https://sciencebase.usgs.gov>`__
 - EPA's `StreamCat <https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset>`__
-  dataset from an HMS endpoints ``WSCatchment``
+  dataset.
 
 They both include hundreds of attributes such as hydroclimate properties, water quality,
 urbanization, and population. In addition to NHD catchment summaries, they also have
 their network-accumulated values (both upstream and divergence-routed). You can use
-``nhdplus_attrs`` and ``epa_nhd_catchments`` functions to get these datasets.
+``nhdplus_attrs``, ``epa_nhd_catchments``, ``streamcat`` functions to get these datasets.
 
 Additionally, PyNHD offers some extra utilities for processing the NHD flowlines:
 
 - ``flowline_xsection`` and ``network_xsection``: Get cross-section lines along a flowline
   at a given spacing or a network of flowlines at a given spacing.
 - ``flowline_resample`` and ``network_resample``:
-  Resampe a flowline or network of flowlines based on a given spacing. This is
+  Resample a flowline or network of flowlines based on a given spacing. This is
   useful for smoothing jagged flowlines similar to those in the NHDPlus database.
 - ``prepare_nhdplus``: For cleaning up the data frame by, for example, removing tiny networks,
   adding a ``to_comid`` column, and finding terminal flowlines if it doesn't exist.
