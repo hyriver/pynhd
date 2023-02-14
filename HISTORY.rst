@@ -9,6 +9,14 @@ New Features
 ~~~~~~~~~~~~
 - Add a new property to ``StreamCat``, called ``metrics_df`` that gets
   a dataframe of metric names and their description.
+- Create a new private ``StreamCatValidator`` class to avoid polluting
+  the public ``StreamCat`` class with private attributes and methods.
+  Moreover, add a new alternative metric names attribute to ``StreamCat``
+  called ``alt_names`` for handling those metric names that do not follow
+  ``METRIC+YYYY`` convention. This attribute is a dictionary that maps the
+  alternative names to the actual metric names, so users can use
+  ``METRIC_NAME`` column of ``metrics_df`` and add a year suffix from
+  ``valid_years`` attribute of ``StreamCat`` to get the actual metric name.
 
 0.13.12 (2023-02-10)
 --------------------
