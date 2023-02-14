@@ -324,6 +324,7 @@ class PyGeoAPIBase:
                         ]
                     ),
                     UserWarning,
+                    stacklevel=2,
                 )
             gdf = gpd.GeoDataFrame(
                 pd.concat(

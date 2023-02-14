@@ -350,7 +350,7 @@ def prepare_nhdplus(
                 "So, use_enhd_attrs is set to False.",
             )
         )
-        warnings.warn(msg, UserWarning)
+        warnings.warn(msg, UserWarning, stacklevel=2)
         use_enhd_attrs = False
 
     nhd.clean_flowlines(use_enhd_attrs, terminal2nan)
@@ -370,7 +370,7 @@ def prepare_nhdplus(
 
     if (nhd.nrows - nhd.flw.shape[0]) > 0:
         warnings.warn(
-            f"Removed {nhd.nrows - nhd.flw.shape[0]} segments from the flowlines.", UserWarning
+            f"Removed {nhd.nrows - nhd.flw.shape[0]} segments from the flowlines.", UserWarning, stacklevel=2
         )
 
     if nhd.flw.shape[0] > 0 and ("tocomid" not in nhd.flw or terminal2nan):

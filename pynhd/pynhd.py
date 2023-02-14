@@ -520,6 +520,7 @@ class WaterData:
                 f"The following requested feature {verb} not found in WaterData:\n"
                 + ", ".join(missing),
                 UserWarning,
+                stacklevel=2,
             )
         return features
 
@@ -674,6 +675,7 @@ class NLDI:
                 ]
             ),
             UserWarning,
+            stacklevel=2,
         )
 
     def _validate_fsource(self, fsource: str) -> None:
