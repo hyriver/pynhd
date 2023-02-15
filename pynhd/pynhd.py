@@ -1,9 +1,8 @@
 """Access NLDI and WaterData databases."""
 from __future__ import annotations
 
-import re
 import warnings
-from typing import TYPE_CHECKING, Any, Mapping, Sequence, Union, cast
+from typing import TYPE_CHECKING, Any, Generator, Literal, Sequence, Union, cast, overload
 
 import async_retriever as ar
 import geopandas as gpd
@@ -12,9 +11,10 @@ import pandas as pd
 import pygeoogc as ogc
 import pygeoutils as geoutils
 import pyproj
-from pygeoogc import WFS, InputValueError, ServiceUnavailableError, ServiceURL
-from pygeoogc import ZeroMatchedError as ZeroMatchedErrorOGC
+from pygeoogc import WFS, InputValueError, ServiceURL
 from pygeoutils import EmptyResponseError, InputTypeError
+from shapely.geometry import MultiPoint, Point
+from yarl import URL
 
 from pynhd.core import AGRBase, GeoConnex, PyGeoAPIBase, PyGeoAPIBatch
 from pynhd.exceptions import InputRangeError, MissingItemError, ZeroMatchedError
@@ -631,52 +631,78 @@ class NHDPlusHR(AGRBase):
 class NLDI:
     """Access the Hydro Network-Linked Data Index (NLDI) service."""
 
-    def _get_url(
-        self, url: str, payload: dict[str, str] | None = None
-    ) -> dict[str, Any] | list[dict[str, Any]]:
-        """Send a request to the service using GET method."""
-        if payload is None:
-            payload = {"f": "json"}
-        else:
-            payload.update({"f": "json"})
-
-        try:
-            resp = ar.retrieve_json([url], [{"params": payload}])
-        except ar.ServiceError as ex:
-            raise ZeroMatchedError from ex
-        except ConnectionError as ex:
-            raise ServiceUnavailableError(self.base_url) from ex
-        else:
-            if resp[0] is None:  # type: ignore
-                raise ZeroMatchedError
-            if isinstance(resp[0], dict) and resp[0].get("type") == "error":
-                raise ZeroMatchedError(resp[0].get("description", "Feature not found"))
-            return resp[0]
-
     def __init__(self) -> None:
         self.base_url = ServiceURL().restful.nldi
 
-        resp = self._get_url("/".join([self.base_url, "linked-data"]))
-        resp = cast("list[dict[str, Any]]", resp)
-        self.valid_fsources = {r["source"]: r["sourceName"] for r in resp}
+        resp = ar.retrieve_json([f"{self.base_url}/linked-data"])
+        resp = cast("list[list[dict[str, Any]]]", resp)
+        self.valid_fsources = {r["source"]: r["sourceName"] for r in resp[0]}
 
-        resp = self._get_url("/".join([self.base_url, "lookups"]))
+        resp = ar.retrieve_json([f"{self.base_url}/lookups"])
+        resp = cast("list[list[dict[str, Any]]]", resp)
+        self.valid_chartypes = {r["type"]: r["typeName"] for r in resp[0]}
+
+        resp = ar.retrieve_json([r["characteristics"] for r in resp[0]])
         resp = cast("list[dict[str, Any]]", resp)
-        self.valid_chartypes = {r["type"]: r["typeName"] for r in resp}
+        char_types = (
+            ogc.traverse_json(r, ["characteristicMetadata", "characteristic"]) for r in resp
+        )
+        self.valid_characteristics = pd.concat(
+            (pd.DataFrame(c) for c in char_types), ignore_index=True
+        )
 
     @staticmethod
-    def _missing_warning(n_miss: int, n_tot: int) -> None:
-        """Show a warning if there are missing features."""
-        warnings.warn(
-            " ".join(
-                [
-                    f"{n_miss} of {n_tot} inputs didn't return any features.",
-                    "They are returned as a list.",
-                ]
-            ),
-            UserWarning,
-            stacklevel=2,
-        )
+    def _check_resp(resp: dict[str, Any] | list[dict[str, Any]] | None) -> bool:
+        if resp is None:
+            return False
+        if isinstance(resp, dict) and resp.get("type") == "error":
+            return False
+        return True
+
+    @overload
+    def _get_urls(
+        self, url_parts: Generator[tuple[str, ...], None, None] | str, raw: Literal[True] = ...
+    ) -> tuple[list[int], list[dict[str, Any]] | list[list[dict[str, Any]]]]:
+        ...
+
+    @overload
+    def _get_urls(
+        self, url_parts: Generator[tuple[str, ...], None, None] | str, raw: Literal[False] = ...
+    ) -> gpd.GeoDataFrame:
+        ...
+
+    def _get_urls(
+        self, url_parts: Generator[tuple[str, ...], None, None] | str, raw: bool = False
+    ) -> tuple[list[int], list[dict[str, Any]] | list[list[dict[str, Any]]]] | gpd.GeoDataFrame:
+        """Send a request to the service using GET method."""
+        if isinstance(url_parts, str):
+            urls = [URL(url_parts)]
+        else:
+            urls = [URL("/".join((self.base_url,) + u)) for u in url_parts]
+        resp = ar.retrieve_json([str(u) for u in urls], raise_status=False)
+
+        try:
+            index, resp = zip(*((i, r) for i, r in enumerate(resp) if self._check_resp(r)))
+        except ValueError as ex:
+            raise ZeroMatchedError from ex
+
+        index = cast("list[int]", list(index))
+        resp = cast("list[dict[str, Any]] | list[list[dict[str, Any]]]", list(resp))
+        failed = [
+            f"{u.parts[5]}?{u.query_string}" if u.query_string else u.parts[5]
+            for i, u in enumerate(urls)
+            if i not in index
+        ]
+
+        if failed:
+            msg = f"{len(failed)} of {len(urls)} requests failed. Failed requests are:\n"
+            msg += "\n".join(failed)
+            warnings.warn(msg, UserWarning, stacklevel=2)
+
+        if raw:
+            return index, resp
+
+        return geoutils.json2geodf(resp, 4269, 4326)  # type: ignore
 
     def _validate_fsource(self, fsource: str) -> None:
         """Check if the given feature source is valid."""
@@ -684,46 +710,7 @@ class NLDI:
             valids = [f'"{s}" for {d}' for s, d in self.valid_fsources.items()]
             raise InputValueError("fsource", valids)
 
-    def _get_urls(
-        self, urls: Mapping[Any, tuple[str, dict[str, str] | None]]
-    ) -> tuple[gpd.GeoDataFrame, list[str]]:
-        """Get basins for a list of station IDs.
-
-        Parameters
-        ----------
-        urls : dict
-            A dict with keys as feature ids and values as corresponding url and payload.
-
-        Returns
-        -------
-        (geopandas.GeoDataFrame, list)
-            NLDI indexed features in EPSG:4326 and list of ID(s) that no feature was found.
-        """
-        not_found = []
-        resp = []
-        for f, (u, p) in urls.items():
-            try:
-                rjson = self._get_url(u, p)
-                resp.append((f, geoutils.json2geodf(rjson, 4269, 4326)))
-            except (
-                ZeroMatchedErrorOGC,
-                ZeroMatchedError,
-                InputTypeError,
-                ar.ServiceError,
-                EmptyResponseError,
-            ):
-                not_found.append(f)
-
-        if not resp:
-            raise ZeroMatchedError
-
-        resp_df = gpd.GeoDataFrame(pd.concat(dict(resp)), crs=4326)
-
-        return resp_df, not_found
-
-    def getfeature_byid(
-        self, fsource: str, fids: str | list[str]
-    ) -> gpd.GeoDataFrame | tuple[gpd.GeoDataFrame, list[str]]:
+    def getfeature_byid(self, fsource: str, fids: str | list[str]) -> gpd.GeoDataFrame:
         """Get feature(s) based ID(s).
 
         Parameters
@@ -754,21 +741,15 @@ class NLDI:
         """
         self._validate_fsource(fsource)
         fids = [fids] if isinstance(fids, (int, str)) else list(fids)
-        urls = {f: ("/".join([self.base_url, "linked-data", fsource, f]), None) for f in fids}
-        features, not_found = self._get_urls(urls)
-
-        if not_found:
-            self._missing_warning(len(not_found), len(fids))
-            return features, not_found
-
-        return features
+        urls = (("linked-data", fsource, f) for f in fids)
+        return self._get_urls(urls, False)
 
     def __byloc(
         self,
         source: str,
         coords: tuple[float, float] | list[tuple[float, float]],
         loc_crs: CRSTYPE = 4326,
-    ) -> gpd.GeoDataFrame | tuple[gpd.GeoDataFrame, list[tuple[float, float]]]:
+    ) -> gpd.GeoDataFrame:
         """Get the closest feature ID(s) based on coordinates.
 
         Parameters
@@ -786,45 +767,30 @@ class NLDI:
             NLDI indexed ComID(s) in EPSG:4326. If some coords don't return any ComID
             a list of missing coords are returned as well.
         """
-        endpoint = "comid/position" if source == "feature" else "hydrolocation"
-        base_url = "/".join([self.base_url, "linked-data", endpoint])
+        try:
+            _point = Point(coords)
+            _coords = [(float(_point.x), float(_point.y))]
+        except (ValueError, TypeError):
+            try:
+                _coords = [(float(p.x), float(p.y)) for p in MultiPoint(coords).geoms]
+            except (ValueError, TypeError) as ex:
+                raise InputTypeError("coords", "tuple or list of tuples") from ex
 
-        if not isinstance(coords, (list, tuple)):
-            raise InputTypeError("coords", "list or tuple")
-
-        if isinstance(coords[0], (int, float)) and len(coords) == 2:
-            _coords = [coords]
-        elif all(len(c) == 2 for c in coords):  # type: ignore
-            _coords = coords
-        else:
-            raise InputTypeError("coords", "list of tuples or a tuple")
+        if not _coords:
+            raise InputTypeError("coords", "list with at least one element")
 
         _coords = ogc.match_crs(_coords, loc_crs, 4326)
-
-        urls = {
-            f"{(lon, lat)}": (base_url, {"coords": f"POINT({lon} {lat})"}) for lon, lat in _coords
-        }
-        comids, not_found_str = self._get_urls(urls)
-
-        if len(comids) == 0:
-            raise ZeroMatchedError
-
-        comids = comids.reset_index(drop=True)
-
-        if not_found_str:
-            not_found = [
-                tuple(float(p) for p in re.sub(r"\(|\)| ", "", m).split(",")) for m in not_found_str
-            ]
-            self._missing_warning(len(not_found), len(_coords))
-            return comids, not_found
-
-        return comids
+        endpoint = "comid/position" if source == "feature" else "hydrolocation"
+        urls = (
+            ("linked-data", f"{endpoint}?coords=POINT({lon:.6f} {lat:.6f})") for lon, lat in _coords
+        )
+        return self._get_urls(urls, False)
 
     def comid_byloc(
         self,
         coords: tuple[float, float] | list[tuple[float, float]],
         loc_crs: CRSTYPE = 4326,
-    ) -> gpd.GeoDataFrame | tuple[gpd.GeoDataFrame, list[tuple[float, float]]]:
+    ) -> gpd.GeoDataFrame:
         """Get the closest ComID based on coordinates using ``hydrolocation`` endpoint.
 
         Notes
@@ -849,16 +815,13 @@ class NLDI:
             any ComID a list of missing coords are returned as well.
         """
         comids = self.__byloc("comid", coords, loc_crs)
-        if isinstance(comids, tuple):
-            cdf, miss = comids
-            return cdf[cdf["source"] == "indexed"].reset_index(drop=True), miss
         return comids[comids["source"] == "indexed"].reset_index(drop=True)
 
     def feature_byloc(
         self,
         coords: tuple[float, float] | list[tuple[float, float]],
         loc_crs: CRSTYPE = 4326,
-    ) -> gpd.GeoDataFrame | tuple[gpd.GeoDataFrame, list[tuple[float, float]]]:
+    ) -> gpd.GeoDataFrame:
         """Get the closest feature ID(s) based on coordinates using ``position`` endpoint.
 
         Parameters
@@ -882,7 +845,7 @@ class NLDI:
         fsource: str = "nwissite",
         split_catchment: bool = False,
         simplified: bool = True,
-    ) -> gpd.GeoDataFrame | tuple[gpd.GeoDataFrame, list[str]]:
+    ) -> gpd.GeoDataFrame:
         """Get basins for a list of station IDs.
 
         Parameters
@@ -917,46 +880,61 @@ class NLDI:
             a list of missing ID(s) are returned as well.
         """
         self._validate_fsource(fsource)
-        if not isinstance(feature_ids, Sequence):
-            raise InputTypeError("feature_ids", "str, list or tuple")
-
-        feature_ids = [feature_ids] if isinstance(feature_ids, (str, int)) else feature_ids
+        feature_ids = [feature_ids] if isinstance(feature_ids, (str, int)) else list(feature_ids)
+        feature_ids = [str(fid) for fid in feature_ids]
 
         if not feature_ids:
             raise InputTypeError("feature_ids", "list with at least one element")
 
         if fsource == "nwissite":
-            feature_ids = [f"USGS-{str(fid).lower().replace('usgs-', '')}" for fid in feature_ids]
+            feature_ids = [f"USGS-{fid.lower().replace('usgs-', '')}" for fid in feature_ids]
 
-        ftype = type(feature_ids[0])
-        payload = {
-            "splitCatchment": str(split_catchment).lower(),
-            "simplified": str(simplified).lower(),
-        }
-        urls = {
-            ftype(str(fid).lower().replace("usgs-", "")): (
-                f"{self.base_url}/linked-data/{fsource}/{fid}/basin",
-                payload,
-            )
-            for fid in feature_ids
-        }
-        basins, not_found = self._get_urls(urls)
-        basins = basins.reset_index(level=1, drop=True)
+        payload = {}
+        if split_catchment:
+            payload["splitCatchment"] = "true"
+
+        if not simplified:
+            payload["simplified"] = "false"
+
+        query = ""
+        if payload:
+            query = URL.build(query=payload).query_string
+
+        urls = (("linked-data", fsource, fid, f"basin?{query}") for fid in feature_ids)
+        index, resp = self._get_urls(urls, True)
+        basins = geoutils.json2geodf(resp, 4269, 4326)  # type: ignore
+        basins.index = pd.Index([feature_ids[i] for i in index])
         basins.index.rename("identifier", inplace=True)
-        nulls = basins.geometry.isnull()
-        not_found += basins[nulls].index.to_list()
-        basins = basins[~nulls].copy()
-
-        if not_found:
-            self._missing_warning(len(not_found), len(feature_ids))
-            return basins, not_found
-
+        basins = basins[~basins.geometry.isnull()].copy()
         return basins
+
+    @overload
+    def getcharacteristic_byid(
+        self,
+        feature_ids: str | int | Sequence[str | int],
+        char_type: str,
+        fsource: str = ...,
+        char_ids: str | list[str] = ...,
+        values_only: Literal[True] = ...,
+    ) -> pd.DataFrame:
+        ...
+
+    @overload
+    def getcharacteristic_byid(
+        self,
+        feature_ids: str | int | Sequence[str | int],
+        char_type: str,
+        fsource: str = ...,
+        char_ids: str | list[str] = ...,
+        values_only: Literal[False] = ...,
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
+        ...
 
     def getcharacteristic_byid(
         self,
-        comids: list[str] | str,
+        feature_ids: str | int | Sequence[str | int],
         char_type: str,
+        fsource: str = "comid",
         char_ids: str | list[str] = "all",
         values_only: bool = True,
     ) -> pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]:
@@ -964,13 +942,29 @@ class NLDI:
 
         Parameters
         ----------
-        comids : str or list
-            The NHDPlus Common Identifier(s).
+        feature_ids : str or list
+            Target feature ID(s).
         char_type : str
             Type of the characteristic. Valid values are ``local`` for
             individual reach catchments, ``tot`` for network-accumulated values
             using total cumulative drainage area and ``div`` for network-accumulated values
             using divergence-routed.
+        fsource : str, optional
+            The name of feature(s) source, defaults to ``comid``.
+            The valid sources are:
+
+            * 'comid' for NHDPlus comid.
+            * 'ca_gages' for Streamgage catalog for CA SB19
+            * 'gfv11_pois' for USGS Geospatial Fabric V1.1 Points of Interest
+            * 'huc12pp' for HUC12 Pour Points
+            * 'nmwdi-st' for New Mexico Water Data Initative Sites
+            * 'nwisgw' for NWIS Groundwater Sites
+            * 'nwissite' for NWIS Surface Water Sites
+            * 'ref_gage' for geoconnex.us reference gages
+            * 'vigil' for Vigil Network Data
+            * 'wade' for Water Data Exchange 2.0 Sites
+            * 'WQP' for Water Quality Portal
+
         char_ids : str or list, optional
             Name(s) of the target characteristics, default to all.
         values_only : bool, optional
@@ -983,38 +977,40 @@ class NLDI:
             Either only ``characteristic_value`` as a dataframe or
             or if ``values_only`` is Fale return ``percent_nodata`` as well.
         """
+        self._validate_fsource(fsource)
         if char_type not in self.valid_chartypes:
             valids = [f'"{s}" for {d}' for s, d in self.valid_chartypes.items()]
             raise InputValueError("char", valids)
 
-        comids = [comids] if isinstance(comids, (str, int)) else list(comids)
+        feature_ids = [feature_ids] if isinstance(feature_ids, (str, int)) else list(feature_ids)
+        feature_ids = [str(c) for c in feature_ids]
+
         v_dict, nd_dict = {}, {}
 
         if char_ids == "all":
             payload = None
         else:
             _char_ids = [char_ids] if isinstance(char_ids, str) else list(char_ids)
-            valid_charids = self.get_validchars(char_type)
+            valid_charids = self.valid_characteristics["characteristic_id"]
 
-            idx = valid_charids.index
-            if any(c not in idx for c in _char_ids):
-                vids = valid_charids["characteristic_description"]
-                raise InputValueError("char_id", [f'"{s}" for {d}' for s, d in vids.items()])
+            if any(c not in valid_charids for c in _char_ids):
+                raise InputValueError("char_id", valid_charids.to_list())
             payload = {"characteristicId": ",".join(_char_ids)}
 
-        for comid in comids:
-            url = "/".join([self.base_url, "linked-data", "comid", f"{comid}", char_type])
-            resp = self._get_url(url, payload)
-            resp = cast("dict[str, Any]", resp)
-            char = pd.DataFrame.from_dict(resp["characteristics"], orient="columns").T
+        query = URL.build(query=payload).query_string
+        urls = (("linked-data", fsource, c, f"{char_type}?{query}") for c in feature_ids)
+        index, resp = self._get_urls(urls, True)
+        resp = cast("list[dict[str, Any]]", resp)
+        for i in index:
+            char = pd.DataFrame.from_dict(resp[i]["characteristics"], orient="columns").T
             char.columns = char.iloc[0]
             char = char.drop(index="characteristic_id")
 
-            v_dict[comid] = char.loc["characteristic_value"]
+            v_dict[feature_ids[i]] = char.loc["characteristic_value"]
             if values_only:
                 continue
 
-            nd_dict[comid] = char.loc["percent_nodata"]
+            nd_dict[feature_ids[i]] = char.loc["percent_nodata"]
 
         def todf(df_dict: dict[str, pd.DataFrame]) -> pd.DataFrame:
             df = pd.DataFrame.from_dict(df_dict, orient="index")
@@ -1027,17 +1023,6 @@ class NLDI:
             return chars
 
         return chars, todf(nd_dict)
-
-    def get_validchars(self, char_type: str) -> pd.DataFrame:
-        """Get all the available characteristics IDs for a given characteristics type."""
-        if char_type not in self.valid_chartypes:
-            raise InputValueError("char", list(self.valid_chartypes))
-
-        resp = self._get_url("/".join([self.base_url, "lookups", char_type, "characteristics"]))
-        c_list = ogc.traverse_json(resp, ["characteristicMetadata", "characteristic"])
-        return pd.DataFrame.from_dict(
-            {c.pop("characteristic_id"): c for c in c_list}, orient="index"
-        )
 
     def navigate_byid(
         self,
@@ -1093,31 +1078,25 @@ class NLDI:
 
         self._validate_fsource(fsource)
 
-        url = "/".join([self.base_url, "linked-data", fsource, fid, "navigation"])
-
-        valid_navigations = self._get_url(url)
-        valid_navigations = cast("dict[str, Any]", valid_navigations)
+        url = "/".join((self.base_url, "linked-data", fsource, fid, "navigation"))
+        _, resp = self._get_urls(url, True)
+        resp = cast("list[dict[str, str]]", resp)
+        valid_navigations = resp[0]
         if not valid_navigations:
             raise ZeroMatchedError
 
         if navigation not in valid_navigations:
             raise InputValueError("navigation", list(valid_navigations))
 
-        url = valid_navigations[navigation]
-
-        resp = self._get_url(url)
-        resp = cast("list[dict[str, Any]]", resp)
-        valid_sources = {s["source"].lower(): s["features"] for s in resp}
+        _, resp = self._get_urls(valid_navigations[navigation], True)
+        resp = cast("list[list[dict[str, Any]]]", resp)
+        valid_sources = {s["source"].lower(): s["features"] for s in resp[0]}
         if source not in valid_sources:
             raise InputValueError("source", list(valid_sources))
 
-        url = valid_sources[source]
         payload = {"distance": f"{round(distance)}", "trimStart": f"{trim_start}".lower()}
-        try:
-            resp = self._get_url(url, payload)
-        except EmptyResponseError as ex:
-            raise ZeroMatchedError from ex
-        return geoutils.json2geodf(resp, 4269, 4326)
+        url = f"{valid_sources[source]}?{URL.build(query=payload).query_string}"
+        return self._get_urls(url, False)
 
     def navigate_byloc(
         self,
@@ -1163,10 +1142,7 @@ class NLDI:
         geopandas.GeoDataFrame
             NLDI indexed features in EPSG:4326.
         """
-        if not (isinstance(coords, tuple) and len(coords) == 2):
-            raise InputTypeError("coods", "tuple of length 2", "(x, y)")
-        resp = self.feature_byloc(coords, loc_crs)
-        comid_df = resp[0] if isinstance(resp, tuple) else resp
+        comid_df = self.feature_byloc(coords, loc_crs)
         comid = comid_df.comid.iloc[0]
 
         if navigation is None or source is None:
