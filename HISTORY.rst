@@ -18,6 +18,12 @@ New Features
   ``METRIC_NAME`` column of ``metrics_df`` and add a year suffix from
   ``valid_years`` attribute of ``StreamCat`` to get the actual metric name.
 
+Breaking Changes
+~~~~~~~~~~~~~~~~
+- Rewrite ``NLDI`` to improve code readability and performance. Now,
+  its methods do now return tuples if there are failed requests,
+  instead they will be shown as a ``UserWarning``.
+
 0.13.12 (2023-02-10)
 --------------------
 
