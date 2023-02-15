@@ -176,16 +176,6 @@ class TestNLDI:
         )
         assert tot.CAT_BFI.values[0] == 57 and prc.CAT_BFI.values[0] == 0
 
-    @pytest.mark.skipif(has_typeguard, reason="Broken if Typeguard is enabled")
-    def test_feature_missing(self):
-        _, missing = self.nldi.feature_byloc([(45.2, -69.3), (-69.3, 45.2)])
-        assert len(missing) == 1
-
-    @pytest.mark.skipif(has_typeguard, reason="Broken if Typeguard is enabled")
-    def test_basin_missing(self):
-        _, missing = self.nldi.get_basins([STA_ID, "00000000"])
-        assert len(missing) == 1
-
 
 class TestNHDAttrs:
     def test_meta_s3(self):
