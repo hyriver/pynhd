@@ -20,9 +20,9 @@ New Features
 
 Breaking Changes
 ~~~~~~~~~~~~~~~~
-- Rewrite ``NLDI`` to improve code readability and performance. Now,
-  its methods do now return tuples if there are failed requests,
-  instead they will be shown as a ``UserWarning``.
+- Rewrite ``NLDI`` to improve code readability and significantly improving
+  performance. Now, its methods do now return tuples if there are failed
+  requests, instead they will be shown as a ``UserWarning``.
 
 0.13.12 (2023-02-10)
 --------------------
