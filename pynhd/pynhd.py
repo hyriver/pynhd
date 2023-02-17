@@ -767,18 +767,7 @@ class NLDI:
             NLDI indexed ComID(s) in EPSG:4326. If some coords don't return any ComID
             a list of missing coords are returned as well.
         """
-        try:
-            _point = Point(coords)
-            _coords = [(float(_point.x), float(_point.y))]
-        except (ValueError, TypeError):
-            try:
-                _coords = [(float(p.x), float(p.y)) for p in MultiPoint(coords).geoms]
-            except (ValueError, TypeError) as ex:
-                raise InputTypeError("coords", "tuple or list of tuples") from ex
-
-        if not _coords:
-            raise InputTypeError("coords", "list with at least one element")
-
+        _coords = geoutils.coords_list(coords)
         _coords = ogc.match_crs(_coords, loc_crs, 4326)
         endpoint = "comid/position" if source == "feature" else "hydrolocation"
         urls = (
