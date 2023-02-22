@@ -980,10 +980,10 @@ class NLDI:
             payload = None
         else:
             _char_ids = [char_ids] if isinstance(char_ids, str) else list(char_ids)
-            valid_charids = self.valid_characteristics["characteristic_id"]
+            valid_charids = self.valid_characteristics["characteristic_id"].to_list()
 
             if any(c not in valid_charids for c in _char_ids):
-                raise InputValueError("char_id", valid_charids.to_list())
+                raise InputValueError("char_id", valid_charids)
             payload = {"characteristicId": ",".join(_char_ids)}
 
         query = URL.build(query=payload).query_string
