@@ -13,7 +13,6 @@ import pygeoutils as geoutils
 import pyproj
 from pygeoogc import WFS, InputValueError, ServiceURL
 from pygeoutils import EmptyResponseError, InputTypeError
-from shapely.geometry import MultiPoint, Point
 from yarl import URL
 
 from pynhd.core import AGRBase, GeoConnex, PyGeoAPIBase, PyGeoAPIBatch
@@ -688,8 +687,9 @@ class NLDI:
 
         index = cast("list[int]", list(index))
         resp = cast("list[dict[str, Any]] | list[list[dict[str, Any]]]", list(resp))
+        u_idx = 4 if "hydrolocation" in urls[0].parts[-1] else 5
         failed = [
-            f"{u.parts[5]}?{u.query_string}" if u.query_string else u.parts[5]
+            f"{u.parts[u_idx]}?{u.query_string}" if u.query_string else u.parts[u_idx]
             for i, u in enumerate(urls)
             if i not in index
         ]
