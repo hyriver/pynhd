@@ -473,7 +473,7 @@ class WaterData:
         distance : int
             The radius (in meters) to search within.
         loc_crs : str, int, or pyproj.CRS, optional
-            The CRS of the input coordinates, default to epsg:4326.
+            The CRS of the input coordinates, default to ``epsg:4326``.
         sort_attr : str, optional
             The column name in the database to sort request by, defaults
             to the first attribute in the schema that contains ``id`` in its name.
@@ -512,15 +512,12 @@ class WaterData:
             fids = [str(featureids)]
         else:
             fids = [str(f) for f in featureids]
-        missing = set(fids).difference(set(features[featurename].astype(str)))
-        if missing:
-            verb = "ID was" if len(missing) == 1 else "IDs were"
-            warnings.warn(
-                f"The following requested feature {verb} not found in WaterData:\n"
-                + ", ".join(missing),
-                UserWarning,
-                stacklevel=2,
-            )
+
+        failed = set(fids).difference(set(features[featurename].astype(str)))
+        if failed:
+            msg = f"{len(failed)} of {len(fids)} requests failed. Failed requests are:\n"
+            msg += "\n".join(failed)
+            warnings.warn(msg, UserWarning, stacklevel=2)
         return features
 
     def byfilter(
