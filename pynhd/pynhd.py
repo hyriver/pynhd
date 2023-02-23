@@ -656,6 +656,8 @@ class NLDI:
             return False
         if isinstance(resp, dict) and resp.get("type") == "error":
             return False
+        if isinstance(resp, dict) and "features" in resp and not resp["features"]:
+            return False
         return True
 
     @overload
@@ -892,8 +894,7 @@ class NLDI:
         urls = (("linked-data", fsource, fid, f"basin?{query}") for fid in feature_ids)
         index, resp = self._get_urls(urls, True)
         basins = geoutils.json2geodf(resp, 4269, 4326)  # type: ignore
-        basins.index = pd.Index([feature_ids[i] for i in index])
-        basins.index.rename("identifier", inplace=True)
+        basins.index = pd.Index([feature_ids[i] for i in index], name="identifier")
         basins = basins[~basins.geometry.isnull()].copy()
         return basins
 
