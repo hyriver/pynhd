@@ -514,9 +514,14 @@ class WaterData:
             fids = [str(f) for f in featureids]
 
         failed = set(fids).difference(set(features[featurename].astype(str)))
+
         if failed:
-            msg = f"{len(failed)} of {len(fids)} requests failed. Failed requests are:\n"
-            msg += "\n".join(failed)
+            msg = ". ".join(
+                (
+                    f"{len(failed)} of {len(fids)} requests failed.",
+                    f"IDs of the failed requests are {list(failed)}",
+                )
+            )
             warnings.warn(msg, UserWarning, stacklevel=2)
         return features
 
@@ -686,16 +691,15 @@ class NLDI:
 
         index = cast("list[int]", list(index))
         resp = cast("list[dict[str, Any]] | list[list[dict[str, Any]]]", list(resp))
-        u_idx = 4 if "hydrolocation" in urls[0].parts[-1] else 5
-        failed = [
-            f"{u.parts[u_idx]}?{u.query_string}" if u.query_string else u.parts[u_idx]
-            for i, u in enumerate(urls)
-            if i not in index
-        ]
+        failed = [i for i in range(len(urls)) if i not in index]
 
         if failed:
-            msg = f"{len(failed)} of {len(urls)} requests failed. Failed requests are:\n"
-            msg += "\n".join(failed)
+            msg = ". ".join(
+                (
+                    f"{len(failed)} of {len(urls)} requests failed.",
+                    f"Indices of the failed requests are {failed}",
+                )
+            )
             warnings.warn(msg, UserWarning, stacklevel=2)
 
         if raw:
@@ -1014,11 +1018,12 @@ class NLDI:
     def navigate_byid(
         self,
         fsource: str,
-        fid: str,
+        fid: str | int,
         navigation: str,
         source: str,
         distance: int = 500,
         trim_start: bool = False,
+        stop_comid: str | int | None = None,
     ) -> gpd.GeoDataFrame:
         """Navigate the NHDPlus database from a single feature id up to a distance.
 
@@ -1039,7 +1044,7 @@ class NLDI:
             * 'wade' for Water Data Exchange 2.0 Sites
             * 'WQP' for Water Quality Portal
 
-        fid : str
+        fid : str or int
             The ID of the feature.
         navigation : str
             The navigation method.
@@ -1054,6 +1059,8 @@ class NLDI:
         trim_start : bool, optional
             If ``True``, trim the starting flowline at the source feature,
             defaults to ``False``.
+        stop_comid : str or int, optional
+            The ComID to stop the navigationation, defaults to ``None``.
 
         Returns
         -------
@@ -1065,7 +1072,7 @@ class NLDI:
 
         self._validate_fsource(fsource)
 
-        url = "/".join((self.base_url, "linked-data", fsource, fid, "navigation"))
+        url = "/".join((self.base_url, "linked-data", fsource, str(fid), "navigation"))
         _, resp = self._get_urls(url, True)
         resp = cast("list[dict[str, str]]", resp)
         valid_navigations = resp[0]
@@ -1082,6 +1089,8 @@ class NLDI:
             raise InputValueError("source", list(valid_sources))
 
         payload = {"distance": f"{round(distance)}", "trimStart": f"{trim_start}".lower()}
+        if stop_comid:
+            payload["stopComid"] = str(stop_comid)
         url = f"{valid_sources[source]}?{URL.build(query=payload).query_string}"
         return self._get_urls(url, False)
 
@@ -1093,6 +1102,7 @@ class NLDI:
         loc_crs: CRSTYPE = 4326,
         distance: int = 500,
         trim_start: bool = False,
+        stop_comid: str | int | None = None,
     ) -> gpd.GeoDataFrame:
         """Navigate the NHDPlus database from a coordinate.
 
@@ -1123,6 +1133,8 @@ class NLDI:
         trim_start : bool, optional
             If ``True``, trim the starting flowline at the source feature,
             defaults to ``False``.
+        stop_comid : str or int, optional
+            The ComID to stop the navigationation, defaults to ``None``.
 
         Returns
         -------
@@ -1135,7 +1147,9 @@ class NLDI:
         if navigation is None or source is None:
             raise MissingItemError(["navigation", "source"])
 
-        return self.navigate_byid("comid", comid, navigation, source, distance, trim_start)
+        return self.navigate_byid(
+            "comid", comid, navigation, source, distance, trim_start, stop_comid
+        )
 
 
 def geoconnex(

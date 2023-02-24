@@ -809,7 +809,7 @@ def mainstem_huc12_nx() -> tuple[nx.DiGraph, dict[int, str], list[str]]:
     return graph, label2huc, onnetwork_sorted
 
 
-def nhdplus_l48(layer: str, data_dire: str | Path = "cache", **kwargs: Any) -> gpd.GeoDataFrame:
+def nhdplus_l48(layer: str, data_dir: str | Path = "cache", **kwargs: Any) -> gpd.GeoDataFrame:
     """Get the entire NHDPlus dataset.
 
     Notes
@@ -915,7 +915,7 @@ def nhdplus_l48(layer: str, data_dire: str | Path = "cache", **kwargs: Any) -> g
     if layer not in layers:
         raise InputValueError("layer", layers)
 
-    root = data_dire or Path("cache")
+    root = data_dir or Path("cache")
     nhdfile = Path(
         root, "NHDPlusNationalData", "NHDPlusV21_National_Seamless_Flattened_Lower48.gdb"
     )
