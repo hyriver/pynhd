@@ -17,6 +17,10 @@ New Features
   alternative names to the actual metric names, so users can use
   ``METRIC_NAME`` column of ``metrics_df`` and add a year suffix from
   ``valid_years`` attribute of ``StreamCat`` to get the actual metric name.
+- In ``navigate_by*`` functions of ``NLDI`` add ``stop_comid``,
+  which is another criterion for stopping the navigation in addition
+  to ``distance``.
+- Improve ``UserWarning`` messages of ``NLDI`` and ``WaterData``.
 
 Breaking Changes
 ~~~~~~~~~~~~~~~~
