@@ -15,8 +15,7 @@ import pandas as pd
 import pyproj
 from pygeoogc import streaming_download
 from pygeoutils import GeoBSpline, InputTypeError
-from shapely import ops
-from shapely.geometry import LineString, MultiLineString, Point
+from shapely import LineString, MultiLineString, Point, ops
 
 from pynhd import nhdplus_derived as derived
 from pynhd.core import ScienceBase
@@ -36,7 +35,7 @@ except ImportError:
 if TYPE_CHECKING:
     from pandas._libs.missing import NAType
     from pandas.core.groupby.generic import DataFrameGroupBy
-    from pygeoutils.pygeoutils import Spline
+    from pygeoutils.geotools import Spline
 
 
 __all__ = [
@@ -404,7 +403,7 @@ def topoogical_sort(
     largest_only: bool = False,
     id_col: str = "ID",
     toid_col: str = "toID",
-) -> tuple[list[np.int64 | NAType], pd.Series, nx.DiGraph]:
+) -> tuple[list[np.int64 | NAType], dict[int, list[int]], nx.DiGraph]:
     """Topological sorting of a river network.
 
     Parameters
@@ -416,17 +415,20 @@ def topoogical_sort(
     largest_only : bool, optional
         Whether to return only the largest network, defaults to ``False``.
     id_col : str, optional
-        Name of the column containing the node ID, defaults to "ID".
+        Name of the column containing the node ID, defaults to ``ID``.
     toid_col : str, optional
-        Name of the column containing the downstream node ID, defaults to "toID".
+        Name of the column containing the downstream node ID, defaults to ``toID``.
 
     Returns
     -------
     (list, dict , networkx.DiGraph)
         A list of topologically sorted IDs, a dictionary
-        with keys as IDs and values as its upstream nodes,
-        and the generated networkx object. Note that the
-        terminal node ID is set to pd.NA.
+        with keys as IDs and values as a list of its upstream nodes,
+        and the generated ``networkx.DiGraph`` object. Note that node
+        IDs are associated with the input flow line IDs, but there might
+        be some negative IDs in the output garph that are not present in
+        the input flow line IDs. These "artificial" nodes are used to represent the
+        graph outlet (the most downstream nodes) in the graph.
     """
     flowlines[[id_col, toid_col]] = flowlines[[id_col, toid_col]].astype("Int64")
     network = nhdflw2nx(flowlines, id_col, toid_col, edge_attr)
@@ -434,7 +436,7 @@ def topoogical_sort(
         nodes = max(nx.weakly_connected_components(network), key=len)
         network = _create_subgraph(network, nodes)
     topo_sorted = list(nx.topological_sort(network))
-    up_nodes = pd.Series({i: network.predecessors(i) for i in network})
+    up_nodes = {i: list(network.predecessors(i)) for i in network}
     return topo_sorted, up_nodes, network
 
 
