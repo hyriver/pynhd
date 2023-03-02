@@ -11,10 +11,12 @@ import geopandas as gpd
 import pandas as pd
 import pygeoutils as geoutils
 import pyproj
-import shapely.geometry as sgeom
+import shapely
+import ujson
 from pygeoogc import ArcGISRESTful, ServiceURL
 from pygeoogc import utils as ogc_utils
 from pygeoutils import EmptyResponseError
+from shapely import MultiPoint, MultiPolygon, Polygon
 
 from pynhd.exceptions import (
     InputRangeError,
@@ -28,9 +30,12 @@ from pynhd.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from shapely.geometry import MultiPolygon, Polygon
+    from shapely import LineString, Point
 
     CRSTYPE = Union[int, str, pyproj.CRS]
+    GTYPE = Union[
+        Polygon, MultiPolygon, MultiPoint, LineString, Point, "tuple[float, float, float, float]"
+    ]
 
 __all__ = ["AGRBase", "ScienceBase", "GeoConnex"]
 
@@ -347,10 +352,10 @@ class PyGeoAPIBase:
     ) -> list[tuple[float, float]]:
         """Check the coordinates."""
         try:
-            mps = sgeom.MultiPoint(coords)
+            mps = MultiPoint(coords)
         except TypeError:
             try:
-                mps = sgeom.MultiPoint([coords])
+                mps = MultiPoint([coords])
             except ValueError as ex:
                 raise InputTypeError(
                     "coords", "tuple or list of them", "(x, y) or [(x, y), ...]"
@@ -503,19 +508,62 @@ class GeoConnex:
 
     Parameters
     ----------
-    item : str, optional
-        The target endpoint to query, defaults to ``None``.
+    The item (service endpoint) to query. Valid endpoints are:
+
+        - ``hu02`` for Two-digit Hydrologic Regions
+        - ``hu04`` for Four-digit Hydrologic Subregion
+        - ``hu06`` for Six-digit Hydrologic Basins
+        - ``hu08`` for Eight-digit Hydrologic Subbasins
+        - ``hu10`` for Ten-digit Watersheds
+        - ``nat_aq`` for National Aquifers of the United States from
+            USGS National Water Information System National Aquifer code list.
+        - ``principal_aq`` for Principal Aquifers of the United States from
+            2003 USGS data release
+        - ``sec_hydrg_reg`` for Secondary Hydrogeologic Regions of the
+            Conterminous United States from 2018 USGS data release
+        - ``gages`` for US Reference Stream Gage Monitoring Locations
+        - ``mainstems`` for US Reference Mainstem Rivers
+        - ``states`` for U.S. States
+        - ``counties`` for U.S. Counties
+        - ``aiannh`` for Native American Lands
+        - ``cbsa`` for U.S. Metropolitan and Micropolitan Statistical Areas
+        - ``ua10`` for Urbanized Areas and Urban Clusters (2010 Census)
+        - ``places`` for U.S. legally incororated and Census designated places
+        - ``pws`` for U.S. Public Water Systems
+        - ``dams`` for US Reference Dams
+
+    dev : bool, optional
+        Whether to use the development endpoint, defaults to ``False``.
+    max_nfeatures : int, optional
+        The maximum number of features to request from the service,
+        defaults to 2000. It should be less than 2000.
     """
 
-    @staticmethod
-    def _get_url(url: str, kwds: dict[str, str] | None = None) -> dict[str, Any]:
-        params = {"params": {**kwds, "f": "json"}} if kwds else {"params": {"f": "json"}}
-        resp = ar.retrieve_json([url], [params])
-        resp = cast("list[dict[str, Any]]", resp)
-        return resp[0]
+    def __init__(
+        self, item: str | None = None, dev: bool = False, max_nfeatures: int = 2000
+    ) -> None:
+        self.dev = dev
+        self.item = item
+        self.max_nfeatures = max_nfeatures
+        if self.max_nfeatures > 2000:
+            raise InputRangeError("max_nfeatures", "less than 2000")
 
-    def _get_endpoints(self) -> dict[str, EndPoints]:
-        pluck = tlz.partial(tlz.pluck, seqs=self._get_url(self.base_url)["collections"])
+    @property
+    def dev(self) -> bool:
+        """Return the name of the endpoint."""
+        return self._dev
+
+    @dev.setter
+    def dev(self, value: bool) -> None:
+        self._dev = value
+        if value:
+            self.base_url = f"{ServiceURL().restful.geoconnex.replace('.us', '.dev')}/collections"
+        else:
+            self.base_url = f"{ServiceURL().restful.geoconnex}/collections"
+
+        resp = ar.retrieve_json([self.base_url], [{"params": {"f": "json"}}])
+        resp = cast("list[dict[str, Any]]", resp)
+        pluck = tlz.partial(tlz.pluck, seqs=resp[0]["collections"])
 
         def get_links(links: list[dict[str, Any]]) -> dict[str, str | list[str]]:
             """Get links."""
@@ -524,7 +572,9 @@ class GeoConnex:
                 for lk in links
                 if lk["type"] == "application/json"
             }
-            fields = list(self._get_url(urls["queryables"])["properties"])
+            resp = ar.retrieve_json([urls["queryables"]], [{"params": {"f": "json"}}])
+            resp = cast("list[dict[str, Any]]", resp)
+            fields = list(resp[0]["properties"])
             if "geom" in fields:
                 fields.remove("geom")
                 if "geometry" not in fields:
@@ -538,7 +588,7 @@ class GeoConnex:
         eps = zip(
             pluck(ind="id"), pluck(ind="description"), pluck(ind="links"), pluck(ind="extent")
         )
-        return {
+        self.endpoints = {
             ep[0]: EndPoints(
                 name=ep[0],
                 description=ep[1],
@@ -547,19 +597,6 @@ class GeoConnex:
             )
             for ep in eps
         }
-
-    def __init__(self, item: str | None = None) -> None:
-        self.base_url = f"{ServiceURL().restful.geoconnex}/collections"
-        self.endpoints = self._get_endpoints()
-        self.query_url: str | None = None
-        self.item = item
-
-    @staticmethod
-    def _get_urls(url: str, kwds: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        params = [{"params": {**kwd, "f": "json"}} for kwd in kwds]
-        resp = ar.retrieve_json([url] * len(kwds), params)
-        resp = cast("list[dict[str, Any]]", resp)
-        return resp
 
     @property
     def item(self) -> str | None:
@@ -570,28 +607,172 @@ class GeoConnex:
     def item(self, value: str | None) -> None:
         self._item = value
         if value is not None:
+            self.dev = self._dev
+            valid = [f"- ``{i}`` for {e.description}" for i, e in self.endpoints.items()]
             if value not in self.endpoints:
-                raise InputValueError("item", list(self.endpoints))
+                raise InputValueError("item", valid)
             self.query_url = self.endpoints[value].url
+            self.item_extent = self.endpoints[value].extent
         else:
             self.query_url = None
 
-    def _get_geodf(self, url: str, kwds: list[dict[str, Any]]) -> gpd.GeoDataFrame:
-        try:
-            return geoutils.json2geodf(self._get_urls(url, kwds))
-        except EmptyResponseError as ex:
-            raise ZeroMatchedError from ex
+    def _get_geodf(
+        self, url: str, kwds: dict[str, Any], method: str = "GET"
+    ) -> gpd.GeoDataFrame | pd.DataFrame:
+        """Get response as a ``geopandas.GeoDataFrame``."""
+
+        def _response(offset: int) -> gpd.GeoDataFrame:
+            """Get response."""
+            if method.lower() == "get":
+                req_url = url
+                params = {
+                    "params": {
+                        **kwds,
+                        "f": "json",
+                        "limit": self.max_nfeatures,
+                        "offset": offset,
+                        "sortby": "uri",
+                    }
+                }
+            else:
+                if "skipGeometry" in kwds:
+                    skip_geometry = kwds.pop("skipGeometry")
+                else:
+                    skip_geometry = "false"
+                url_kwds = {
+                    "f": "json",
+                    "limit": self.max_nfeatures,
+                    "offset": offset,
+                    "sortby": "uri",
+                    "filter-lang": "cql-json",
+                    "skipGeometry": skip_geometry,
+                }
+                req_url = f"{url}?{'&'.join([f'{k}={v}' for k, v in url_kwds.items()])}"
+                params = {
+                    **kwds,
+                    "headers": {"Content-Type": "application/query-cql-json"},
+                }
+                print(req_url, params)
+            resp = ar.retrieve_json([req_url], [params], request_method=method)
+            resp = cast("list[dict[str, Any]]", resp)
+            if resp[0].get("code") is not None:
+                raise ServiceError(f"{resp[0]['code']}: {resp[0]['description']}")
+            try:
+                return geoutils.json2geodf(resp)
+            except EmptyResponseError as ex:
+                raise ZeroMatchedError from ex
+
+        gdf = _response(0)
+        gdf_list = [gdf]
+        counter = 1
+        while len(gdf) == self.max_nfeatures:
+            gdf = _response(self.max_nfeatures * counter)
+            gdf_list.append(gdf)
+            counter += 1
+
+        if all(len(df) == 0 for df in gdf_list):
+            raise ZeroMatchedError
+
+        if "geometry" in gdf:
+            return gpd.GeoDataFrame(pd.concat(gdf_list, ignore_index=True), crs=gdf.crs)
+        return pd.concat(gdf_list, ignore_index=True)
+
+    def bygeom(
+        self,
+        geometry1: GTYPE,
+        geometry2: GTYPE | None = None,
+        predicate: str = "intersects",
+        crs: CRSTYPE | None = 4326,
+        skip_geometry: bool = False,
+    ) -> gpd.GeoDataFrame:
+        """Query the GeoConnex endpoint by geometry.
+
+        Parameters
+        ----------
+        geometry1 : Polygon or tuple of float
+            The first geometry or bounding boxes to query. A bounding box is
+            a tuple of length 4 in the form of ``(xmin, ymin, xmax, ymax)``.
+            For example, an spatial query for a single geometry would be
+            ``INTERSECTS(geom, geometry1)``.
+        geometry2 : Polygon or tuple of float, optional
+            The second geometry or bounding boxes to query. A bounding box is
+            a tuple of length 4 in the form of ``(xmin, ymin, xmax, ymax)``.
+            Default is ``None``. For example, an spatial query for a two
+            geometries would be ``CROSSES(geometry1, geometry2)``.
+        predicate : str, optional
+            The predicate to use, by default ``intersects``. Supported
+            predicates are ``intersects``, ``within``, ``contains``,
+            ``overlaps``, ``crosses``, ``disjoint``, ``touches``, and
+            ``equals``.
+        crs : int or str or pyproj.CRS, optional
+            The CRS of the polygon, by default ``EPSG:4326``. If the input
+            is a ``geopandas.GeoDataFrame`` or ``geopandas.GeoSeries``,
+            this argument will be ignored.
+        skip_geometry: bool, optional
+            If ``True``, no geometry will not be returned.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            The query result as a ``geopandas.GeoDataFrame``.
+        """
+        if self.item is None or self.query_url is None:
+            raise MissingItemError(["item"])
+
+        geom1 = geoutils.geo2polygon(geometry1, crs, 4326)
+        if not geom1.within(shapely.box(*self.item_extent)):
+            raise InputRangeError("geometry", f"within {self.item_extent}")
+
+        if geometry2 is not None:
+            geom2 = geoutils.geo2polygon(geometry2, crs, 4326)
+            if not geom2.within(shapely.box(*self.item_extent)):
+                raise InputRangeError("geometry", f"within {self.item_extent}")
+        else:
+            geom2 = None
+
+        if not isinstance(geom1, (Polygon, MultiPolygon)):
+            raise InputTypeError("geometry", "Polygon or MultiPolygon")
+
+        valid_predicates = (
+            "INTERSECTS",
+            "WITHIN",
+            "CONTAINS",
+            "OVERLAPS",
+            "CROSSES",
+            "DISJOINT",
+            "TOUCHES",
+            "EQUALS",
+        )
+        if predicate.upper() not in valid_predicates:
+            raise InputValueError("predicate", valid_predicates)
+
+        if crs is None:
+            raise MissingCRSError
+
+        geom1 = ogc_utils.match_crs(geom1, crs, 4326)
+        geom1_json = ujson.loads(shapely.to_geojson(geom1))
+        if geom2 is not None:
+            geom2 = ogc_utils.match_crs(geom2, crs, 4326)
+            geom_json2 = ujson.loads(shapely.to_geojson(geom2))
+            kwds = {
+                "json": {predicate.lower(): [geom1_json, geom_json2]},
+                "skipGeometry": str(skip_geometry).lower(),
+            }
+        else:
+            kwds = {
+                "json": {predicate.lower(): [{"property": "geom"}, geom1_json]},
+                "skipGeometry": str(skip_geometry).lower(),
+            }
+
+        return self._get_geodf(self.query_url, kwds, method="POST")
 
     def query(
         self,
-        kwds: dict[
-            str,
-            (str | int | float | tuple[float, float, float, float] | Polygon | MultiPolygon),
-        ],
+        kwds: dict[str, str | int],
         skip_geometry: bool = False,
     ) -> gpd.GeoDataFrame:
         """Query the GeoConnex endpoint."""
-        if self.query_url is None or self.item is None:
+        if self.item is None or self.query_url is None:
             raise MissingItemError(["item"])
 
         valid_keys = self.endpoints[self.item].query_fields
@@ -601,35 +782,9 @@ class GeoConnex:
             raise InputValueError(f"query: {keys}", valid_keys)
 
         if skip_geometry:
-            kwds["skip_geometry"] = "true"
+            kwds["skipGeometry"] = "true"
 
-        if "geometry" in kwds:
-            geometry = geoutils.geometry_list(kwds["geometry"])
-            extent = self.endpoints[self.item].extent
-            if not all(g.within(sgeom.box(*extent)) for g in geometry):
-                raise InputRangeError("geometry", f"within {extent}")
-            _ = kwds.pop("geometry")
-
-            param_list = [
-                {**kwds, "bbox": ",".join(f"{c:.6f}" for c in g.bounds)} for g in geometry
-            ]
-
-            gdf = self._get_geodf(self.query_url, param_list)
-            gdf = gdf.reset_index(drop=True)
-            _, idx = gdf.sindex.query_bulk(gpd.GeoSeries(geometry, crs=4326), predicate="contains")
-            if len(idx) == 0:
-                raise ZeroMatchedError
-            gdf = gdf.iloc[idx].reset_index(drop=True)
-        else:
-            gdf = self._get_geodf(self.query_url, [kwds])
-
-            if len(gdf) == 0:
-                raise ZeroMatchedError
-
-        if "nhdpv2_COMID" in gdf:
-            gdf["nhdpv2_COMID"] = gdf["nhdpv2_COMID"].astype("Int64")
-
-        return gdf
+        return self._get_geodf(self.query_url, kwds)
 
     def __repr__(self) -> str:
         if self.item is None:

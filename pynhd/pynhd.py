@@ -19,9 +19,12 @@ from pynhd.core import AGRBase, GeoConnex, PyGeoAPIBase, PyGeoAPIBatch
 from pynhd.exceptions import InputRangeError, MissingItemError, ZeroMatchedError
 
 if TYPE_CHECKING:
-    from shapely.geometry import MultiPolygon, Polygon
+    from shapely import LineString, MultiPoint, MultiPolygon, Point, Polygon
 
     CRSTYPE = Union[int, str, pyproj.CRS]
+    GTYPE = Union[
+        Polygon, MultiPolygon, MultiPoint, LineString, Point, "tuple[float, float, float, float]"
+    ]
 
 
 __all__ = ["NHD", "PyGeoAPI", "pygeoapi", "WaterData", "NHDPlusHR", "NLDI", "geoconnex"]
@@ -278,7 +281,7 @@ def pygeoapi(coords: gpd.GeoDataFrame, service: str) -> gpd.GeoDataFrame:
 
     Examples
     --------
-    >>> from shapely.geometry import Point
+    >>> from shapely import Point
     >>> gdf = gpd.GeoDataFrame(
     ...     {
     ...         "direction": [
@@ -1153,34 +1156,70 @@ class NLDI:
 
 
 def geoconnex(
-    item: str | None = None,
-    query: None
-    | (
-        dict[
-            str,
-            (str | int | float | tuple[float, float, float, float] | Polygon | MultiPolygon),
-        ]
-    ) = None,
+    item: str,
+    query: dict[str, str | int] | None = None,
+    geometry1: GTYPE | None = None,
+    geometry2: GTYPE | None = None,
+    predicate: str = "INTERSECTS",
+    crs: CRSTYPE = 4326,
     skip_geometry: bool = False,
 ) -> gpd.GeoDataFrame | None:
     """Query the GeoConnex API.
 
     Notes
     -----
-    If you run the function without any arguments, it will print out a list
-    of available endpoints. If you run the function with ``item`` but no ``query``,
-    it will print out the description, queryable fields, and extent of the
-    selected endpoint (``item``).
+    It's recommended that for all spatial queries to use the
+    ``geometry1`` (and/or ``geometry2``) arguments instead of
+    the ``query`` argument. Use ``query`` for cases such as getting
+    some property by their IDs, like ``query={"huc2": "02"}``.
 
     Parameters
     ----------
-    item: str, optional
-        The item to query.
-    query: dict, optional
-        Query parameters. The ``geometry`` field can be a Polygon, MultiPolygon,
-        or tuple/list of length 4 (bbox) in ``EPSG:4326`` CRS.
+    item: str
+        The item (service endpoint) to query. Valid endpoints are:
+
+        - ``hu02`` for Two-digit Hydrologic Regions
+        - ``hu04`` for Four-digit Hydrologic Subregion
+        - ``hu06`` for Six-digit Hydrologic Basins
+        - ``hu08`` for Eight-digit Hydrologic Subbasins
+        - ``hu10`` for Ten-digit Watersheds
+        - ``nat_aq`` for National Aquifers of the United States from
+          USGS National Water Information System National Aquifer code list.
+        - ``principal_aq`` for Principal Aquifers of the United States from
+          2003 USGS data release
+        - ``sec_hydrg_reg`` for Secondary Hydrogeologic Regions of the
+          Conterminous United States from 2018 USGS data release
+        - ``gages`` for US Reference Stream Gage Monitoring Locations
+        - ``mainstems`` for US Reference Mainstem Rivers
+        - ``states`` for U.S. States
+        - ``counties`` for U.S. Counties
+        - ``aiannh`` for Native American Lands
+        - ``cbsa`` for U.S. Metropolitan and Micropolitan Statistical Areas
+        - ``ua10`` for Urbanized Areas and Urban Clusters (2010 Census)
+        - ``places`` for U.S. legally incororated and Census designated places
+        - ``pws`` for U.S. Public Water Systems
+        - ``dams`` for US Reference Dams
+
+    query: dict, or list of dict, optional
+        Query parameters. The keys are the queryable fields. Note that
+        each key can only have one value. For example, ``query={"huc2": "02"}``.
+    geometry1 : Polygon or tuple of float
+        The first geometry or bounding boxes to query. A bounding box is
+        a tuple of length 4 in the form of ``(xmin, ymin, xmax, ymax)``.
+        For example, an spatial query for a single geometry would be
+        ``INTERSECTS(geom, geometry1)``.
+    geometry2 : Polygon or tuple of float, optional
+        The second geometry or bounding boxes to query. A bounding box is
+        a tuple of length 4 in the form of ``(xmin, ymin, xmax, ymax)``.
+        Default is ``None``. For example, an spatial query for a two
+        geometries would be ``CROSSES(geometry1, geometry2)``.
+    predicate : str, optional
+        The predicate to use, by default ``intersects``. Supported
+        predicates are ``intersects``, ``within``, ``contains``,
+        ``overlaps``, ``crosses``, ``disjoint``, ``touches``, and
+        ``equals``.
     skip_geometry: bool, optional
-        If ``True``, the geometry will not be returned.
+        If ``True``, the geometry will not be returned, defaults to ``False``.
 
     Returns
     -------
@@ -1188,7 +1227,10 @@ def geoconnex(
         The data.
     """
     gcx = GeoConnex(item)
-    if item is None or query is None:
-        return None
+    if geometry1 is not None:
+        return gcx.bygeom(geometry1, geometry2, predicate, crs, skip_geometry)
 
-    return gcx.query(query, skip_geometry)
+    if query is not None:
+        return gcx.query(query, skip_geometry)
+
+    raise MissingItemError(["either ``query`` or ``geometry1`` must be provided."])
