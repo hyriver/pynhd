@@ -118,14 +118,15 @@ Features
 PyNHD is a part of `HyRiver <https://github.com/hyriver/HyRiver>`__ software stack that
 is designed to aid in hydroclimate analysis through web services.
 
-This package provides access to several hydro-linked datasets including
-`StreamCat <https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset>`__,
-`WaterData <https://labs.waterdata.usgs.gov/geoserver/web/wicket/bookmarkable/org.geoserver.web.demo.MapPreviewPage?1>`__,
-The National Map's `NHDPlus MR <https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer>`__,
-and `NHDPlus HR <https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer>`__,
-`NLDI <https://labs.waterdata.usgs.gov/about-nldi/>`__,
-`PyGeoAPI <https://labs.waterdata.usgs.gov/api/nldi/pygeoapi>`__,
-and `GeoConnex <https://geoconnex.internetofwater.dev/>`__.
+This package provides access to several hydro-linked datasets:
+
+- `StreamCat <https://www.epa.gov/national-aquatic-resource-surveys/streamcat-dataset>`__
+- `WaterData <https://labs.waterdata.usgs.gov/geoserver/web/wicket/bookmarkable/org.geoserver.web.demo.MapPreviewPage?1>`__
+- `NHDPlus MR <https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer>`__
+- `NHDPlus HR <https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer>`__
+- `NLDI <https://labs.waterdata.usgs.gov/about-nldi/>`__
+- `PyGeoAPI <https://labs.waterdata.usgs.gov/api/nldi/pygeoapi>`__
+- `GeoConnex <https://geoconnex.internetofwater.dev/>`__
 
 These web services can be used to navigate and extract vector data from NHDPlus V2 (both mid-
 and high-resolution) database such as catchments, HUC8, HUC12, GagesII, flowlines, and water

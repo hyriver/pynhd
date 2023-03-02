@@ -1,7 +1,7 @@
 import pytest
 
 import pynhd
-from pynhd import NLDI, InputRangeError, ZeroMatchedError
+from pynhd import NLDI, InputRangeError, InputValueError, ZeroMatchedError
 
 
 class TestNLDI:
@@ -23,11 +23,16 @@ class TestNLDI:
             assert "no features" in str(ex.value)
 
 
-class TestGCXException:
+class TestGCX:
+    def test_no_item(self):
+        with pytest.raises(InputValueError) as ex:
+            _ = pynhd.geoconnex("wrong")
+        assert "gages" in str(ex.value)
+
     def test_wrong_bounds(self):
         with pytest.raises(InputRangeError) as ex:
             _ = pynhd.geoconnex(
                 item="gages",
-                query={"geometry": (1350626.862, 1687621.573, 1996597.949, 2557120.139)},
+                geometry1=(1350626.862, 1687621.573, 1996597.949, 2557120.139),
             )
         assert "(-170, 15, -51, 72)" in str(ex.value)
