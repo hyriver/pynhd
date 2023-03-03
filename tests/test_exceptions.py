@@ -26,13 +26,13 @@ class TestNLDI:
 class TestGCX:
     def test_no_item(self):
         with pytest.raises(InputValueError) as ex:
-            _ = pynhd.geoconnex("wrong")
+            _ = pynhd.GeoConnex("wrong")
         assert "gages" in str(ex.value)
 
     def test_wrong_bounds(self):
         with pytest.raises(InputRangeError) as ex:
-            _ = pynhd.geoconnex(
-                item="gages",
+            gcx = pynhd.GeoConnex("gages")
+            _ = gcx.bygeometry(
                 geometry1=(1350626.862, 1687621.573, 1996597.949, 2557120.139),
             )
         assert "(-170, 15, -51, 72)" in str(ex.value)

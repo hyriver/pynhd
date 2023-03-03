@@ -222,21 +222,27 @@ class TestWaterData:
 
 class TestGCX:
     def test_single(self):
-        gage = pynhd.geoconnex(item="gages", query={"provider_id": "01031500"})
+        gcx = pynhd.GeoConnex("gages")
+        gage = gcx.byid("provider_id", "01031500")
         assert (gage["nhdpv2_comid"] == 1722317).sum() == 1
 
     def test_multiple(self):
         gcx = pynhd.GeoConnex()
         gcx.item = "hu02"
-        h2 = gcx.query({"huc2": "02"})
-        h3 = gcx.query({"huc2": "03"})
+        h2 = gcx.byid("huc2", "02")
+        h3 = gcx.byid("huc2", "03")
         assert (h2["gnis_id"] == 2730132).sum() == (h3["gnis_id"] == 2730133).sum() == 1
 
     def test_many_features(self):
         gcx = pynhd.GeoConnex(max_nfeatures=10)
         gcx.item = "mainstems"
-        ms = gcx.bygeom((-69.77, 45.07, -69.31, 45.45))
+        ms = gcx.bygeometry((-69.77, 45.07, -69.31, 45.45))
         assert len(ms) == 20
+    
+    def test_cql(self):
+        gcx = pynhd.GeoConnex("ua10")
+        awa = gcx.bycql({"gt": [{"property": "awater10"}, 100e6]})
+        assert len(awa) == 14
 
 
 def test_nhdphr():
