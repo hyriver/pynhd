@@ -238,7 +238,7 @@ class TestGCX:
         gcx.item = "mainstems"
         ms = gcx.bygeometry((-69.77, 45.07, -69.31, 45.45))
         assert len(ms) == 20
-    
+
     def test_cql(self):
         gcx = pynhd.GeoConnex("ua10")
         awa = gcx.bycql({"gt": [{"property": "awater10"}, 100e6]})
