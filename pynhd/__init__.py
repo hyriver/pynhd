@@ -37,7 +37,7 @@ from pynhd.nhdplus_derived import (
     streamcat,
 )
 from pynhd.print_versions import show_versions
-from pynhd.pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData, geoconnex, pygeoapi
+from pynhd.pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData, pygeoapi
 
 try:
     __version__ = version("pynhd")
@@ -55,7 +55,6 @@ __all__ = [
     "ZeroMatchedError",
     "NoTerminalError",
     "prepare_nhdplus",
-    "geoconnex",
     "topoogical_sort",
     "vector_accumulation",
     "flowline_resample",

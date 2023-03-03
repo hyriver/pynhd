@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterator, NamedTuple, Union, cast
+from typing import TYPE_CHECKING, Any, Iterator, Literal, NamedTuple, Union, cast, overload
 
 import async_retriever as ar
 import cytoolz.curried as tlz
@@ -49,19 +49,6 @@ def get_parquet(parquet_path: Path | str) -> Path:
     output.parent.mkdir(parents=True, exist_ok=True)
 
     return output
-
-
-class GCXURL(NamedTuple):
-    items: str
-    queryables: str
-
-
-class EndPoints(NamedTuple):
-    name: str
-    description: str
-    url: str
-    query_fields: list[str]
-    extent: tuple[float, float, float, float]
 
 
 class ServiceInfo(NamedTuple):
@@ -497,6 +484,20 @@ class ScienceBase:
         return files.set_index("name")
 
 
+class GCXURL(NamedTuple):
+    items: str
+    queryables: str
+
+
+class EndPoints(NamedTuple):
+    name: str
+    description: str
+    url: str
+    query_fields: list[str]
+    extent: tuple[float, float, float, float]
+    dtypes: dict[str, str]
+
+
 class GeoConnex:
     """Access to the GeoConnex API.
 
@@ -536,17 +537,15 @@ class GeoConnex:
         Whether to use the development endpoint, defaults to ``False``.
     max_nfeatures : int, optional
         The maximum number of features to request from the service,
-        defaults to 2000. It should be less than 2000.
+        defaults to 10000.
     """
 
     def __init__(
-        self, item: str | None = None, dev: bool = False, max_nfeatures: int = 2000
+        self, item: str | None = None, dev: bool = False, max_nfeatures: int = 10000
     ) -> None:
         self.dev = dev
         self.item = item
         self.max_nfeatures = max_nfeatures
-        if self.max_nfeatures > 2000:
-            raise InputRangeError("max_nfeatures", "less than 2000")
 
     @property
     def dev(self) -> bool:
@@ -565,7 +564,7 @@ class GeoConnex:
         resp = cast("list[dict[str, Any]]", resp)
         pluck = tlz.partial(tlz.pluck, seqs=resp[0]["collections"])
 
-        def get_links(links: list[dict[str, Any]]) -> dict[str, str | list[str]]:
+        def get_links(links: list[dict[str, Any]]) -> dict[str, str | list[str] | dict[str, str]]:
             """Get links."""
             urls = {
                 lk["rel"]: lk["href"].replace("?f=json", "")
@@ -574,15 +573,22 @@ class GeoConnex:
             }
             resp = ar.retrieve_json([urls["queryables"]], [{"params": {"f": "json"}}])
             resp = cast("list[dict[str, Any]]", resp)
-            fields = list(resp[0]["properties"])
-            if "geom" in fields:
-                fields.remove("geom")
-                if "geometry" not in fields:
-                    fields.append("geometry")
+            prop: dict[str, dict[str, str]] = resp[0]["properties"]
+            _ = prop.pop("geometry", None)
+            fields = list(prop)
+            type_map = {
+                "INTEGER": "int64",
+                "VARCHAR": "str",
+                "DOUBLE_PRECISION": "f8",
+                "TIMESTAMP": "datetime64[ns]",
+                "BOOLEAN": "bool",
+            }
+            dtypes = {str(v["title"]): type_map[v["type"]] for v in prop.values()}
 
             return {
                 "url": f"{urls['self']}/items",
                 "query_fields": fields,
+                "dtypes": dtypes,
             }
 
         eps = zip(
@@ -616,75 +622,81 @@ class GeoConnex:
         else:
             self.query_url = None
 
-    def _get_geodf(
-        self, url: str, kwds: dict[str, Any], method: str = "GET"
-    ) -> gpd.GeoDataFrame | pd.DataFrame:
+    def _get_geodf(self, kwds: dict[str, Any]) -> gpd.GeoDataFrame | pd.DataFrame:
         """Get response as a ``geopandas.GeoDataFrame``."""
+        if "skipGeometry" in kwds:
+            skip_geometry = kwds.pop("skipGeometry")
+        else:
+            skip_geometry = "false"
+        params = {
+            **kwds,
+            "headers": {"Content-Type": "application/query-cql-json"},
+        }
 
-        def _response(offset: int) -> gpd.GeoDataFrame:
-            """Get response."""
-            if method.lower() == "get":
-                req_url = url
-                params = {
-                    "params": {
-                        **kwds,
-                        "f": "json",
-                        "limit": self.max_nfeatures,
-                        "offset": offset,
-                        "sortby": "uri",
-                    }
-                }
-            else:
-                if "skipGeometry" in kwds:
-                    skip_geometry = kwds.pop("skipGeometry")
-                else:
-                    skip_geometry = "false"
-                url_kwds = {
-                    "f": "json",
-                    "limit": self.max_nfeatures,
-                    "offset": offset,
-                    "sortby": "uri",
-                    "filter-lang": "cql-json",
-                    "skipGeometry": skip_geometry,
-                }
-                req_url = f"{url}?{'&'.join([f'{k}={v}' for k, v in url_kwds.items()])}"
-                params = {
-                    **kwds,
-                    "headers": {"Content-Type": "application/query-cql-json"},
-                }
-                print(req_url, params)
-            resp = ar.retrieve_json([req_url], [params], request_method=method)
+        def _get_url(offset: int) -> str:
+            url_kwds = {
+                "f": "json",
+                "limit": self.max_nfeatures,
+                "offset": offset,
+                "sortby": "uri",
+                "filter-lang": "cql-json",
+                "skipGeometry": skip_geometry,
+            }
+            return f"{self.query_url}?{'&'.join([f'{k}={v}' for k, v in url_kwds.items()])}"
+
+        resp = ar.retrieve_json([_get_url(0)], [params], request_method="POST")
+        resp = cast("list[dict[str, Any]]", resp)
+        if resp[0].get("code") is not None:
+            raise ServiceError(f"{resp[0]['code']}: {resp[0]['description']}")
+        try:
+            gdf = geoutils.json2geodf(resp)
+            n_matched = int(resp[0]["numberMatched"])
+        except EmptyResponseError as ex:
+            raise ZeroMatchedError from ex
+
+        if len(gdf) != n_matched:
+            urls = [_get_url(i) for i in range(0, n_matched, self.max_nfeatures)]
+            resp = ar.retrieve_json(urls, [params] * len(urls), request_method="POST")
             resp = cast("list[dict[str, Any]]", resp)
-            if resp[0].get("code") is not None:
-                raise ServiceError(f"{resp[0]['code']}: {resp[0]['description']}")
-            try:
-                return geoutils.json2geodf(resp)
-            except EmptyResponseError as ex:
-                raise ZeroMatchedError from ex
+            gdf = geoutils.json2geodf(resp)
 
-        gdf = _response(0)
-        gdf_list = [gdf]
-        counter = 1
-        while len(gdf) == self.max_nfeatures:
-            gdf = _response(self.max_nfeatures * counter)
-            gdf_list.append(gdf)
-            counter += 1
-
-        if all(len(df) == 0 for df in gdf_list):
+        if len(gdf) == 0:
             raise ZeroMatchedError
 
         if "geometry" in gdf:
-            return gpd.GeoDataFrame(pd.concat(gdf_list, ignore_index=True), crs=gdf.crs)
-        return pd.concat(gdf_list, ignore_index=True)
+            return gdf.reset_index(drop=True)
+        return pd.DataFrame(gdf.reset_index(drop=True))
 
-    def bygeom(
+    @overload
+    def bygeometry(
+        self,
+        geometry1: GTYPE,
+        geometry2: GTYPE | None = None,
+        predicate: str = "intersects",
+        crs: CRSTYPE | None = 4326,
+        skip_geometry: Literal[False] = False,
+    ) -> gpd.GeoDataFrame:
+        ...
+
+    @overload
+    def bygeometry(
+        self,
+        geometry1: GTYPE,
+        geometry2: GTYPE | None = None,
+        predicate: str = "intersects",
+        crs: CRSTYPE | None = 4326,
+        skip_geometry: Literal[True] = True,
+    ) -> pd.DataFrame:
+        ...
+
+    def bygeometry(
         self,
         geometry1: GTYPE,
         geometry2: GTYPE | None = None,
         predicate: str = "intersects",
         crs: CRSTYPE | None = 4326,
         skip_geometry: bool = False,
-    ) -> gpd.GeoDataFrame:
+    ) -> gpd.GeoDataFrame | pd.DataFrame:
         """Query the GeoConnex endpoint by geometry.
 
         Parameters
@@ -764,27 +776,103 @@ class GeoConnex:
                 "skipGeometry": str(skip_geometry).lower(),
             }
 
-        return self._get_geodf(self.query_url, kwds, method="POST")
+        return self._get_geodf(kwds)
 
-    def query(
+    @overload
+    def byid(
         self,
-        kwds: dict[str, str | int],
-        skip_geometry: bool = False,
+        feature_name: str,
+        feature_ids: list[str] | str,
+        skip_geometry: Literal[False] = False,
     ) -> gpd.GeoDataFrame:
+        ...
+
+    @overload
+    def byid(
+        self,
+        feature_name: str,
+        feature_ids: list[str] | str,
+        skip_geometry: Literal[True],
+    ) -> pd.DataFrame:
+        ...
+
+    def byid(
+        self,
+        feature_name: str,
+        feature_ids: list[str] | str,
+        skip_geometry: bool = False,
+    ) -> gpd.GeoDataFrame | pd.DataFrame:
         """Query the GeoConnex endpoint."""
         if self.item is None or self.query_url is None:
             raise MissingItemError(["item"])
 
+        fids = {feature_ids} if isinstance(feature_ids, (str, int)) else set(feature_ids)
+
         valid_keys = self.endpoints[self.item].query_fields
-        invalid_key = [k for k in kwds if k not in valid_keys]
-        if invalid_key:
-            keys = ", ".join(invalid_key)
-            raise InputValueError(f"query: {keys}", valid_keys)
+        if feature_name not in valid_keys:
+            raise InputValueError("feature_name", valid_keys)
+        ftyped = pd.Series(list(fids)).astype(self.endpoints[self.item].dtypes[feature_name])
+        kwds = {
+            "json": {
+                "in": {
+                    "value": {"property": feature_name},
+                    "list": ftyped.to_list(),
+                },
+                "skipGeometry": str(skip_geometry).lower(),
+            }
+        }
+        return self._get_geodf(kwds)
 
-        if skip_geometry:
-            kwds["skipGeometry"] = "true"
+    @overload
+    def bycql(
+        self,
+        cql_dict: dict[str, Any],
+        skip_geometry: Literal[False] = False,
+    ) -> gpd.GeoDataFrame:
+        ...
 
-        return self._get_geodf(self.query_url, kwds)
+    @overload
+    def bycql(
+        self,
+        cql_dict: dict[str, Any],
+        skip_geometry: Literal[True],
+    ) -> pd.DataFrame:
+        ...
+
+    def bycql(
+        self,
+        cql_dict: dict[str, Any],
+        skip_geometry: bool = False,
+    ) -> gpd.GeoDataFrame | pd.DataFrame:
+        """Query the GeoConnex endpoint.
+
+        Notes
+        -----
+        GeoConnex only supports simple CQL queries. For more information
+        and examples visit https://portal.ogc.org/files/96288#simple-cql-JSON.
+        Use this for non-spatial queries, since there's a dedicated method
+        for spatial queries, :meth:`.bygeometry`.
+
+        Parameters
+        ----------
+        cql_dict : dict
+            A valid CQL dictionary (non-spatial queries).
+        skip_geometry: bool, optional
+            If ``True``, no geometry will not be returned, by default ``False``.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            The query result as a ``geopandas.GeoDataFrame``.
+        """
+        if self.item is None or self.query_url is None:
+            raise MissingItemError(["item"])
+
+        cql_dict = {
+            "json": cql_dict,
+            "skipGeometry": str(skip_geometry).lower(),
+        }
+        return self._get_geodf(cql_dict)
 
     def __repr__(self) -> str:
         if self.item is None:
