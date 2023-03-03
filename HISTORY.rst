@@ -2,11 +2,15 @@
 History
 =======
 
-0.13.13 (unreleased)
---------------------
+0.14.0 (unreleased)
+-------------------
 
 New Features
 ~~~~~~~~~~~~
+- Rewrite the ``GeoConnex`` class to provide access to new capabilities
+  of the web service. Support for spatial queries have been added via
+  CQL queries. For more information, check out the updated GeoConnex example
+  `notebook <https://github.com/hyriver/HyRiver-examples/blob/main/notebooks/geoconnex.ipynb>`__.
 - Add a new property to ``StreamCat``, called ``metrics_df`` that gets
   a dataframe of metric names and their description.
 - Create a new private ``StreamCatValidator`` class to avoid polluting
@@ -24,9 +28,14 @@ New Features
 
 Breaking Changes
 ~~~~~~~~~~~~~~~~
+- Remove ``pynhd.geoconnex`` function since more functionality has been
+  added to the GeoConnex service that existence of this function does not
+  make sense anymore. All queries should be done via ``pynhd.GeoConnex``
+  class.
 - Rewrite ``NLDI`` to improve code readability and significantly improving
   performance. Now, its methods do now return tuples if there are failed
   requests, instead they will be shown as a ``UserWarning``.
+
 
 0.13.12 (2023-02-10)
 --------------------
