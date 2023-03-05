@@ -40,8 +40,8 @@ dependencies = [
   "numpy>=1.21",
   "pandas>=1",
   "pyarrow>=1.0.1",
-  "pygeoogc>=0.13.12",
-  "pygeoutils>=0.13.12",
+  "pygeoogc>=0.14.0",
+  "pygeoutils>=0.14.0",
   "shapely>=2",
 ]
 [project.optional-dependencies]
