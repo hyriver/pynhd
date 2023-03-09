@@ -2,6 +2,20 @@
 History
 =======
 
+0.14.1 (unreleased)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Add ``use_arrow=True`` to ``pynhd.nhdplus_l48`` when reading the NHDPlus
+  dataset. This speeds up the process since ``pyarrow`` is installed.
+
+Bug Fixes
+~~~~~~~~~
+- Remove unnecessary conversion of ``id_col`` and ``toid_col`` to ``Int64``
+  in ``nhdflw2nx`` and ``vector_accumulation``. This ensures that the input
+  data types are preserved.
+
 0.14.0 (2023-03-05)
 -------------------
 
