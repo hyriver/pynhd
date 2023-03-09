@@ -430,7 +430,6 @@ def topoogical_sort(
         the input flow line IDs. These "artificial" nodes are used to represent the
         graph outlet (the most downstream nodes) in the graph.
     """
-    flowlines[[id_col, toid_col]] = flowlines[[id_col, toid_col]].astype("Int64")
     network = nhdflw2nx(flowlines, id_col, toid_col, edge_attr)
     if largest_only:
         nodes = max(nx.weakly_connected_components(network), key=len)
@@ -489,7 +488,6 @@ def vector_accumulation(
         raise InputTypeError("arg_cols", "list of column names")
 
     flw = flowlines.copy()
-    flw[[id_col, toid_col]] = flw[[id_col, toid_col]].astype("Int64")
     toid_na = flw[toid_col].isna() | (flw[toid_col] == 0)
     if toid_na.any():
         flw.loc[toid_na, toid_col] = -flw.loc[toid_na, id_col]
@@ -935,4 +933,5 @@ def nhdplus_l48(layer: str, data_dir: str | Path = "cache", **kwargs: Any) -> gp
         nhd7z.unlink()
 
     pyogrio.set_gdal_config_options({"OGR_ORGANIZE_POLYGONS": "CCW_INNER_JUST_AFTER_CW_OUTER"})
-    return gpd.read_file(nhdfile, layer=layer, engine="pyogrio", **kwargs)
+    _ = kwargs.pop("use_arrow", None)
+    return gpd.read_file(nhdfile, layer=layer, engine="pyogrio", use_arrow=True, **kwargs)
