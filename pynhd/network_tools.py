@@ -809,7 +809,7 @@ def mainstem_huc12_nx() -> tuple[nx.DiGraph, dict[int, str], list[str]]:
     return graph, label2huc, onnetwork_sorted
 
 
-def nhdplus_l48(layer: str, data_dir: str | Path = "cache", **kwargs: Any) -> gpd.GeoDataFrame:
+def nhdplus_l48(layer: str | None = None, data_dir: str | Path = "cache", **kwargs: Any) -> gpd.GeoDataFrame:
     """Get the entire NHDPlus dataset.
 
     Notes
@@ -825,8 +825,10 @@ def nhdplus_l48(layer: str, data_dir: str | Path = "cache", **kwargs: Any) -> gp
 
     Parameters
     ----------
-    layer : str
-        The layer name to be returned. The available layers are:
+    layer : str, optional
+        The layer name to be returned. Either ``layer`` should be provided or
+        ``sql``. Defaults to ``None``.
+        The available layers are:
 
         - ``Gage``
         - ``BurnAddLine``
@@ -877,7 +879,7 @@ def nhdplus_l48(layer: str, data_dir: str | Path = "cache", **kwargs: Any) -> gp
         import py7zr
         import pyogrio
     except ImportError as ex:
-        raise DependencyError("nhdplus_full", ["pyogrio", "py7zr"]) from ex
+        raise DependencyError("nhdplus_l48", ["pyogrio", "py7zr"]) from ex
 
     layers = [
         "Gage",
@@ -912,7 +914,10 @@ def nhdplus_l48(layer: str, data_dir: str | Path = "cache", **kwargs: Any) -> gp
         "N_1_JTopo2",
         "N_1_Props",
     ]
-    if layer not in layers:
+    if "sql" not in kwargs and layer is None:
+        raise InputValueError("layer", layers)
+
+    if layer is not None and layer not in layers:
         raise InputValueError("layer", layers)
 
     root = data_dir or Path("cache")
