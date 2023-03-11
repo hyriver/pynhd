@@ -809,7 +809,9 @@ def mainstem_huc12_nx() -> tuple[nx.DiGraph, dict[int, str], list[str]]:
     return graph, label2huc, onnetwork_sorted
 
 
-def nhdplus_l48(layer: str | None = None, data_dir: str | Path = "cache", **kwargs: Any) -> gpd.GeoDataFrame:
+def nhdplus_l48(
+    layer: str | None = None, data_dir: str | Path = "cache", **kwargs: Any
+) -> gpd.GeoDataFrame:
     """Get the entire NHDPlus dataset.
 
     Notes
