@@ -9,6 +9,10 @@ New Features
 ~~~~~~~~~~~~
 - Add ``use_arrow=True`` to ``pynhd.nhdplus_l48`` when reading the NHDPlus
   dataset. This speeds up the process since ``pyarrow`` is installed.
+- In ``nhdplus_l48`` make ``layer`` option so ``sql`` parameter of
+  ``pyogrio.read_dataframe`` can also be used. This is necessary
+  since ``pyogrio.read_dataframe`` does not support passing both
+  ``layer`` and ``sql`` parameters.
 
 Bug Fixes
 ~~~~~~~~~
