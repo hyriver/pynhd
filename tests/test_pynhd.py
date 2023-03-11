@@ -186,7 +186,7 @@ class TestNHDAttrs:
 
     def test_meta(self):
         meta = pynhd.nhdplus_attrs()
-        assert len(meta) == 603
+        assert len(meta) == 598
 
     def test_sb(self):
         attr = pynhd.nhdplus_attrs("BANKFULL")
