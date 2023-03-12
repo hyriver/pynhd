@@ -7,12 +7,15 @@ History
 
 New Features
 ~~~~~~~~~~~~
+- Add a new function, called ``nhdplus_h12pp``, for retrieving
+  HUC12 pour points across CONUS.
 - Add ``use_arrow=True`` to ``pynhd.nhdplus_l48`` when reading the NHDPlus
   dataset. This speeds up the process since ``pyarrow`` is installed.
 - In ``nhdplus_l48`` make ``layer`` option so ``sql`` parameter of
   ``pyogrio.read_dataframe`` can also be used. This is necessary
   since ``pyogrio.read_dataframe`` does not support passing both
   ``layer`` and ``sql`` parameters.
+- Update the mainstems dataset link to version 2.0 in ``mainstem_huc12_nx``.
 
 Bug Fixes
 ~~~~~~~~~
