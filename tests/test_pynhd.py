@@ -222,7 +222,7 @@ class TestWaterData:
 
 class TestGCX:
     def test_single(self):
-        gcx = pynhd.GeoConnex("gauges")
+        gcx = pynhd.GeoConnex("gages")
         gauge = gcx.byid("provider_id", "01031500")
         assert (gauge["nhdpv2_comid"] == 1722317).sum() == 1
 
