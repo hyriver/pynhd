@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import async_retriever as ar
 import cytoolz.curried as tlz
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pyarrow.dataset as pds
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
 __all__ = [
     "enhd_attrs",
     "nhdplus_vaa",
+    "nhdplus_h12pp",
     "nhdplus_attrs",
     "nhdplus_attrs_s3",
     "nhd_fcode",
@@ -319,6 +321,40 @@ def nhdplus_attrs_s3(
         return ds.to_table(columns=cols).to_pandas().set_index("COMID")
 
     return pd.concat((to_pandas(d, c, nodata) for d, c in zip(datasets, ids.values())), axis=1)
+
+
+def nhdplus_h12pp(
+    gpkg_path: Path | str | None = None,
+) -> pd.DataFrame:
+    """Access HUC12 Pour Points for NHDPlus V2.1 L48 (CONUS).
+
+    Notes
+    -----
+    More info can be found
+    `here <https://www.sciencebase.gov/catalog/item/60cb5edfd34e86b938a373f4>`_.
+
+    Parameters
+    ----------
+    gpkg_path : Path or str, optional
+        Path to the geopackage file, defaults to None, i.e., download
+        the file to the cache directory as ``102020wbd_outlets.gpkg``.
+
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        A geodataframe of HUC12 pour points.
+    """
+    sb = ScienceBase()
+    files = sb.get_file_urls("60cb5edfd34e86b938a373f4").loc["102020wbd_outlets.gpkg"].url
+    if gpkg_path is None:
+        gpkg_path = Path("cache", "102020wbd_outlets.gpkg")
+    else:
+        gpkg_path = Path(gpkg_path)
+    _ = ogc.streaming_download(files, fnames=gpkg_path)
+    h12pp = gpd.read_file(gpkg_path, engine="pyogrio")
+    h12pp = h12pp[["COMID", "REACHCODE", "REACH_meas", "offset", "HUC12", "LevelPathI", "geometry"]]
+    h12pp[["COMID", "LevelPathI"]] = h12pp[["COMID", "LevelPathI"]].astype("uint32")
+    return h12pp
 
 
 def nhd_fcode() -> pd.DataFrame:

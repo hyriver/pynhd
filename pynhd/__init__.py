@@ -33,6 +33,7 @@ from pynhd.nhdplus_derived import (
     nhd_fcode,
     nhdplus_attrs,
     nhdplus_attrs_s3,
+    nhdplus_h12pp,
     nhdplus_vaa,
     streamcat,
 )
@@ -83,4 +84,5 @@ __all__ = [
     "epa_nhd_catchments",
     "enhd_attrs",
     "nhdplus_vaa",
+    "nhdplus_h12pp",
 ]
