@@ -731,7 +731,7 @@ class NLDI:
             * 'nmwdi-st' for New Mexico Water Data Initative Sites
             * 'nwisgw' for NWIS Groundwater Sites
             * 'nwissite' for NWIS Surface Water Sites
-            * 'ref_gage' for geoconnex.us reference gauges
+            * 'ref_gage' for geoconnex.us reference gages
             * 'vigil' for Vigil Network Data
             * 'wade' for Water Data Exchange 2.0 Sites
             * 'WQP' for Water Quality Portal
@@ -858,7 +858,7 @@ class NLDI:
             * 'nmwdi-st' for New Mexico Water Data Initative Sites
             * 'nwisgw' for NWIS Groundwater Sites
             * 'nwissite' for NWIS Surface Water Sites
-            * 'ref_gage' for geoconnex.us reference gauges
+            * 'ref_gage' for geoconnex.us reference gages
             * 'vigil' for Vigil Network Data
             * 'wade' for Water Data Exchange 2.0 Sites
             * 'WQP' for Water Quality Portal
@@ -954,7 +954,7 @@ class NLDI:
             * 'nmwdi-st' for New Mexico Water Data Initative Sites
             * 'nwisgw' for NWIS Groundwater Sites
             * 'nwissite' for NWIS Surface Water Sites
-            * 'ref_gage' for geoconnex.us reference gauges
+            * 'ref_gage' for geoconnex.us reference gages
             * 'vigil' for Vigil Network Data
             * 'wade' for Water Data Exchange 2.0 Sites
             * 'WQP' for Water Quality Portal
@@ -1042,7 +1042,7 @@ class NLDI:
             * 'nmwdi-st' for New Mexico Water Data Initative Sites
             * 'nwisgw' for NWIS Groundwater Sites
             * 'nwissite' for NWIS Surface Water Sites
-            * 'ref_gage' for geoconnex.us reference gauges
+            * 'ref_gage' for geoconnex.us reference gages
             * 'vigil' for Vigil Network Data
             * 'wade' for Water Data Exchange 2.0 Sites
             * 'WQP' for Water Quality Portal
