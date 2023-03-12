@@ -734,7 +734,7 @@ def enhd_flowlines_nx() -> tuple[nx.DiGraph, dict[int, int], list[int]]:
     Notes
     -----
     The graph is directed and has the all the attributes of the flowlines
-    in `ENHD <https://www.sciencebase.gov/catalog/item/60c92503d34e86b9389df1c9>`__.
+    in `ENHD <https://www.sciencebase.gov/catalog/item/63cb311ed34e06fef14f40a3>`__.
     Note that COMIDs are based on the 2020 snapshot of the NHDPlusV2.1.
 
     Returns
@@ -757,7 +757,7 @@ def enhd_flowlines_nx() -> tuple[nx.DiGraph, dict[int, int], list[int]]:
     )
     label2comid = nx.get_node_attributes(graph, "str_id")
     s_map = {label2comid[i]: r for i, r in zip(nx.topological_sort(graph), range(len(graph)))}
-    onnetwork_sorted = sorted(set(enhd.comid).intersection(s_map), key=lambda i: s_map[i])
+    onnetwork_sorted = sorted(set(enhd["comid"]).intersection(s_map), key=lambda i: s_map[i])
     return graph, label2comid, onnetwork_sorted
 
 
@@ -768,19 +768,21 @@ def mainstem_huc12_nx() -> tuple[nx.DiGraph, dict[int, str], list[str]]:
     -----
     The directed graph is generated from the ``nhdplusv2wbd.csv`` file with all
     attributes that can be found in
-    `Mainstem <https://www.sciencebase.gov/catalog/item/60cb5edfd34e86b938a373f4>`__.
+    `Mainstem <https://www.sciencebase.gov/catalog/item/63cb38b2d34e06fef14f40ad>`__.
     Note that HUC12s are based on the 2020 snapshot of the NHDPlusV2.1.
 
     Returns
     -------
-    tuple of networkx.DiGraph and dict
-    tuple of networkx.DiGraph, dict, and list
-        The first element is the graph, the second element is a dictionary
-        mapping the HUC12s to the node IDs in the graph, and the third element
-        is a topologically sorted list of the HUC12s which strings of length 12.
+    networkx.DiGraph
+        The mainstem as a ``networkx.DiGraph`` with all the attributes of the
+        mainstems.
+    dict
+        A mapping of the HUC12s to the node IDs in the graph.
+    list
+        A topologically sorted list of the HUC12s which strings of length 12.
     """
     sb = ScienceBase()
-    files = sb.get_file_urls("60cb5edfd34e86b938a373f4")
+    files = sb.get_file_urls("63cb38b2d34e06fef14f40ad")
     resp = ar.retrieve_text([files.loc["nhdplusv2wbd.csv"].url])
     ms = pd.read_csv(io.StringIO(resp[0]))
     str_cols = ["HUC12", "TOHUC", "head_HUC12", "outlet_HUC12"]
@@ -791,7 +793,8 @@ def mainstem_huc12_nx() -> tuple[nx.DiGraph, dict[int, str], list[str]]:
 
     int_cols = ["intersected_LevelPathI", "corrected_LevelPathI"]
     ms[int_cols] = ms[int_cols].astype(int)
-    ms = ms[ms.HUC12 != "000000000000"].reset_index(drop=True)
+    zeroidx = ms["TOHUC"] == "000000000000"
+    ms.loc[zeroidx, "TOHUC"] = "T" + ms.loc[zeroidx, "HUC"]
 
     graph = nx.relabel.convert_node_labels_to_integers(
         nx.from_pandas_edgelist(
@@ -884,7 +887,7 @@ def nhdplus_l48(
         raise DependencyError("nhdplus_l48", ["pyogrio", "py7zr"]) from ex
 
     layers = [
-        "Gage",
+        "Gauge",
         "BurnAddLine",
         "BurnAddWaterbody",
         "LandSea",

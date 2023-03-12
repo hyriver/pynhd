@@ -327,9 +327,9 @@ We can get more information about these stations using GeoConnex:
 
 .. code:: python
 
-    gcx = GeoConnex("gages")
+    gcx = GeoConnex("gauges")
     stations = st_all.identifier.str.split("-").str[1].unique()
-    gages = gpd.GeoDataFrame(
+    gauges = gpd.GeoDataFrame(
         pd.concat(gcx.query({"provider_id": sid}) for sid in stations),
         crs="epsg:4326",
     )
@@ -338,8 +338,8 @@ Instead, we can carry out a spatial query within the basin of interest:
 
 .. code:: python
 
-    gages = pynhd.geoconnex(
-        item="gages",
+    gauges = pynhd.geoconnex(
+        item="gauges",
         query={"geometry": basin.geometry.iloc[0]},
     )
 
