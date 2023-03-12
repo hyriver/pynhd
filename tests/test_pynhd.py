@@ -222,9 +222,9 @@ class TestWaterData:
 
 class TestGCX:
     def test_single(self):
-        gcx = pynhd.GeoConnex("gages")
-        gage = gcx.byid("provider_id", "01031500")
-        assert (gage["nhdpv2_comid"] == 1722317).sum() == 1
+        gcx = pynhd.GeoConnex("gauges")
+        gauge = gcx.byid("provider_id", "01031500")
+        assert (gauge["nhdpv2_comid"] == 1722317).sum() == 1
 
     def test_multiple(self):
         gcx = pynhd.GeoConnex()
@@ -298,6 +298,11 @@ def test_acc(trib):
     flw = flw.merge(qsim, on="comid")
     diff = flw.arbolatesu - flw.acc_lengthkm
     assert_close(diff.abs().sum(), 439.451)
+
+
+def test_h12pp():
+    h12pp = pynhd.nhdplus_h12pp()
+    assert len(h12pp) == 78249
 
 
 def test_enhd_nx():
