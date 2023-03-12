@@ -794,7 +794,7 @@ def mainstem_huc12_nx() -> tuple[nx.DiGraph, dict[int, str], list[str]]:
     int_cols = ["intersected_LevelPathI", "corrected_LevelPathI"]
     ms[int_cols] = ms[int_cols].astype(int)
     zeroidx = ms["TOHUC"] == "000000000000"
-    ms.loc[zeroidx, "TOHUC"] = "T" + ms.loc[zeroidx, "HUC"]
+    ms.loc[zeroidx, "TOHUC"] = "T" + ms.loc[zeroidx, "HUC12"]
 
     graph = nx.relabel.convert_node_labels_to_integers(
         nx.from_pandas_edgelist(
