@@ -22,6 +22,8 @@ Bug Fixes
 - Remove unnecessary conversion of ``id_col`` and ``toid_col`` to ``Int64``
   in ``nhdflw2nx`` and ``vector_accumulation``. This ensures that the input
   data types are preserved.
+- Fix an issue in ``nhdplus_l48``, where if the input ``data_dir`` is not
+  absolute ``py7zr`` fails to extract the file.
 
 0.14.0 (2023-03-05)
 -------------------
