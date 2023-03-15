@@ -925,7 +925,7 @@ def nhdplus_l48(
     if layer is not None and layer not in layers:
         raise InputValueError("layer", layers)
 
-    root = data_dir or Path("cache")
+    root = Path(data_dir) or Path("cache")
     nhdfile = Path(
         root, "NHDPlusNationalData", "NHDPlusV21_National_Seamless_Flattened_Lower48.gdb"
     )
