@@ -939,7 +939,7 @@ def nhdplus_l48(
         nhd7z = Path(root, Path(url).name)
         _ = streaming_download(url, fnames=nhd7z)
         with py7zr.SevenZipFile(nhd7z, mode="r") as z:
-            z.extractall(path=root)
+            z.extractall(path=root.resolve())
         nhd7z.unlink()
 
     pyogrio.set_gdal_config_options({"OGR_ORGANIZE_POLYGONS": "CCW_INNER_JUST_AFTER_CW_OUTER"})
