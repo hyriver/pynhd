@@ -943,5 +943,5 @@ def nhdplus_l48(
         nhd7z.unlink()
 
     pyogrio.set_gdal_config_options({"OGR_ORGANIZE_POLYGONS": "CCW_INNER_JUST_AFTER_CW_OUTER"})
-    _ = kwargs.pop("use_arrow", None)
-    return gpd.read_file(nhdfile, layer=layer, engine="pyogrio", use_arrow=True, **kwargs)
+    kwargs["use_arrow"] = kwargs.pop("use_arrow", True)
+    return gpd.read_file(nhdfile, layer=layer, engine="pyogrio", **kwargs)
