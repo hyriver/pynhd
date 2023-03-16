@@ -1051,9 +1051,9 @@ class NLDI:
             The ID of the feature.
         navigation : str
             The navigation method.
-        source : str, optional
+        source : str
             Return the data from another source after navigating
-            the features using fsource, defaults to None.
+            features from ``fsource``.
         distance : int, optional
             Limit the search for navigation up to a distance in km,
             defaults is 500 km. Note that this is an expensive request so you
@@ -1124,15 +1124,14 @@ class NLDI:
             if ``comid_only`` is False.
         source : str, optional
             Return the data from another source after navigating
-            the features based on ``comid``, defaults to None which throws an exception
-            if ``comid_only`` is False.
+            the features based on ``comid``, defaults to ``None`` which throws
+            an exception if ``comid_only`` is False.
         loc_crs : str, int, or pyproj.CRS, optional
             The spatial reference of the input coordinate, defaults to EPSG:4326.
         distance : int, optional
             Limit the search for navigation up to a distance in km,
             defaults to 500 km. Note that this is an expensive request so you
-            have be mindful of the value that you provide. If you want to get
-            all the available features you can pass a large distance like 9999999.
+            have be mindful of the value that you provide.
         trim_start : bool, optional
             If ``True``, trim the starting flowline at the source feature,
             defaults to ``False``.
