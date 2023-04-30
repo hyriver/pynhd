@@ -60,7 +60,7 @@ def get_sys_info() -> list[tuple[str, str | None]]:
         env["LANGUAGE"] = "C"
         env["LANG"] = "C"
         env["LC_ALL"] = "C"
-        out = subprocess.check_output(cmd, stderr=subprocess.STDOUT, env=env)
+        out = subprocess.check_output(cmd, stderr=subprocess.STDOUT, env=env)  # noqa: S603
         return out
 
     commit = None
