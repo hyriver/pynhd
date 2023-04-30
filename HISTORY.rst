@@ -16,6 +16,7 @@ New Features
   since ``pyogrio.read_dataframe`` does not support passing both
   ``layer`` and ``sql`` parameters.
 - Update the mainstems dataset link to version 2.0 in ``mainstem_huc12_nx``.
+- Expose ``NHDTools`` class to the public API.
 
 Bug Fixes
 ~~~~~~~~~
