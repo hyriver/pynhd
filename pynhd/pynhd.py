@@ -19,7 +19,7 @@ from pynhd.core import AGRBase, PyGeoAPIBase, PyGeoAPIBatch
 from pynhd.exceptions import InputRangeError, MissingItemError, ZeroMatchedError
 
 if TYPE_CHECKING:
-    from shapely import LineString, MultiPoint, MultiPolygon, Point, Polygon
+    from shapely.geometry import LineString, MultiPoint, MultiPolygon, Point, Polygon
 
     CRSTYPE = Union[int, str, pyproj.CRS]
     GTYPE = Union[
@@ -281,7 +281,7 @@ def pygeoapi(coords: gpd.GeoDataFrame, service: str) -> gpd.GeoDataFrame:
 
     Examples
     --------
-    >>> from shapely import Point
+    >>> from shapely.geometry import Point
     >>> gdf = gpd.GeoDataFrame(
     ...     {
     ...         "direction": [

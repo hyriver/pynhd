@@ -16,7 +16,8 @@ import ujson
 from pygeoogc import ArcGISRESTful, ServiceURL
 from pygeoogc import utils as ogc_utils
 from pygeoutils import EmptyResponseError
-from shapely import MultiPoint, MultiPolygon, Polygon
+from shapely.geometry import MultiPoint, MultiPolygon, Polygon
+from shapely.geometry import box as shapely_box
 
 from pynhd.exceptions import (
     InputRangeError,
@@ -30,7 +31,7 @@ from pynhd.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from shapely import LineString, Point
+    from shapely.geometry import LineString, Point
 
     CRSTYPE = Union[int, str, pyproj.CRS]
     GTYPE = Union[
@@ -340,7 +341,7 @@ class PyGeoAPIBase:
         """Check the coordinates."""
         try:
             mps = MultiPoint(coords)
-        except TypeError:
+        except (TypeError, AttributeError):
             try:
                 mps = MultiPoint([coords])
             except ValueError as ex:
@@ -732,12 +733,12 @@ class GeoConnex:
             raise MissingItemError(["item"])
 
         geom1 = geoutils.geo2polygon(geometry1, crs, 4326)
-        if not geom1.within(shapely.box(*self.item_extent)):
+        if not geom1.within(shapely_box(*self.item_extent)):
             raise InputRangeError("geometry", f"within {self.item_extent}")
 
         if geometry2 is not None:
             geom2 = geoutils.geo2polygon(geometry2, crs, 4326)
-            if not geom2.within(shapely.box(*self.item_extent)):
+            if not geom2.within(shapely_box(*self.item_extent)):
                 raise InputRangeError("geometry", f"within {self.item_extent}")
         else:
             geom2 = None
@@ -762,10 +763,16 @@ class GeoConnex:
             raise MissingCRSError
 
         geom1 = ogc_utils.match_crs(geom1, crs, 4326)
-        geom1_json = ujson.loads(shapely.to_geojson(geom1))
+        try:
+            geom1_json = ujson.loads(shapely.to_geojson(geom1))
+        except AttributeError:
+            geom1_json = shapely.geometry.mapping(geom1)
         if geom2 is not None:
             geom2 = ogc_utils.match_crs(geom2, crs, 4326)
-            geom_json2 = ujson.loads(shapely.to_geojson(geom2))
+            try:
+                geom_json2 = ujson.loads(shapely.to_geojson(geom2))
+            except AttributeError:
+                geom_json2 = shapely.geometry.mapping(geom2)
             kwds = {
                 "json": {predicate.lower(): [geom1_json, geom_json2]},
                 "skipGeometry": str(skip_geometry).lower(),

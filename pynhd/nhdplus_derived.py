@@ -323,9 +323,7 @@ def nhdplus_attrs_s3(
     return pd.concat((to_pandas(d, c, nodata) for d, c in zip(datasets, ids.values())), axis=1)
 
 
-def nhdplus_h12pp(
-    gpkg_path: Path | str | None = None,
-) -> pd.DataFrame:
+def nhdplus_h12pp(gpkg_path: Path | str | None = None) -> pd.DataFrame:
     """Access HUC12 Pour Points for NHDPlus V2.1 L48 (CONUS).
 
     Notes

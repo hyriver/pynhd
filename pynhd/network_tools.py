@@ -15,7 +15,8 @@ import pandas as pd
 import pyproj
 from pygeoogc import streaming_download
 from pygeoutils import GeoBSpline, InputTypeError
-from shapely import LineString, MultiLineString, Point, ops
+from shapely import ops
+from shapely.geometry import LineString, MultiLineString, Point
 
 from pynhd import nhdplus_derived as derived
 from pynhd.core import ScienceBase
@@ -50,6 +51,7 @@ __all__ = [
     "enhd_flowlines_nx",
     "mainstem_huc12_nx",
     "nhdplus_l48",
+    "NHDTools",
 ]
 
 
@@ -122,7 +124,15 @@ class NHDTools:
         self.is_hr = "nhdplusid" in flowlines
 
     def clean_flowlines(self, use_enhd_attrs: bool, terminal2nan: bool) -> None:
-        """Clean up flowlines."""
+        """Clean up flowlines.
+
+        Parameters
+        ----------
+        use_enhd_attrs : bool
+            Use attributes from the ENHD database.
+        terminal2nan : bool
+            Convert terminal flowlines to ``NaN``.
+        """
         self.flw.columns = self.flw.columns.str.lower()
 
         if self.is_hr:

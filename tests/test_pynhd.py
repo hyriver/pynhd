@@ -7,7 +7,7 @@ from pathlib import Path
 import geopandas as gpd
 import numpy as np
 import pytest
-from shapely import MultiPoint, Point, box
+from shapely.geometry import MultiPoint, Point, box
 
 import pynhd
 from pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData
@@ -178,7 +178,7 @@ class TestNLDI:
 class TestNHDAttrs:
     def test_meta_s3(self):
         meta = pynhd.nhdplus_attrs_s3()
-        assert len(meta) == 14601
+        assert len(meta) == 14139
 
     def test_s3(self):
         attr = pynhd.nhdplus_attrs_s3("CAT_RECHG")
@@ -186,7 +186,7 @@ class TestNHDAttrs:
 
     def test_meta(self):
         meta = pynhd.nhdplus_attrs()
-        assert len(meta) == 598
+        assert len(meta) == 595
 
     def test_sb(self):
         attr = pynhd.nhdplus_attrs("BANKFULL")

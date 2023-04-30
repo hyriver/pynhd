@@ -14,6 +14,7 @@ from pynhd.exceptions import (
     ZeroMatchedError,
 )
 from pynhd.network_tools import (
+    NHDTools,
     enhd_flowlines_nx,
     flowline_resample,
     flowline_xsection,
@@ -70,6 +71,7 @@ __all__ = [
     "streamcat",
     "show_versions",
     "NLDI",
+    "NHDTools",
     "AGRBase",
     "GeoConnex",
     "ScienceBase",
