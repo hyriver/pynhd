@@ -2,8 +2,14 @@
 History
 =======
 
-0.14.1 (unreleased)
+0.15.0 (unreleased)
 -------------------
+From release 0.15 onward, all minor versions of HyRiver packages
+will be pinned. This ensures that previous minor versions of HyRiver
+packages cannot be installed with later minor releases. For example,
+if you have ``py3dep==0.14.x`` installed, you cannot install
+``pydaymet==0.15.x``. This is to ensure that the API is
+consistent across all minor versions.
 
 New Features
 ~~~~~~~~~~~~
@@ -17,6 +23,8 @@ New Features
   ``layer`` and ``sql`` parameters.
 - Update the mainstems dataset link to version 2.0 in ``mainstem_huc12_nx``.
 - Expose ``NHDTools`` class to the public API.
+- For now, retain compatibility with ``shapely<2`` while supporting
+  ``shapley>=2``.
 
 Bug Fixes
 ~~~~~~~~~
