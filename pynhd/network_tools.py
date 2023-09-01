@@ -11,6 +11,7 @@ import cytoolz.curried as tlz
 import geopandas as gpd
 import networkx as nx
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 import pyproj
 from pygeoogc import streaming_download
@@ -536,18 +537,23 @@ def __get_spline(line: LineString, ns_pts: int, crs: str | pyproj.CRS) -> Spline
     return GeoBSpline(pts, ns_pts).spline
 
 
-def __get_idx(d_sp: np.ndarray, distance: float) -> np.ndarray:  # type: ignore
+def __get_idx(d_sp: npt.NDArray[np.float64], distance: float) -> npt.NDArray[np.int64]:
     """Get the index of the closest points based on a given distance."""
     dis = pd.DataFrame(d_sp, columns=["distance"]).reset_index()
-    grouper = pd.cut(dis.distance, np.arange(0, dis.distance.max() + distance, distance))
-    idx = dis.groupby(grouper).last()["index"].to_numpy()
+    grouper = pd.cut(dis["distance"], np.arange(0, dis["distance"].max() + distance, distance))
+    idx = dis.groupby(grouper).last()["index"].to_numpy("int64")
     return np.append(0, idx)
 
 
 def __get_spline_params(
     line: LineString, n_seg: int, distance: float, crs: str | pyproj.CRS
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:  # type: ignore[type-arg]
-    """Get perpendiculars to a line."""
+) -> tuple[
+    npt.NDArray[np.float64],
+    npt.NDArray[np.float64],
+    npt.NDArray[np.float64],
+    npt.NDArray[np.float64],
+]:
+    """Get Spline parameters (x, y, phi)."""
     _n_seg = n_seg
     spline = __get_spline(line, _n_seg, crs)
     idx = __get_idx(spline.distance, distance)
@@ -703,7 +709,7 @@ def flowline_xsection(
     )
 
     cs = gpd.GeoDataFrame(geometry=list(main_split), crs=flw.crs)
-    cs_idx, flw_idx = flw.sindex.query_bulk(cs.geometry)
+    cs_idx, flw_idx = flw.sindex.query(cs.geometry)
     merged_idx = tlz.merge_with(list, ({t: i} for t, i in zip(flw_idx, cs_idx)))
 
     cs[id_col] = 0
