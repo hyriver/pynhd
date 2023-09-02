@@ -883,7 +883,7 @@ def nhdplus_l48(
         - ``N_1_JTopo2``
         - ``N_1_Props``
 
-    data_dire : str or pathlib.Path
+    data_dire : str or pathlib.Pathlib.Path
         Directory to store the downloaded file and use in subsequent calls,
         defaults to ``./cache``.
     **kwargs

@@ -98,7 +98,7 @@ def enhd_attrs(
 
     Parameters
     ----------
-    parquet_path : str or Path, optional
+    parquet_path : str or pathlib.Pathlib.Path, optional
         Path to a file with ``.parquet`` extension for storing the file,
         defaults to ``./cache/enhd_attrs.parquet``.
 
@@ -141,7 +141,7 @@ def nhdplus_vaa(
 
     Parameters
     ----------
-    parquet_path : str or Path, optional
+    parquet_path : str or pathlib.Pathlib.Path, optional
         Path to a file with ``.parquet`` extension for storing the file, defaults to
         ``./cache/nldplus_vaa.parquet``.
 
@@ -333,7 +333,7 @@ def nhdplus_h12pp(gpkg_path: Path | str | None = None) -> pd.DataFrame:
 
     Parameters
     ----------
-    gpkg_path : Path or str, optional
+    gpkg_path : str or pathlib.Pathlib.Path, optional
         Path to the geopackage file, defaults to None, i.e., download
         the file to the cache directory as ``102020wbd_outlets.gpkg``.
 
