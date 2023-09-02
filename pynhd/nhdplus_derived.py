@@ -135,7 +135,7 @@ def nhdplus_vaa(
     Notes
     -----
     This function downloads a 245 MB ``parquet`` file from
-    `here <https://www.hydroshare.org/resource/6092c8a62fac45be97a09bfd0b0bf726>`__ .
+    `here <https://www.hydroshare.org/resource/6092c8a62fac45be97a09bfd0b0bf726>`__.
     Although this dataframe does not include geometry, it can be linked
     to other geospatial NHDPlus dataframes through ComIDs.
 
@@ -175,7 +175,7 @@ def nhdplus_attrs(attr_name: str | None = None) -> pd.DataFrame:
 
     Notes
     -----
-    More info can be found `here <https://www.sciencebase.gov/catalog/item/5669a79ee4b08895842a1d47>`_.
+    More info can be found `here <https://www.sciencebase.gov/catalog/item/5669a79ee4b08895842a1d47>`__.
 
     Parameters
     ----------
@@ -275,7 +275,7 @@ def nhdplus_attrs_s3(
 
     Notes
     -----
-    More info can be found `here <https://www.sciencebase.gov/catalog/item/5669a79ee4b08895842a1d47>`_.
+    More info can be found `here <https://www.sciencebase.gov/catalog/item/5669a79ee4b08895842a1d47>`__.
 
     Parameters
     ----------
@@ -329,7 +329,7 @@ def nhdplus_h12pp(gpkg_path: Path | str | None = None) -> pd.DataFrame:
     Notes
     -----
     More info can be found
-    `here <https://www.sciencebase.gov/catalog/item/60cb5edfd34e86b938a373f4>`_.
+    `here <https://www.sciencebase.gov/catalog/item/60cb5edfd34e86b938a373f4>`__.
 
     Parameters
     ----------
