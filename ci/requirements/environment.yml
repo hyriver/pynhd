@@ -36,7 +36,7 @@ dependencies:
 - scipy
 - shapely >=2.0
 - ujson
-- xarray >=2022.03.0
+- xarray >=2023.04.0
 
   # pynhd deps
   # - async-retriever >=0.3.6
