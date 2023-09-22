@@ -139,6 +139,13 @@ class AGRBase:
         """
         rjson = ar.retrieve_json([url], [{"params": {"f": "json"}}])
         rjson = cast("list[dict[str, Any]]", rjson)
+        if not rjson[0]["layers"]:
+            ar.delete_url_cache(url, params={"f": "json"})
+            with ogc_utils.RetrySession(disable=True) as session:
+                rjson = session.get(url, params={"f": "json"}).json()
+        if not rjson[0]["layers"]:
+            msg = "The service doesn't have any layers."
+            raise ServiceError(msg, url)
         return {lyr["name"].lower(): int(lyr["id"]) for lyr in rjson[0]["layers"]}
 
     def _getfeatures(
