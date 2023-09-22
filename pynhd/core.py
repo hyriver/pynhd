@@ -572,17 +572,17 @@ class GeoConnex:
                 for lk in links
                 if lk["type"] == "application/json"
             }
-            resp = ar.retrieve_json([urls["queryables"]], [{"params": {"f": "json"}}])
+            resp = ar.retrieve_json([f"{urls['self']}/queryables"], [{"params": {"f": "json"}}])
             resp = cast("list[dict[str, Any]]", resp)
             prop: dict[str, dict[str, str]] = resp[0]["properties"]
             _ = prop.pop("geometry", None)
             fields = list(prop)
             type_map = {
-                "INTEGER": "int64",
-                "VARCHAR": "str",
-                "DOUBLE_PRECISION": "f8",
-                "TIMESTAMP": "datetime64[ns]",
-                "BOOLEAN": "bool",
+                "integer": "int64",
+                "string": "str",
+                "number": "f8",
+                "timestamp": "datetime64[ns]",
+                "boolean": "bool",
             }
             dtypes = {str(v["title"]): type_map[v["type"]] for v in prop.values()}
 
