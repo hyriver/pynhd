@@ -62,7 +62,16 @@ class NHD(AGRBase):
     outfields : str or list, optional
         Target field name(s), default to "*" i.e., all the fields.
     crs : str, int, or pyproj.CRS, optional
-        Target spatial reference, default to ``EPSG:4326``
+        Target spatial reference, default to ``EPSG:4326``.
+
+    Methods
+    -------
+    bygeom(geom, geo_crs=4326, sql_clause="", distance=None, return_m=False, return_geom=True)
+        Get features within a geometry that can be combined with a SQL where clause.
+    byids(field, fids, return_m=False, return_geom=True)
+        Get features by object IDs.
+    bysql(sql_clause, return_m=False, return_geom=True)
+        Get features using a valid SQL 92 WHERE clause.
     """
 
     def __init__(
@@ -597,7 +606,16 @@ class NHDPlusHR(AGRBase):
     outfields : str or list, optional
         Target field name(s), default to "*" i.e., all the fields.
     crs : str, int, or pyproj.CRS, optional
-        Target spatial reference, default to ``EPSG:4326``
+        Target spatial reference, default to ``EPSG:4326``.
+
+    Methods
+    -------
+    bygeom(geom, geo_crs=4326, sql_clause="", distance=None, return_m=False, return_geom=True)
+        Get features within a geometry that can be combined with a SQL where clause.
+    byids(field, fids, return_m=False, return_geom=True)
+        Get features by object IDs.
+    bysql(sql_clause, return_m=False, return_geom=True)
+        Get features using a valid SQL 92 WHERE clause.
     """
 
     def __init__(
