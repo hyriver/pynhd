@@ -2,6 +2,13 @@
 History
 =======
 
+0.15.2 (2023-09-22)
+-------------------
+
+Bug Fixes
+~~~~~~~~~
+- Update ``GeoConnex`` based on the latest changes in the web service.
+
 0.15.1 (2023-09-02)
 -------------------
 
