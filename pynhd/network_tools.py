@@ -13,9 +13,10 @@ import networkx as nx
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import pygeoutils as pgu
 import pyproj
 from pygeoogc import streaming_download
-from pygeoutils import GeoBSpline, InputTypeError
+from pygeoutils import InputTypeError
 from shapely import ops
 from shapely.geometry import LineString, MultiLineString, Point
 
@@ -37,7 +38,6 @@ except ImportError:
 if TYPE_CHECKING:
     from pandas._libs.missing import NAType
     from pandas.core.groupby.generic import DataFrameGroupBy
-    from pygeoutils.geotools import Spline
 
 
 __all__ = [
@@ -530,13 +530,6 @@ def vector_accumulation(
     return acc
 
 
-def __get_spline(line: LineString, ns_pts: int, crs: str | pyproj.CRS) -> Spline:
-    """Get a B-spline from a line."""
-    x, y = line.xy
-    pts = gpd.GeoSeries(gpd.points_from_xy(x, y, crs=crs))
-    return GeoBSpline(pts, ns_pts).spline
-
-
 def __get_idx(d_sp: npt.NDArray[np.float64], distance: float) -> npt.NDArray[np.int64]:
     """Get the index of the closest points based on a given distance."""
     dis = pd.DataFrame(d_sp, columns=["distance"]).reset_index()
@@ -546,7 +539,7 @@ def __get_idx(d_sp: npt.NDArray[np.float64], distance: float) -> npt.NDArray[np.
 
 
 def __get_spline_params(
-    line: LineString, n_seg: int, distance: float, crs: str | pyproj.CRS
+    line: LineString, n_seg: int, distance: float, crs: str | int | pyproj.CRS
 ) -> tuple[
     npt.NDArray[np.float64],
     npt.NDArray[np.float64],
@@ -555,24 +548,29 @@ def __get_spline_params(
 ]:
     """Get Spline parameters (x, y, phi)."""
     _n_seg = n_seg
-    spline = __get_spline(line, _n_seg, crs)
+    spline = pgu.smooth_linestring(line, crs, _n_seg)
     idx = __get_idx(spline.distance, distance)
     while np.isnan(idx).any():
         _n_seg *= 2
-        spline = __get_spline(line, _n_seg, crs)
+        spline = pgu.smooth_linestring(line, crs, _n_seg)
         idx = __get_idx(spline.distance, distance)
-    return spline.x[idx].flatten(), spline.y[idx].flatten(), spline.phi[idx].flatten()
+    return spline.x[idx], spline.y[idx], spline.phi[idx], spline.distance[idx]
 
 
 def __get_perpendicular(
-    line: LineString, n_seg: int, distance: float, half_width: float, crs: str | pyproj.CRS
+    line: LineString, n_seg: int, distance: float, half_width: float, crs: str | int | pyproj.CRS
 ) -> list[LineString]:
     """Get perpendiculars to a line."""
-    x, y, phi = __get_spline_params(line, n_seg, distance, crs)
+    x, y, phi, dis = __get_spline_params(line, n_seg, distance, crs)
     x_l = x - half_width * np.sin(phi)
     x_r = x + half_width * np.sin(phi)
     y_l = y + half_width * np.cos(phi)
     y_r = y - half_width * np.cos(phi)
+    if np.diff(dis)[-1] < 0.25 * distance:
+        x_l = np.delete(x_l, -2)
+        x_r = np.delete(x_r, -2)
+        y_l = np.delete(y_l, -2)
+        y_r = np.delete(y_r, -2)
     return [LineString([(x1, y1), (x2, y2)]) for x1, y1, x2, y2 in zip(x_l, y_l, x_r, y_r)]
 
 
