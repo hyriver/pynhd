@@ -47,6 +47,8 @@ class InputValueError(ar.InputValueError):
         Name of the input parameter
     valid_inputs : tuple
         List of valid inputs
+    given : str, optional
+        The given input, defaults to None.
     """
 
 
