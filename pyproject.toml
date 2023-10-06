@@ -42,7 +42,7 @@ dependencies = [
   "pyarrow>=1.0.1",
   "pygeoogc<0.16,>=0.15.2",
   "pygeoutils<0.16,>=0.15.2",
-  "shapely>=2.0.0",
+  "shapely>=2",
 ]
 [project.optional-dependencies]
 nhdplus = [
