@@ -42,7 +42,7 @@ dependencies = [
   "pyarrow>=1.0.1",
   "pygeoogc<0.16,>=0.15.2",
   "pygeoutils<0.16,>=0.15.2",
-  "shapely>=1.8.5",
+  "shapely>=2.0.0",
 ]
 [project.optional-dependencies]
 nhdplus = [
@@ -50,7 +50,6 @@ nhdplus = [
   "pyogrio",
 ]
 test = [
-  "coverage[toml]",
   "pytest-cov",
   "pytest-xdist[psutil]",
 ]
@@ -203,6 +202,8 @@ filterwarnings = [
   "ignore:.*--rsyncdir command line argument.*",
   "ignore:.*numpy.ndarray size changed.*",
   "ignore:.*'cgi' is deprecated.*",
+  "ignore:.*Calling float on a single element.*",
+  "ignore:.*Shapely GEOS version.*",
 ]
 testpaths = [
   "tests",
