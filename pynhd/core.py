@@ -1,24 +1,24 @@
 """Base classes for PyNHD functions."""
+# pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 
 import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterator, Literal, NamedTuple, Union, cast, overload
 
-import async_retriever as ar
 import cytoolz.curried as tlz
 import geopandas as gpd
 import pandas as pd
-import pygeoutils as geoutils
-import pyproj
 import shapely
 import ujson
+from shapely import MultiPoint, MultiPolygon, Polygon
+from shapely import box as shapely_box
+
+import async_retriever as ar
+import pygeoutils as geoutils
 from pygeoogc import ArcGISRESTful, ServiceURL
 from pygeoogc import utils as ogc_utils
 from pygeoutils import EmptyResponseError
-from shapely.geometry import MultiPoint, MultiPolygon, Polygon
-from shapely.geometry import box as shapely_box
-
 from pynhd.exceptions import (
     InputRangeError,
     InputTypeError,
@@ -31,7 +31,8 @@ from pynhd.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from shapely.geometry import LineString, Point
+    import pyproj
+    from shapely import LineString, Point
 
     CRSTYPE = Union[int, str, pyproj.CRS]
     GTYPE = Union[
@@ -361,7 +362,9 @@ class PyGeoAPIBase:
             ) from ex
 
         _coords = [(p.x, p.y) for p in mps.geoms]
-        _coords = [(round(x, 6), round(y, 6)) for x, y in ogc_utils.match_crs(_coords, crs, 4326)]
+        _coords = [
+            (round(x, 6), round(y, 6)) for x, y in geoutils.geometry_reproject(_coords, crs, 4326)
+        ]
         return _coords
 
 
@@ -393,7 +396,7 @@ class PyGeoAPIBatch(PyGeoAPIBase):
         if coords.crs is None:
             raise MissingCRSError
 
-        self.coords = coords.to_crs(4326)
+        self.coords = cast("gpd.GeoDataFrame", coords.to_crs(4326))
         self.req_idx = self.coords.index.tolist()
         self.req_cols = {
             "flow_trace": ["direction"],
@@ -422,7 +425,7 @@ class PyGeoAPIBatch(PyGeoAPIBase):
 
     def check_geotype(self, method: str) -> None:
         """Check if the required geometry type is present in the GeoDataFrame."""
-        if any(self.coords.geom_type != self.geo_types[method]):
+        if not self.coords.geom_type.eq(self.geo_types[method]).all():
             raise InputTypeError("coords", self.geo_types[method])
 
     def get_payload(self, method: str) -> list[dict[str, dict[str, list[dict[str, Any]]]]]:
@@ -438,7 +441,7 @@ class PyGeoAPIBatch(PyGeoAPIBase):
         else:
             coords = self.coords
 
-        geo_iter = coords[["geometry"] + attrs].itertuples(index=False, name=None)
+        geo_iter = coords[["geometry", *attrs]].itertuples(index=False, name=None)
 
         if method == "elevation_profile":
             if any(len(g.geoms) != 2 for g in coords.geometry):
@@ -606,8 +609,8 @@ class GeoConnex:
             ep[0]: EndPoints(
                 name=ep[0],
                 description=ep[1],
-                **get_links(ep[2]),  # type: ignore
-                extent=tuple(ep[3]["spatial"]["bbox"][0]),  # type: ignore
+                **get_links(ep[2]),
+                extent=tuple(ep[3]["spatial"]["bbox"][0]),
             )
             for ep in eps
         }
@@ -632,10 +635,7 @@ class GeoConnex:
 
     def _get_geodf(self, kwds: dict[str, Any]) -> gpd.GeoDataFrame | pd.DataFrame:
         """Get response as a ``geopandas.GeoDataFrame``."""
-        if "skipGeometry" in kwds:
-            skip_geometry = kwds.pop("skipGeometry")
-        else:
-            skip_geometry = "false"
+        skip_geometry = kwds.pop("skipGeometry") if "skipGeometry" in kwds else "false"
         params = {
             **kwds,
             "headers": {"Content-Type": "application/query-cql-json"},
@@ -655,7 +655,8 @@ class GeoConnex:
         resp = ar.retrieve_json([_get_url(0)], [params], request_method="POST")
         resp = cast("list[dict[str, Any]]", resp)
         if resp[0].get("code") is not None:
-            raise ServiceError(f"{resp[0]['code']}: {resp[0]['description']}")
+            msg = f"{resp[0]['code']}: {resp[0]['description']}"
+            raise ServiceError(msg, _get_url(0))
         try:
             gdf = geoutils.json2geodf(resp)
             n_matched = int(resp[0]["numberMatched"])
@@ -679,9 +680,9 @@ class GeoConnex:
     def bygeometry(
         self,
         geometry1: GTYPE,
-        geometry2: GTYPE | None = None,
-        predicate: str = "intersects",
-        crs: CRSTYPE | None = 4326,
+        geometry2: GTYPE | None = ...,
+        predicate: str = ...,
+        crs: CRSTYPE = ...,
         skip_geometry: Literal[False] = False,
     ) -> gpd.GeoDataFrame:
         ...
@@ -690,9 +691,9 @@ class GeoConnex:
     def bygeometry(
         self,
         geometry1: GTYPE,
-        geometry2: GTYPE | None = None,
-        predicate: str = "intersects",
-        crs: CRSTYPE | None = 4326,
+        geometry2: GTYPE | None = ...,
+        predicate: str = ...,
+        crs: CRSTYPE = ...,
         skip_geometry: Literal[True] = True,
     ) -> pd.DataFrame:
         ...
@@ -702,7 +703,7 @@ class GeoConnex:
         geometry1: GTYPE,
         geometry2: GTYPE | None = None,
         predicate: str = "intersects",
-        crs: CRSTYPE | None = 4326,
+        crs: CRSTYPE = 4326,
         skip_geometry: bool = False,
     ) -> gpd.GeoDataFrame | pd.DataFrame:
         """Query the GeoConnex endpoint by geometry.
@@ -739,20 +740,6 @@ class GeoConnex:
         if self.item is None or self.query_url is None:
             raise MissingItemError(["item"])
 
-        geom1 = geoutils.geo2polygon(geometry1, crs, 4326)
-        if not geom1.within(shapely_box(*self.item_extent)):
-            raise InputRangeError("geometry", f"within {self.item_extent}")
-
-        if geometry2 is not None:
-            geom2 = geoutils.geo2polygon(geometry2, crs, 4326)
-            if not geom2.within(shapely_box(*self.item_extent)):
-                raise InputRangeError("geometry", f"within {self.item_extent}")
-        else:
-            geom2 = None
-
-        if not isinstance(geom1, (Polygon, MultiPolygon)):
-            raise InputTypeError("geometry", "Polygon or MultiPolygon")
-
         valid_predicates = (
             "INTERSECTS",
             "WITHIN",
@@ -766,31 +753,35 @@ class GeoConnex:
         if predicate.upper() not in valid_predicates:
             raise InputValueError("predicate", valid_predicates)
 
-        if crs is None:
-            raise MissingCRSError
-
-        geom1 = ogc_utils.match_crs(geom1, crs, 4326)
+        geom1 = geoutils.geo2polygon(geometry1, crs, 4326)
+        if not geom1.intersects(shapely_box(*self.item_extent)):
+            raise InputRangeError("geometry", f"within {self.item_extent}")
         try:
             geom1_json = ujson.loads(shapely.to_geojson(geom1))
         except AttributeError:
             geom1_json = shapely.geometry.mapping(geom1)
-        if geom2 is not None:
-            geom2 = ogc_utils.match_crs(geom2, crs, 4326)
-            try:
-                geom_json2 = ujson.loads(shapely.to_geojson(geom2))
-            except AttributeError:
-                geom_json2 = shapely.geometry.mapping(geom2)
-            kwds = {
+
+        if geometry2 is None:
+            return self._get_geodf(
+                {
+                    "json": {predicate.lower(): [{"property": "geom"}, geom1_json]},
+                    "skipGeometry": str(skip_geometry).lower(),
+                }
+            )
+
+        geom2 = geoutils.geo2polygon(geometry2, crs, 4326)
+        if not geom2.intersects(shapely_box(*self.item_extent)):
+            raise InputRangeError("geometry", f"within {self.item_extent}")
+        try:
+            geom_json2 = ujson.loads(shapely.to_geojson(geom2))
+        except AttributeError:
+            geom_json2 = shapely.geometry.mapping(geom2)
+        return self._get_geodf(
+            {
                 "json": {predicate.lower(): [geom1_json, geom_json2]},
                 "skipGeometry": str(skip_geometry).lower(),
             }
-        else:
-            kwds = {
-                "json": {predicate.lower(): [{"property": "geom"}, geom1_json]},
-                "skipGeometry": str(skip_geometry).lower(),
-            }
-
-        return self._get_geodf(kwds)
+        )
 
     @overload
     def byid(
@@ -893,7 +884,7 @@ class GeoConnex:
             return "\n".join(
                 [
                     "Available Endpoints:",
-                    "\n".join(f"    '{k}': {v.description}" for k, v in self.endpoints.items()),
+                    "\n".join(f"'{k}': {v.description}" for k, v in self.endpoints.items()),
                 ]
             )
         return "\n".join(

@@ -1,4 +1,6 @@
 """Access NLDI and WaterData databases."""
+# pyright: reportGeneralTypeIssues=false
+# pyright: reportOptionalMemberAccess=false
 from __future__ import annotations
 
 import io
@@ -6,20 +8,18 @@ import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable
 
-import async_retriever as ar
 import cytoolz.curried as tlz
 import geopandas as gpd
 import networkx as nx
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+from shapely import LineString, MultiLineString, Point, ops
+
+import async_retriever as ar
 import pygeoutils as pgu
-import pyproj
 from pygeoogc import streaming_download
 from pygeoutils import InputTypeError
-from shapely import ops
-from shapely.geometry import LineString, MultiLineString, Point
-
 from pynhd import nhdplus_derived as derived
 from pynhd.core import ScienceBase
 from pynhd.exceptions import (
@@ -36,6 +36,7 @@ except ImportError:
     IntCastingNaNError = TypeError
 
 if TYPE_CHECKING:
+    import pyproj
     from pandas._libs.missing import NAType
     from pandas.core.groupby.generic import DataFrameGroupBy
 
@@ -624,7 +625,7 @@ def flowline_resample(
 
     dist = sorted(line.project(Point(p)) for p in line.coords)
     n_seg = int(np.ceil(line.length / spacing)) * 100
-    xs, ys, _ = __get_spline_params(line, n_seg, spacing, flw.crs)
+    xs, ys, _, _ = __get_spline_params(line, n_seg, spacing, flw.crs)
     line = LineString(list(zip(xs, ys)))
 
     lines = [ops.substring(line, s, e) for s, e in zip(dist[:-1], dist[1:])]

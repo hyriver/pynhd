@@ -7,7 +7,7 @@ from pathlib import Path
 import geopandas as gpd
 import numpy as np
 import pytest
-from shapely.geometry import MultiPoint, Point, box
+from shapely import MultiPoint, Point, box
 
 import pynhd
 from pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData

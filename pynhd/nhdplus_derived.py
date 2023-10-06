@@ -7,15 +7,15 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-import async_retriever as ar
 import cytoolz.curried as tlz
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pyarrow.dataset as pds
-import pygeoogc as ogc
 from pyarrow import ArrowInvalid, fs
 
+import async_retriever as ar
+import pygeoogc as ogc
 from pynhd.core import ScienceBase, get_parquet
 from pynhd.exceptions import InputTypeError, InputValueError, ServiceError
 
@@ -313,7 +313,7 @@ def nhdplus_attrs_s3(
 
     def to_pandas(ds: FileSystemDataset, cols: list[str], nodata: bool) -> pd.DataFrame:
         """Convert a pyarrow dataset to a pandas dataframe."""
-        cols = ["COMID"] + cols
+        cols = ["COMID", *cols]
         if nodata:
             ds_columns = ds.schema.names
             with contextlib.suppress(StopIteration):
@@ -344,15 +344,12 @@ def nhdplus_h12pp(gpkg_path: Path | str | None = None) -> pd.DataFrame:
     """
     sb = ScienceBase()
     files = sb.get_file_urls("60cb5edfd34e86b938a373f4").loc["102020wbd_outlets.gpkg"].url
-    if gpkg_path is None:
-        gpkg_path = Path("cache", "102020wbd_outlets.gpkg")
-    else:
-        gpkg_path = Path(gpkg_path)
+    gpkg_path = Path("cache", "102020wbd_outlets.gpkg") if gpkg_path is None else Path(gpkg_path)
     _ = ogc.streaming_download(files, fnames=gpkg_path)
     h12pp = gpd.read_file(gpkg_path, engine="pyogrio")
     h12pp = h12pp[["COMID", "REACHCODE", "REACH_meas", "offset", "HUC12", "LevelPathI", "geometry"]]
     h12pp[["COMID", "LevelPathI"]] = h12pp[["COMID", "LevelPathI"]].astype("uint32")
-    return h12pp
+    return h12pp  # pyright: ignore[reportGeneralTypeIssues]
 
 
 def nhd_fcode() -> pd.DataFrame:
@@ -518,7 +515,8 @@ class StreamCat:
         names.loc[names["SLOPE"] == "", "SLOPE"] = np.nan
         slp = ~names["SLOPE"].isna()
         names.loc[slp, "METRIC_NAME"] = [f"{n}[Slope]" for n in names.loc[slp, "METRIC_NAME"]]
-        names = names.drop_duplicates("METRIC_NAME").reset_index(drop=True)
+        names = names.drop_duplicates("METRIC_NAME")
+        names = names.reset_index(drop=True)  # pyright: ignore[reportOptionalMemberAccess]
         names = names.drop(columns="WEBTOOL_NAME")
         self.metrics_df = names
 

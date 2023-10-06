@@ -4,22 +4,22 @@ from __future__ import annotations
 import warnings
 from typing import TYPE_CHECKING, Any, Generator, Literal, Sequence, Union, cast, overload
 
-import async_retriever as ar
-import geopandas as gpd
 import numpy as np
 import pandas as pd
-import pygeoogc as ogc
-import pygeoutils as geoutils
-import pyproj
-from pygeoogc import WFS, InputValueError, ServiceURL
-from pygeoutils import EmptyResponseError, InputTypeError
 from yarl import URL
 
+import async_retriever as ar
+import pygeoogc as ogc
+import pygeoutils as geoutils
+from pygeoogc import WFS, InputValueError, ServiceURL
+from pygeoutils import EmptyResponseError, InputTypeError
 from pynhd.core import AGRBase, PyGeoAPIBase, PyGeoAPIBatch
 from pynhd.exceptions import InputRangeError, MissingItemError, ZeroMatchedError
 
 if TYPE_CHECKING:
-    from shapely.geometry import LineString, MultiPoint, MultiPolygon, Point, Polygon
+    import geopandas as gpd
+    import pyproj
+    from shapely import LineString, MultiPoint, MultiPolygon, Point, Polygon
 
     CRSTYPE = Union[int, str, pyproj.CRS]
     GTYPE = Union[
@@ -290,7 +290,8 @@ def pygeoapi(coords: gpd.GeoDataFrame, service: str) -> gpd.GeoDataFrame:
 
     Examples
     --------
-    >>> from shapely.geometry import Point
+    >>> from shapely import Point
+    >>> import geopandas as gpd
     >>> gdf = gpd.GeoDataFrame(
     ...     {
     ...         "direction": [
@@ -313,7 +314,7 @@ def pygeoapi(coords: gpd.GeoDataFrame, service: str) -> gpd.GeoDataFrame:
         feat = gdf[~gdf.comid.isna()].set_index("req_idx")
         raindrop = gdf.loc[gdf.comid.isna(), ["req_idx", "geometry"]].set_index("req_idx")
         feat["raindrop_path"] = raindrop.geometry
-        return feat.reset_index()
+        return feat.reset_index()  # pyright: ignore[reportGeneralTypeIssues]
     return gdf
 
 
@@ -567,13 +568,15 @@ class WaterData:
 
     def __repr__(self) -> str:
         """Print the services properties."""
-        return (
-            "Connected to the WaterData web service on GeoServer:\n"
-            + f"URL: {self.wfs.url}\n"
-            + f"Version: {self.wfs.version}\n"
-            + f"Layer: {self.layer}\n"
-            + f"Output Format: {self.wfs.outformat}\n"
-            + f"Output CRS: {self.crs}"
+        return "\n".join(
+            (
+                "Connected to the WaterData web service on GeoServer:",
+                f"URL: {self.wfs.url}",
+                f"Version: {self.wfs.version}",
+                f"Layer: {self.layer}",
+                f"Output Format: {self.wfs.outformat}",
+                f"Output CRS: {self.crs}",
+            )
         )
 
 
@@ -686,7 +689,7 @@ class NLDI:
     @overload
     def _get_urls(
         self, url_parts: Generator[tuple[str, ...], None, None] | str, raw: Literal[True] = ...
-    ) -> tuple[list[int], list[dict[str, Any]] | list[list[dict[str, Any]]]]:
+    ) -> tuple[list[int], list[dict[str, Any]] | dict[str, Any]]:
         ...
 
     @overload
@@ -697,12 +700,12 @@ class NLDI:
 
     def _get_urls(
         self, url_parts: Generator[tuple[str, ...], None, None] | str, raw: bool = False
-    ) -> tuple[list[int], list[dict[str, Any]] | list[list[dict[str, Any]]]] | gpd.GeoDataFrame:
+    ) -> tuple[list[int], list[dict[str, Any]] | dict[str, Any]] | gpd.GeoDataFrame:
         """Send a request to the service using GET method."""
         if isinstance(url_parts, str):
             urls = [URL(url_parts)]
         else:
-            urls = [URL("/".join((self.base_url,) + u)) for u in url_parts]
+            urls = [URL("/".join((self.base_url, *u))) for u in url_parts]
         resp = ar.retrieve_json([str(u) for u in urls], raise_status=False)
 
         try:
@@ -711,7 +714,7 @@ class NLDI:
             raise ZeroMatchedError from ex
 
         index = cast("list[int]", list(index))
-        resp = cast("list[dict[str, Any]] | list[list[dict[str, Any]]]", list(resp))
+        resp = cast("list[dict[str, Any]] | dict[str, Any]", list(resp))
         failed = [i for i in range(len(urls)) if i not in index]
 
         if failed:
@@ -726,7 +729,7 @@ class NLDI:
         if raw:
             return index, resp
 
-        return geoutils.json2geodf(resp, 4269, 4326)  # type: ignore
+        return geoutils.json2geodf(resp, 4269, 4326)
 
     def _validate_fsource(self, fsource: str) -> None:
         """Check if the given feature source is valid."""
@@ -746,7 +749,7 @@ class NLDI:
             * 'ca_gages' for Streamgage catalog for CA SB19
             * 'gfv11_pois' for USGS Geospatial Fabric V1.1 Points of Interest
             * 'huc12pp' for HUC12 Pour Points
-            * 'nmwdi-st' for New Mexico Water Data Initative Sites
+            * 'nmwdi-st' for New Mexico Water Data Initiative Sites
             * 'nwisgw' for NWIS Groundwater Sites
             * 'nwissite' for NWIS Surface Water Sites
             * 'ref_gage' for geoconnex.us reference gages
@@ -828,7 +831,9 @@ class NLDI:
             any ComID a list of missing coords are returned as well.
         """
         comids = self.__byloc("comid", coords, loc_crs)
-        return comids[comids["source"] == "indexed"].reset_index(drop=True)
+        comids = comids[comids["source"] == "indexed"].reset_index(drop=True)
+        comids = cast("gpd.GeoDataFrame", comids)
+        return comids
 
     def feature_byloc(
         self,
@@ -873,7 +878,7 @@ class NLDI:
             * 'ca_gages' for Streamgage catalog for CA SB19
             * 'gfv11_pois' for USGS Geospatial Fabric V1.1 Points of Interest
             * 'huc12pp' for HUC12 Pour Points
-            * 'nmwdi-st' for New Mexico Water Data Initative Sites
+            * 'nmwdi-st' for New Mexico Water Data Initiative Sites
             * 'nwisgw' for NWIS Groundwater Sites
             * 'nwissite' for NWIS Surface Water Sites
             * 'ref_gage' for geoconnex.us reference gages
@@ -915,9 +920,10 @@ class NLDI:
 
         urls = (("linked-data", fsource, fid, f"basin?{query}") for fid in feature_ids)
         index, resp = self._get_urls(urls, True)
-        basins = geoutils.json2geodf(resp, 4269, 4326)  # type: ignore
+        basins = geoutils.json2geodf(resp, 4269, 4326)
         basins.index = pd.Index([feature_ids[i] for i in index], name="identifier")
-        basins = basins[~basins.geometry.isnull()].copy()
+        basins = basins[~basins.geometry.isnull()].reset_index(drop=True)
+        basins = cast("gpd.GeoDataFrame", basins)
         return basins
 
     @overload
@@ -969,7 +975,7 @@ class NLDI:
             * 'ca_gages' for Streamgage catalog for CA SB19
             * 'gfv11_pois' for USGS Geospatial Fabric V1.1 Points of Interest
             * 'huc12pp' for HUC12 Pour Points
-            * 'nmwdi-st' for New Mexico Water Data Initative Sites
+            * 'nmwdi-st' for New Mexico Water Data Initiative Sites
             * 'nwisgw' for NWIS Groundwater Sites
             * 'nwissite' for NWIS Surface Water Sites
             * 'ref_gage' for geoconnex.us reference gages
@@ -1057,7 +1063,7 @@ class NLDI:
             * 'ca_gages' for Streamgage catalog for CA SB19
             * 'gfv11_pois' for USGS Geospatial Fabric V1.1 Points of Interest
             * 'huc12pp' for HUC12 Pour Points
-            * 'nmwdi-st' for New Mexico Water Data Initative Sites
+            * 'nmwdi-st' for New Mexico Water Data Initiative Sites
             * 'nwisgw' for NWIS Groundwater Sites
             * 'nwissite' for NWIS Surface Water Sites
             * 'ref_gage' for geoconnex.us reference gages
