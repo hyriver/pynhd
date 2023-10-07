@@ -24,7 +24,7 @@ def assert_close(a: float, b: float) -> bool:
     assert np.isclose(a, b, rtol=1e-3).all()
 
 
-@pytest.fixture
+@pytest.fixture()
 def trib():
     comids = NLDI().navigate_byid(site, station_id, UT, "flowlines")
     wd = WaterData("nhdflowline_network")
@@ -50,7 +50,8 @@ def test_nhd_xs_resample():
     main_nhd = pynhd.prepare_nhdplus(flw, 0, 0, 0, purge_non_dendritic=True)
     cs = pynhd.network_xsection(main_nhd, 2000, 1000)
     rs = pynhd.network_resample(main_nhd, 2000)
-    assert len(cs) == 29 and len(rs) == 46
+    assert len(cs) == 29
+    assert len(rs) == 46
 
 
 class TestPyGeoAPI:
@@ -160,7 +161,8 @@ class TestNLDI:
         lon = round(station.geometry[0].centroid.x, 1)
         lat = round(station.geometry[0].centroid.y, 1)
         comid = self.nldi.feature_byloc((lon, lat))
-        assert station.comid.values[0] == "1722317" and comid.comid.values[0] == "1722211"
+        assert station.comid.values[0] == "1722317"
+        assert comid.comid.values[0] == "1722211"
 
     def test_basin(self):
         eck4 = "+proj=eck4 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=km"
@@ -172,7 +174,8 @@ class TestNLDI:
         tot, prc = self.nldi.getcharacteristic_byid(
             "6710923", "local", char_ids="all", values_only=False
         )
-        assert tot.CAT_BFI.values[0] == 57 and prc.CAT_BFI.values[0] == 0
+        assert tot.CAT_BFI.values[0] == 57
+        assert prc.CAT_BFI.values[0] == 0
 
 
 class TestNHDAttrs:
@@ -205,7 +208,7 @@ class TestWaterData:
 
     def test_bybox(self):
         wd = WaterData("wbd12")
-        print(wd)
+        assert "wbd12" in wd.__repr__()
         wb_g = wd.bygeom(box(-118.72, 34.118, -118.31, 34.518), predicate="INTERSECTS", xy=True)
         wb_b = wd.bybox((-118.72, 34.118, -118.31, 34.518))
         assert_close(wb_b.areasqkm.sum(), wb_g.areasqkm.sum())
@@ -217,7 +220,8 @@ class TestWaterData:
         huc12 = wb[wb.huc12 == "170300010602"].geometry
         coords = (huc12.centroid.x, huc12.centroid.y)
         hucs = wd.bydistance(coords, 100, crs)
-        assert wb.shape[0] == 52 and hucs.name[0] == "Upper Wenas River"
+        assert wb.shape[0] == 52
+        assert hucs.name[0] == "Upper Wenas River"
 
 
 class TestGCX:
@@ -252,10 +256,8 @@ def test_nhdphr():
     flwi = hr.byids("permanent_identifier", ids)
     ids_str = ", ".join([f"'{i}'" for i in ids])
     flwf = hr.bysql(f"permanent_identifier IN ({ids_str})")
-    assert (
-        flwb.shape[0] == 3887
-        and sorted(flwi["permanent_identifier"]) == sorted(flwf["permanent_identifier"]) == ids
-    )
+    assert flwb.shape[0] == 3887
+    assert sorted(flwi["permanent_identifier"]) == sorted(flwf["permanent_identifier"]) == ids
 
 
 @pytest.mark.xfail(reason="Hydroshare is unstable.")
@@ -307,12 +309,14 @@ def test_h12pp():
 
 def test_enhd_nx():
     g, m, s = pynhd.enhd_flowlines_nx()
-    assert g.number_of_nodes() == len(m) and s[0] == 8318775
+    assert g.number_of_nodes() == len(m)
+    assert s[0] == 8318775
 
 
 def test_huc12_nx():
     g, m, s = pynhd.mainstem_huc12_nx()
-    assert g.number_of_nodes() == len(m) and s[0] == "150301040501"
+    assert g.number_of_nodes() == len(m)
+    assert s[0] == "150301040501"
 
 
 def test_fcode():

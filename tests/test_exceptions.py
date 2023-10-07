@@ -18,9 +18,9 @@ class TestNLDI:
         assert "[1]" in str(w.message)
 
     def test_basin_empty(self):
-        with pytest.raises(ZeroMatchedError) as ex:
-            _ = self.nldi.get_basins(["04253294", "04253296"])
-            assert "no features" in str(ex.value)
+        ids = ["04253294", "04253296"]
+        with pytest.raises(ZeroMatchedError, match="no features"):
+            _ = self.nldi.get_basins(ids)
 
 
 class TestGCX:
@@ -30,9 +30,8 @@ class TestGCX:
         assert "gages" in str(ex.value)
 
     def test_wrong_bounds(self):
+        gcx = pynhd.GeoConnex("gages")
+        geometry1 = (1350626.862, 1687621.573, 1996597.949, 2557120.139)
         with pytest.raises(InputRangeError) as ex:
-            gcx = pynhd.GeoConnex("gages")
-            _ = gcx.bygeometry(
-                geometry1=(1350626.862, 1687621.573, 1996597.949, 2557120.139),
-            )
+            _ = gcx.bygeometry(geometry1=geometry1)
         assert "(-170, 15, -51, 72)" in str(ex.value)
