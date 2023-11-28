@@ -46,7 +46,7 @@ def test_epa():
 @pytest.mark.xfail(reason="Hydro is unstable.")
 def test_nhd_xs_resample():
     main = NLDI().navigate_byid(site, station_id, UM, "flowlines")
-    flw = NHD("flowline_mr").byids("COMID", main.nhdplus_comid.tolist()).to_crs("epsg:3857")
+    flw = NHD("flowline_mr").byids("COMID", main.nhdplus_comid.tolist()).to_crs(3857)
     main_nhd = pynhd.prepare_nhdplus(flw, 0, 0, 0, purge_non_dendritic=True)
     cs = pynhd.network_xsection(main_nhd, 2000, 1000)
     rs = pynhd.network_resample(main_nhd, 2000)
@@ -214,7 +214,7 @@ class TestWaterData:
         assert_close(wb_b.areasqkm.sum(), wb_g.areasqkm.sum())
 
     def test_byfilter(self):
-        crs = "epsg:3857"
+        crs = 3857
         wd = WaterData("huc12", crs)
         wb = wd.byfilter("huc12 LIKE '17030001%'", sort_attr="huc12")
         huc12 = wb[wb.huc12 == "170300010602"].geometry
