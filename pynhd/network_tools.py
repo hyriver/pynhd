@@ -6,7 +6,7 @@ from __future__ import annotations
 import io
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterable
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Union
 
 import cytoolz.curried as tlz
 import geopandas as gpd
@@ -14,7 +14,8 @@ import networkx as nx
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from shapely import LineString, MultiLineString, Point, ops
+import shapely
+from shapely import LineString, MultiLineString, ops
 
 import async_retriever as ar
 import pygeoutils as pgu
@@ -39,6 +40,8 @@ if TYPE_CHECKING:
     import pyproj
     from pandas._libs.missing import NAType
     from pandas.core.groupby.generic import DataFrameGroupBy
+
+    CRSTYPE = Union[str, int, pyproj.CRS]
 
 
 __all__ = [
@@ -531,48 +534,86 @@ def vector_accumulation(
     return acc
 
 
-def __get_idx(d_sp: npt.NDArray[np.float64], distance: float) -> npt.NDArray[np.int64]:
+def _get_idx(d_sp: npt.NDArray[np.float64], distance: float) -> npt.NDArray[np.int64]:
     """Get the index of the closest points based on a given distance."""
     dis = pd.DataFrame(d_sp, columns=["distance"]).reset_index()
-    grouper = pd.cut(dis["distance"], np.arange(0, dis["distance"].max() + distance, distance))
-    idx = dis.groupby(grouper).last()["index"].to_numpy("int64")
+    bins = np.arange(0, dis["distance"].max() + distance, distance)
+    grouper = pd.cut(dis["distance"], bins)
+    idx = dis.groupby(grouper, observed=True).last()["index"].to_numpy("int64")
     return np.append(0, idx)
 
 
-def __get_spline_params(
-    line: LineString, n_seg: int, distance: float, crs: str | int | pyproj.CRS
-) -> tuple[
-    npt.NDArray[np.float64],
-    npt.NDArray[np.float64],
-    npt.NDArray[np.float64],
-    npt.NDArray[np.float64],
-]:
+def _get_spline_params(
+    line: LineString, n_seg: int, distance: float, crs: CRSTYPE, smoothing: float | None
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64],]:
     """Get Spline parameters (x, y, phi)."""
     _n_seg = n_seg
-    spline = pgu.smooth_linestring(line, crs, _n_seg)
-    idx = __get_idx(spline.distance, distance)
+    spline = pgu.spline_linestring(line, crs, _n_seg, smoothing=smoothing)
+    idx = _get_idx(spline.distance, distance)
     while np.isnan(idx).any():
         _n_seg *= 2
-        spline = pgu.smooth_linestring(line, crs, _n_seg)
-        idx = __get_idx(spline.distance, distance)
-    return spline.x[idx], spline.y[idx], spline.phi[idx], spline.distance[idx]
+        spline = pgu.spline_linestring(line, crs, _n_seg, smoothing=smoothing)
+        idx = _get_idx(spline.distance, distance)
+    x, y, phi = spline.x[idx], spline.y[idx], spline.phi[idx]
+    spacing = np.diff(spline.distance[idx])
+
+    if spacing[0] < 0.25 * distance:
+        x = np.delete(x, 1)
+        y = np.delete(y, 1)
+        phi = np.delete(phi, 1)
+
+    if spacing[-1] < 0.25 * distance:
+        x = np.delete(x, -2)
+        y = np.delete(y, -2)
+        phi = np.delete(phi, -2)
+    return x, y, phi
 
 
-def __get_perpendicular(
-    line: LineString, n_seg: int, distance: float, half_width: float, crs: str | int | pyproj.CRS
-) -> list[LineString]:
-    """Get perpendiculars to a line."""
-    x, y, phi, dis = __get_spline_params(line, n_seg, distance, crs)
-    x_l = x - half_width * np.sin(phi)
-    x_r = x + half_width * np.sin(phi)
-    y_l = y + half_width * np.cos(phi)
-    y_r = y - half_width * np.cos(phi)
-    if np.diff(dis)[-1] < 0.25 * distance:
-        x_l = np.delete(x_l, -2)
-        x_r = np.delete(x_r, -2)
-        y_l = np.delete(y_l, -2)
-        y_r = np.delete(y_r, -2)
-    return [LineString([(x1, y1), (x2, y2)]) for x1, y1, x2, y2 in zip(x_l, y_l, x_r, y_r)]
+def _xs_planar(
+    line: LineString,
+    n_seg: int,
+    half_width: float,
+    distance: float,
+    crs: CRSTYPE,
+    smoothing: float | None,
+) -> npt.NDArray[LineString]:
+    """Get cross-sections along a line at a given spacing.
+
+    Parameters
+    ----------
+    line : LineString
+        A river centerline along which the cross-sections will be generated.
+    n_seg : int
+        Number of segments to use for the spline.
+    half_width : float
+        Half of the width of the cross-section.
+    distance : float
+        The distance between two consecutive cross-sections.
+    crs : str or int or pyproj.CRS
+        The CRS of the input line. Using projected CRS is highly recommended.
+    smoothing : float or None
+        Smoothing factor is used for determining the number of knots.
+        This arg controls the tradeoff between closeness and smoothness of fit.
+        Larger ``smoothing`` means more smoothing while smaller values of
+        ``smoothing`` indicates less smoothing. If None, smoothing
+        is done with all points.
+
+    Returns
+    -------
+    numpy.ndarray
+        Cross-sections along the line.
+    """
+    if not isinstance(line, LineString):
+        raise InputTypeError("line", "LineString")
+    x, y, phi = _get_spline_params(line, n_seg, distance, crs, smoothing)
+
+    xy = np.c_[x, y]
+    # Normal vector of the centerline at each point.
+    vn_right = np.c_[np.sin(phi), -np.cos(phi)]
+    vn_left = np.c_[-np.sin(phi), np.cos(phi)]
+
+    _lines = zip(xy + half_width * vn_left, xy + half_width * vn_right)
+    return shapely.linestrings(list(_lines))
 
 
 def __check_flw(flw: gpd.GeoDataFrame, req_cols: list[str]) -> None:
@@ -581,22 +622,35 @@ def __check_flw(flw: gpd.GeoDataFrame, req_cols: list[str]) -> None:
         raise MissingCRSError
 
     if not flw.crs.is_projected:
-        raise InputTypeError("flw.crs", "projected CRS")
+        warnings.warn(
+            " ".join(
+                (
+                    "The flowlines are not in a projected CRS.",
+                    "So, length computations are not accurate and all input lengths",
+                    "are assumed to be in the ``flw``'s CRS unit.",
+                )
+            ),
+            UserWarning,
+            stacklevel=2,
+        )
 
     if any(col not in flw for col in req_cols):
         raise MissingItemError(req_cols)
 
 
-def __merge_flowlines(flw: list[LineString | MultiLineString]) -> list[LineString]:
+def __merge_flowlines(flw: gpd.GeoDataFrame) -> LineString:
     """Merge flowlines."""
-    merged = ops.linemerge(flw)
-    if isinstance(merged, LineString):
-        return [merged]
-    return list(merged.geoms)
+    line = flw.geometry.unary_union
+    if isinstance(line, MultiLineString):
+        line = ops.linemerge(line)
+
+    if not isinstance(line, LineString):
+        raise InputValueError("flw.geometry", "mergeable to a single line")
+    return line
 
 
 def flowline_resample(
-    flw: gpd.GeoDataFrame, spacing: float, id_col: str = "comid"
+    flw: gpd.GeoDataFrame, spacing: float, id_col: str = "comid", smoothing: float | None = None
 ) -> gpd.GeoDataFrame:
     """Resample a flowline based on a given spacing.
 
@@ -610,6 +664,12 @@ def flowline_resample(
         Spacing between the sample points in meters.
     id_col : str, optional
         Name of the flowlines column containing IDs, defaults to ``comid``.
+    smoothing : float or None, optional
+        Smoothing factor is used for determining the number of knots.
+        This arg controls the tradeoff between closeness and smoothness of fit.
+        Larger ``smoothing`` means more smoothing while smaller values of
+        ``smoothing`` indicates less smoothing. If None (default), smoothing
+        is done with all points.
 
     Returns
     -------
@@ -617,18 +677,12 @@ def flowline_resample(
         Resampled flowline.
     """
     __check_flw(flw, ["geometry", id_col])
+    line = __merge_flowlines(flw)
 
-    line_list = __merge_flowlines(flw.geometry.to_list())
-    if len(line_list) > 1:
-        raise InputTypeError("flw.geometry", "mergeable to a single line")
-    line = line_list[0]
-
-    dist = sorted(line.project(Point(p)) for p in line.coords)
     n_seg = int(np.ceil(line.length / spacing)) * 100
-    xs, ys, _, _ = __get_spline_params(line, n_seg, spacing, flw.crs)
-    line = LineString(list(zip(xs, ys)))
+    line = pgu.smooth_linestring(line, smoothing, n_seg)
 
-    lines = [ops.substring(line, s, e) for s, e in zip(dist[:-1], dist[1:])]
+    lines = shapely.linestrings(list(zip(line.coords[:-1], line.coords[1:])))
     resampled = gpd.GeoDataFrame(geometry=lines, crs=flw.crs)
     rs_idx, flw_idx = flw.sindex.nearest(resampled.geometry, max_distance=spacing, return_all=False)
     merged_idx = tlz.merge_with(list, ({t: i} for t, i in zip(flw_idx, rs_idx)))
@@ -643,41 +697,65 @@ def flowline_resample(
     return resampled
 
 
-def network_resample(flw: gpd.GeoDataFrame, spacing: float) -> gpd.GeoDataFrame:
-    """Get cross-section of a river network at a given spacing.
+def network_resample(
+    flw: gpd.GeoDataFrame, spacing: float, id_col: str = "comid", smoothing: float | None = None
+) -> gpd.GeoDataFrame:
+    """Resample a network flowline based on a given spacing.
 
     Parameters
     ----------
     flw : geopandas.GeoDataFrame
-        A dataframe with ``geometry`` and ``comid`` columns and CRS attribute.
+        A dataframe with ``geometry`` and, ``id_col``, and ``levelpathi``
+        columns and a projected CRS attribute.
     spacing : float
-        The spacing between the points.
+        Target spacing between the sample points in the length unit of the ``flw``'s CRS.
+    id_col : str, optional
+        Name of the flowlines column containing IDs, defaults to ``comid``.
+    smoothing : float or None, optional
+        Smoothing factor is used for determining the number of knots.
+        This arg controls the tradeoff between closeness and smoothness of fit.
+        Larger ``smoothing`` means more smoothing while smaller values of
+        ``smoothing`` indicates less smoothing. If None (default), smoothing
+        is done with all points.
 
     Returns
     -------
     geopandas.GeoDataFrame
         Resampled flowlines.
     """
-    __check_flw(flw, ["comid", "levelpathi", "geometry"])
-    cs = pd.concat(flowline_resample(f, spacing) for _, f in flw.groupby("levelpathi"))
-    return gpd.GeoDataFrame(cs, crs=flw.crs).drop_duplicates().dissolve(by="comid")
+    __check_flw(flw, [id_col, "levelpathi", "geometry"])
+    cs = pd.concat(
+        flowline_resample(f, spacing, id_col, smoothing) for _, f in flw.groupby("levelpathi")
+    )
+    return gpd.GeoDataFrame(cs, crs=flw.crs).drop_duplicates().dissolve(by=id_col)
 
 
 def flowline_xsection(
-    flw: gpd.GeoDataFrame, distance: float, width: float, id_col: str = "comid"
+    flw: gpd.GeoDataFrame,
+    distance: float,
+    width: float,
+    id_col: str = "comid",
+    smoothing: float | None = None,
 ) -> gpd.GeoDataFrame:
     """Get cross-section of a river network at a given spacing.
 
     Parameters
     ----------
     flw : geopandas.GeoDataFrame
-        A dataframe with ``geometry`` and ``id_col`` columns and CRS attribute.
+        A dataframe with ``geometry`` and, ``id_col``, and ``levelpathi``
+        columns and a projected CRS attribute.
     distance : float
         The distance between two consecutive cross-sections.
     width : float
         The width of the cross-section.
     id_col : str, optional
         Name of the flowlines column containing IDs, defaults to ``comid``.
+    smoothing : float or None, optional
+        Smoothing factor is used for determining the number of knots.
+        This arg controls the tradeoff between closeness and smoothness of fit.
+        Larger ``smoothing`` means more smoothing while smaller values of
+        ``smoothing`` indicates less smoothing. If None (default), smoothing
+        is done with all points.
 
     Returns
     -------
@@ -689,21 +767,18 @@ def flowline_xsection(
         the given spacing distance.
     """
     __check_flw(flw, ["geometry", id_col])
-    if flw.crs is None:
-        raise MissingCRSError
-
-    if not flw.crs.is_projected:
-        raise InputTypeError("points.crs", "projected CRS")
-
-    req_cols = [id_col, "geometry"]
-    if any(col not in flw for col in req_cols):
-        raise MissingItemError(req_cols)
-
     half_width = width * 0.5
-    lines = __merge_flowlines(flw.geometry.to_list())
+    lines = flw.geometry.unary_union
+    if isinstance(lines, LineString):
+        lines = [lines]
+    elif isinstance(lines, MultiLineString):
+        lines = list(lines.geoms)
+    else:
+        raise InputValueError("flw.geometry", "LineString or MultiLineString")
+
     n_segments = (int(np.ceil(ln.length / distance)) * 100 for ln in lines)
     main_split = tlz.concat(
-        __get_perpendicular(ln, n_seg, distance, half_width, flw.crs)
+        _xs_planar(ln, n_seg, half_width, distance, flw.crs, smoothing)
         for ln, n_seg in zip(lines, n_segments)
     )
 
@@ -717,17 +792,32 @@ def flowline_xsection(
     return cs.drop_duplicates().dissolve(by=id_col)
 
 
-def network_xsection(flw: gpd.GeoDataFrame, distance: float, width: float) -> gpd.GeoDataFrame:
+def network_xsection(
+    flw: gpd.GeoDataFrame,
+    distance: float,
+    width: float,
+    id_col: str = "comid",
+    smoothing: float | None = None,
+) -> gpd.GeoDataFrame:
     """Get cross-section of a river network at a given spacing.
 
     Parameters
     ----------
     flw : geopandas.GeoDataFrame
-        A dataframe with ``geometry`` and ``comid`` columns and CRS attribute.
+        A dataframe with ``geometry`` and, ``id_col``, and ``levelpathi``
+        columns and a projected CRS attribute.
     distance : float
         The distance between two consecutive cross-sections.
     width : float
         The width of the cross-section.
+    id_col : str, optional
+        Name of the flowlines column containing IDs, defaults to ``comid``.
+    smoothing : float or None, optional
+        Smoothing factor is used for determining the number of knots.
+        This arg controls the tradeoff between closeness and smoothness of fit.
+        Larger ``smoothing`` means more smoothing while smaller values of
+        ``smoothing`` indicates less smoothing. If None (default), smoothing
+        is done with all points.
 
     Returns
     -------
@@ -738,9 +828,12 @@ def network_xsection(flw: gpd.GeoDataFrame, distance: float, width: float) -> gp
         Note that each ``comid`` can have multiple cross-sections depending on
         the given spacing distance.
     """
-    __check_flw(flw, ["comid", "levelpathi", "geometry"])
-    cs = pd.concat(flowline_xsection(f, distance, width) for _, f in flw.groupby("levelpathi"))
-    return gpd.GeoDataFrame(cs, crs=flw.crs).drop_duplicates().dissolve(by="comid")
+    __check_flw(flw, [id_col, "levelpathi", "geometry"])
+    cs = pd.concat(
+        flowline_xsection(f, distance, width, id_col, smoothing)
+        for _, f in flw.groupby("levelpathi")
+    )
+    return gpd.GeoDataFrame(cs, crs=flw.crs).drop_duplicates().dissolve(by=id_col)
 
 
 def enhd_flowlines_nx() -> tuple[nx.DiGraph, dict[int, int], list[int]]:
