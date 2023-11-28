@@ -16,9 +16,9 @@ New Features
   ``GeoDataFrame`` must have been a ``MultiPoint`` with two coordinates.
   Now, you must the input must contain ``LineString`` geometries.
 - Switch to using the new smoothing algorithm from ``pygeoutils`` for
-  resampling the flowlines and getting thier cross-sections. This new
+  resampling the flowlines and getting their cross-sections. This new
   algorithm is more robust, accurate, and faster. It has a new argument
-  called ``smoothing`` for controling the number knots of the spline. Higher
+  called ``smoothing`` for controlling the number knots of the spline. Higher
   values result in smoother curves. The default value is ``None`` which
   uses all the points from the input flowline.
 
