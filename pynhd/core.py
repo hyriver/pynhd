@@ -314,6 +314,8 @@ class PyGeoAPIBase:
         try:
             idx, resp = zip(*((i, r) for i, r in enumerate(resp) if "code" not in r))
             idx = cast("tuple[int]", idx)
+            if len(idx) != nfeat:
+                _ = [ar.delete_url_cache(url, **p) for i, p in enumerate(payload) if i not in idx]
             resp = cast("tuple[dict[str, Any]]", resp)
 
             if len(resp) < nfeat:
@@ -402,18 +404,21 @@ class PyGeoAPIBatch(PyGeoAPIBase):
             "flow_trace": ["direction"],
             "split_catchment": ["upstream"],
             "elevation_profile": ["numpts", "dem_res"],
+            "endpoints_profile": ["numpts", "dem_res"],
             "cross_section": ["numpts", "width"],
         }
         self.geo_types = {
             "flow_trace": "Point",
             "split_catchment": "Point",
-            "elevation_profile": "MultiPoint",
+            "elevation_profile": "LineString",
+            "endpoints_profile": "MultiPoint",
             "cross_section": "Point",
         }
         self.service = {
             "flow_trace": "flowtrace",
             "split_catchment": "splitcatchment",
-            "elevation_profile": "xsatendpts",
+            "elevation_profile": "xsatpathpts",
+            "endpoints_profile": "xsatendpts",
             "cross_section": "xsatpoint",
         }
 
@@ -443,23 +448,37 @@ class PyGeoAPIBatch(PyGeoAPIBase):
 
         geo_iter = coords[["geometry", *attrs]].itertuples(index=False, name=None)
 
-        if method == "elevation_profile":
+        if method == "endpoints_profile":
             if any(len(g.geoms) != 2 for g in coords.geometry):
                 raise InputTypeError("coords", "MultiPoint of length 2")
 
             return self.request_body(
                 [
                     {
-                        "lat": [g.y for g in mp.geoms],
-                        "lon": [g.x for g in mp.geoms],
+                        "lat": [round(g.y, 6) for g in mp.geoms],
+                        "lon": [round(g.x, 6) for g in mp.geoms],
                         **dict(zip(attrs, list(u))),
                     }
                     for mp, *u in geo_iter
                 ]
             )
 
+        if method == "elevation_profile":
+            return self.request_body(
+                [
+                    {
+                        "path": [[round(x, 6), round(y, 6)] for x, y in line.coords],
+                        **dict(zip(attrs, list(u))),
+                    }
+                    for line, *u in geo_iter
+                ]
+            )
+
         return self.request_body(
-            [{"lat": g.y, "lon": g.x, **dict(zip(attrs, list(u)))} for g, *u in geo_iter]
+            [
+                {"lat": round(g.y, 6), "lon": round(g.x, 6), **dict(zip(attrs, list(u)))}
+                for g, *u in geo_iter
+            ]
         )
 
 
