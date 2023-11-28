@@ -2,6 +2,26 @@
 History
 =======
 
+0.16.0 (2023-XX-XX)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Add support for the new PyGeoAPI endpoints called ``xsatpathpts``.
+  This new endpoint is useful for getting elevation profile along A
+  ``shapely.LineString``. You can use ``pygeoapi`` function with
+  ``service="elevation_profile"`` (or ``PyGeoAPI`` class) to access this
+  new endpoint. Previously, the ``elevation_profile`` endpoint was used for
+  getting elevation profile along a path from two endpoints and the input
+  ``GeoDataFrame`` must have been a ``MultiPoint`` with two coordinates.
+  Now, you must the input must contain ``LineString`` geometries.
+- Switch to using the new smoothing algorithm from ``pygeoutils`` for
+  resampling the flowlines and getting thier cross-sections. This new
+  algorithm is more robust, accurate, and faster. It has a new argument
+  called ``smoothing`` for controling the number knots of the spline. Higher
+  values result in smoother curves. The default value is ``None`` which
+  uses all the points from the input flowline.
+
 0.15.2 (2023-09-22)
 -------------------
 
