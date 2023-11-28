@@ -339,7 +339,7 @@ We can get more information about these stations using GeoConnex:
     stations = st_all.identifier.str.split("-").str[1].unique()
     gauges = gpd.GeoDataFrame(
         pd.concat(gcx.query({"provider_id": sid}) for sid in stations),
-        crs="epsg:4326",
+        crs=4326,
     )
 
 Instead, we can carry out a spatial query within the basin of interest:
@@ -415,16 +415,16 @@ will be the only way to access the database. Let's compare the two, starting by
 
     trace = pygeoapi.flow_trace((1774209.63, 856381.68), crs="ESRI:102003", direction="none")
 
-    split = pygeoapi.split_catchment((-73.82705, 43.29139), crs="epsg:4326", upstream=False)
+    split = pygeoapi.split_catchment((-73.82705, 43.29139), crs=4326, upstream=False)
 
     profile = pygeoapi.elevation_profile(
         [(-103.801086, 40.26772), (-103.80097, 40.270568)],
         numpts=101,
         dem_res=1,
-        crs="epsg:4326",
+        crs=4326,
     )
 
-    section = pygeoapi.cross_section((-103.80119, 40.2684), width=1000.0, numpts=101, crs="epsg:4326")
+    section = pygeoapi.cross_section((-103.80119, 40.2684), width=1000.0, numpts=101, crs=4326)
 
 Now, let's do the same operations using ``pygeoapi``:
 
@@ -445,7 +445,7 @@ Now, let's do the same operations using ``pygeoapi``:
             sgeom.Point(-73.82705, 43.29139),
             sgeom.Point(-103.801086, 40.26772),
         ],
-        crs="epsg:4326",
+        crs=4326,
     )
     trace = nhd.pygeoapi(coords, "flow_trace")
     split = nhd.pygeoapi(coords, "split_catchment")
@@ -463,7 +463,7 @@ Now, let's do the same operations using ``pygeoapi``:
             sgeom.MultiPoint([(-103.801086, 40.26772), (-103.80097, 40.270568)]),
             sgeom.MultiPoint([(-102.801086, 39.26772), (-102.80097, 39.270568)]),
         ],
-        crs="epsg:4326",
+        crs=4326,
     )
     profile = nhd.pygeoapi(coords, "elevation_profile")
 
