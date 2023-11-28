@@ -4,8 +4,10 @@ from __future__ import annotations
 import warnings
 from typing import TYPE_CHECKING, Any, Generator, Literal, Sequence, Union, cast, overload
 
+import cytoolz.curried as tlz
 import numpy as np
 import pandas as pd
+from shapely import LineString, MultiLineString
 from yarl import URL
 
 import async_retriever as ar
@@ -19,11 +21,70 @@ from pynhd.exceptions import InputRangeError, MissingItemError, ZeroMatchedError
 if TYPE_CHECKING:
     import geopandas as gpd
     import pyproj
-    from shapely import LineString, MultiPoint, MultiPolygon, Point, Polygon
+    from shapely import MultiPoint, MultiPolygon, Point, Polygon
 
     CRSTYPE = Union[int, str, pyproj.CRS]
     GTYPE = Union[
         Polygon, MultiPolygon, MultiPoint, LineString, Point, "tuple[float, float, float, float]"
+    ]
+    NHD_LAYERS = Literal[
+        "point",
+        "point_event",
+        "line_hr",
+        "flow_direction",
+        "flowline_mr",
+        "flowline_hr_nonconus",
+        "flowline_hr",
+        "area_mr",
+        "area_hr_nonconus",
+        "area_hr",
+        "waterbody_mr",
+        "waterbody_hr_nonconus",
+        "waterbody_hr",
+    ]
+    WD_LAYERS = Literal[
+        "catchmentsp",
+        "gagesii",
+        "gagesii_basins",
+        "huc08",
+        "huc12",
+        "nhdarea",
+        "nhdflowline_network",
+        "nhdflowline_nonnetwork",
+        "nhdwaterbody",
+        "wbd02",
+        "wbd04",
+        "wbd06",
+        "wbd08",
+        "wbd10",
+        "wbd12",
+    ]
+    PREDICATES = Literal[
+        "equals",
+        "disjoint",
+        "intersects",
+        "touches",
+        "crosses",
+        "within",
+        "contains",
+        "overlaps",
+        "relate",
+        "beyond",
+    ]
+    NHDHR_LAYERS = Literal[
+        "gauge",
+        "sink",
+        "point",
+        "flowline",
+        "non_network_flowline",
+        "flow_direction",
+        "wall",
+        "line",
+        "area",
+        "waterbody",
+        "catchment",
+        "boundary_unit",
+        "huc12",
     ]
 
 
@@ -76,7 +137,7 @@ class NHD(AGRBase):
 
     def __init__(
         self,
-        layer: str,
+        layer: NHD_LAYERS,
         outfields: str | list[str] = "*",
         crs: CRSTYPE = 4326,
     ):
@@ -113,7 +174,7 @@ class PyGeoAPI(PyGeoAPIBase):
         self,
         coord: tuple[float, float],
         crs: CRSTYPE = 4326,
-        direction: str = "none",
+        direction: Literal["down", "up", "none"] = "none",
     ) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame from the flowtrace service.
 
@@ -182,6 +243,61 @@ class PyGeoAPI(PyGeoAPIBase):
 
     def elevation_profile(
         self,
+        line: LineString | MultiLineString,
+        numpts: int,
+        dem_res: int,
+        crs: CRSTYPE = 4326,
+    ) -> gpd.GeoDataFrame:
+        """Return a GeoDataFrame from the xsatpathpts service.
+
+        Parameters
+        ----------
+        line : shapely.LineString or shapely.MultiLineString
+            The line to extract the elevation profile for.
+        numpts : int
+            The number of points to extract the elevation profile from the DEM.
+        dem_res : int
+            The target resolution for requesting the DEM from 3DEP service.
+        crs : str, int, or pyproj.CRS, optional
+            The coordinate reference system of the coordinates, defaults to EPSG:4326.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            A GeoDataFrame containing the elevation profile along the requested endpoints.
+
+        Examples
+        --------
+        >>> from pynhd import PyGeoAPI
+        >>> from shapely import LineString
+        >>> pga = PyGeoAPI()
+        >>> coords = [(-103.801086, 40.26772), (-103.80097, 40.270568)]
+        >>> gdf = pga.elevation_profile(LineString(coords), 101, 1, 4326)
+        >>> print(gdf.iloc[-1, 1])
+        411.5906
+        """
+        if not isinstance(line, (LineString, MultiLineString)):
+            raise InputTypeError("line", "LineString or MultiLineString")
+        line = geoutils.geometry_reproject(line, crs, 4326)
+        if isinstance(line, LineString):
+            coords = line.coords
+        else:
+            coords = list(tlz.concat(c.coords for c in line.geoms))
+
+        url = self.get_url("xsatpathpts")
+        payload = self.request_body(
+            [
+                {
+                    "path": [[round(x, 6), round(y, 6)] for x, y in coords],
+                    "numpts": numpts,
+                    "3dep_res": dem_res,
+                }
+            ]
+        )
+        return self.get_response(url, payload)
+
+    def endpoints_profile(
+        self,
         coords: list[tuple[float, float]],
         numpts: int,
         dem_res: int,
@@ -210,7 +326,7 @@ class PyGeoAPI(PyGeoAPIBase):
         --------
         >>> from pynhd import PyGeoAPI
         >>> pga = PyGeoAPI()
-        >>> gdf = pga.elevation_profile(
+        >>> gdf = pga.endpoints_profile(
         ...     [(-103.801086, 40.26772), (-103.80097, 40.270568)], numpts=101, dem_res=1, crs=4326
         ... )  # doctest: +SKIP
         >>> print(gdf.iloc[-1, 1])  # doctest: +SKIP
@@ -259,20 +375,28 @@ class PyGeoAPI(PyGeoAPIBase):
         return self.get_response(url, payload)
 
 
-def pygeoapi(coords: gpd.GeoDataFrame, service: str) -> gpd.GeoDataFrame:
+def pygeoapi(
+    geodf: gpd.GeoDataFrame,
+    service: Literal[
+        "flow_trace", "split_catchment", "elevation_profile", "endpoints_profile", "cross_section"
+    ],
+) -> gpd.GeoDataFrame:
     """Return a GeoDataFrame from the flowtrace service.
 
     Parameters
     ----------
-    coords : geopandas.GeoDataFrame
-        A GeoDataFrame containing the coordinates to query.
-        The required columns services are:
+    geodf : geopandas.GeoDataFrame
+        A GeoDataFrame containing geometries to query.
+        The required columns for each service are:
 
         * ``flow_trace``: ``direction`` that indicates the direction of the flow trace.
-          It can be ``up``, ``down``, or ``none``.
+          It can be ``up``, ``down``, or ``none`` (both directions).
         * ``split_catchment``: ``upstream`` that indicates whether to return all upstream
           catchments or just the local catchment.
         * ``elevation_profile``: ``numpts`` that indicates the number of points to extract
+          along the flowpath and ``3dep_res`` that indicates the target resolution for
+          requesting the DEM from 3DEP service.
+        * ``endpoints_profile``: ``numpts`` that indicates the number of points to extract
           along the flowpath and ``3dep_res`` that indicates the target resolution for
           requesting the DEM from 3DEP service.
         * ``cross_section``: ``numpts`` that indicates the number of points to extract
@@ -281,7 +405,7 @@ def pygeoapi(coords: gpd.GeoDataFrame, service: str) -> gpd.GeoDataFrame:
 
     service : str
         The service to query, can be ``flow_trace``, ``split_catchment``, ``elevation_profile``,
-        or ``cross_section``.
+        ``endpoints_profile``, or ``cross_section``.
 
     Returns
     -------
@@ -305,7 +429,7 @@ def pygeoapi(coords: gpd.GeoDataFrame, service: str) -> gpd.GeoDataFrame:
     >>> print(trace.comid.iloc[0])
     22294818
     """
-    pgab = PyGeoAPIBatch(coords)
+    pgab = PyGeoAPIBatch(geodf)
     url = pgab.get_url(pgab.service[service])
     payload = pgab.get_payload(service)
     gdf = pgab.get_response(url, payload)
@@ -351,10 +475,28 @@ class WaterData:
 
     def __init__(
         self,
-        layer: str,
+        layer: WD_LAYERS,
         crs: CRSTYPE = 4326,
-        validation: bool = True,
     ) -> None:
+        self.valid_layers = [
+            "catchmentsp",
+            "gagesii",
+            "gagesii_basins",
+            "huc08",
+            "huc12",
+            "nhdarea",
+            "nhdflowline_network",
+            "nhdflowline_nonnetwork",
+            "nhdwaterbody",
+            "wbd02",
+            "wbd04",
+            "wbd06",
+            "wbd08",
+            "wbd10",
+            "wbd12",
+        ]
+        if layer not in self.valid_layers:
+            raise InputValueError("layer", self.valid_layers)
         self.layer = layer if ":" in layer else f"wmadata:{layer}"
         if "wbd" in self.layer and "20201006" not in self.layer:
             self.layer = f"{self.layer}_20201006"
@@ -365,7 +507,7 @@ class WaterData:
             outformat="application/json",
             version="2.0.0",
             crs=4269,
-            validation=validation,
+            validation=False,
         )
 
     def _to_geodf(self, resp: list[dict[str, Any]]) -> gpd.GeoDataFrame:
@@ -427,7 +569,7 @@ class WaterData:
         geometry: Polygon | MultiPolygon,
         geo_crs: CRSTYPE = 4326,
         xy: bool = True,
-        predicate: str = "INTERSECTS",
+        predicate: PREDICATES = "intersects",
         sort_attr: str | None = None,
     ) -> gpd.GeoDataFrame:
         """Get features within a geometry.
@@ -444,16 +586,16 @@ class WaterData:
             The geometric prediacte to use for requesting the data, defaults to
             INTERSECTS. Valid predicates are:
 
-            - ``EQUALS``
-            - ``DISJOINT``
-            - ``INTERSECTS``
-            - ``TOUCHES``
-            - ``CROSSES``
-            - ``WITHIN``
-            - ``CONTAINS``
-            - ``OVERLAPS``
-            - ``RELATE``
-            - ``BEYOND``
+            - ``equals``
+            - ``disjoint``
+            - ``intersects``
+            - ``touches``
+            - ``crosses``
+            - ``within``
+            - ``contains``
+            - ``overlaps``
+            - ``relate``
+            - ``beyond``
 
         sort_attr : str, optional
             The column name in the database to sort request by, defaults
@@ -465,7 +607,7 @@ class WaterData:
             The requested features in the given geometry.
         """
         resp = self.wfs.getfeature_bygeom(
-            geometry, geo_crs, always_xy=not xy, predicate=predicate, sort_attr=sort_attr
+            geometry, geo_crs, always_xy=not xy, predicate=predicate.upper(), sort_attr=sort_attr
         )
         resp = cast("list[dict[str, Any]]", resp)
         return self._to_geodf(resp)
@@ -539,7 +681,10 @@ class WaterData:
         return features
 
     def byfilter(
-        self, cql_filter: str, method: str = "GET", sort_attr: str | None = None
+        self,
+        cql_filter: str,
+        method: Literal["GET", "get", "POST", "post"] = "GET",
+        sort_attr: str | None = None,
     ) -> gpd.GeoDataFrame:
         """Get features based on a CQL filter.
 
@@ -549,6 +694,7 @@ class WaterData:
             The CQL filter to use for requesting the data.
         method : str, optional
             The HTTP method to use for requesting the data, defaults to GET.
+            Allowed methods are GET and POST.
         sort_attr : str, optional
             The column name in the database to sort request by, defaults
             to the first attribute in the schema that contains ``id`` in its name.
@@ -623,7 +769,7 @@ class NHDPlusHR(AGRBase):
 
     def __init__(
         self,
-        layer: str,
+        layer: NHDHR_LAYERS,
         outfields: str | list[str] = "*",
         crs: CRSTYPE = 4326,
     ):
