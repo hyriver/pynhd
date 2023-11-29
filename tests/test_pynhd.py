@@ -10,7 +10,7 @@ import pytest
 from shapely import LineString, MultiPoint, Point, box
 
 import pynhd
-from pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData, HP3D
+from pynhd import HP3D, NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData
 
 is_ci = os.environ.get("GH_CI") == "true"
 STA_ID = "01031500"

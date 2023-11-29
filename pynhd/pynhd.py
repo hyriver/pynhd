@@ -87,11 +87,12 @@ if TYPE_CHECKING:
         "huc12",
     ]
     HP3D_LAYERS = Literal[
-                "hydrolocation",
-                "flowline",
-                "waterbody",
-                "drainage_area",
-                "catchment",]
+        "hydrolocation",
+        "flowline",
+        "waterbody",
+        "drainage_area",
+        "catchment",
+    ]
 
 __all__ = ["NHD", "HP3D", "PyGeoAPI", "pygeoapi", "WaterData", "NHDPlusHR", "NLDI"]
 
