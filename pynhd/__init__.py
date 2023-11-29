@@ -39,7 +39,7 @@ from pynhd.nhdplus_derived import (
     streamcat,
 )
 from pynhd.print_versions import show_versions
-from pynhd.pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData, pygeoapi
+from pynhd.pynhd import NHD, HP3D, NLDI, NHDPlusHR, PyGeoAPI, WaterData, pygeoapi
 
 try:
     __version__ = version("pynhd")
@@ -77,6 +77,7 @@ __all__ = [
     "ScienceBase",
     "NHDPlusHR",
     "NHD",
+    "HP3D",
     "PyGeoAPI",
     "pygeoapi",
     "WaterData",

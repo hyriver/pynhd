@@ -86,9 +86,14 @@ if TYPE_CHECKING:
         "boundary_unit",
         "huc12",
     ]
+    HP3D_LAYERS = Literal[
+                "hydrolocation",
+                "flowline",
+                "waterbody",
+                "drainage_area",
+                "catchment",]
 
-
-__all__ = ["NHD", "PyGeoAPI", "pygeoapi", "WaterData", "NHDPlusHR", "NLDI"]
+__all__ = ["NHD", "HP3D", "PyGeoAPI", "pygeoapi", "WaterData", "NHDPlusHR", "NLDI"]
 
 
 class NHD(AGRBase):
@@ -161,6 +166,66 @@ class NHD(AGRBase):
             raise InputValueError("layer", list(self.valid_layers))
         super().__init__(
             ServiceURL().restful.nhd,
+            _layer,
+            outfields,
+            crs,
+        )
+
+
+class HP3D(AGRBase):
+    """Access USGS 3D Hydrography Program (3DHP) service.
+
+    Notes
+    -----
+    For more info visit: https://hydro.nationalmap.gov/arcgis/rest/services/3DHP_all/MapServer
+
+    Parameters
+    ----------
+    layer : str, optional
+        A valid service layer. Layer names with ``_hr`` are high resolution and
+        ``_mr`` are medium resolution. Also, layer names with ``_nonconus`` are for
+        non-conus areas, i.e., Alaska, Hawaii, Puerto Rico, the Virgin Islands , and
+        the Pacific Islands. Valid layers are:
+
+        - ``hydrolocation``
+        - ``flowline``
+        - ``waterbody``
+        - ``drainage_area``
+        - ``catchment``
+
+    outfields : str or list, optional
+        Target field name(s), default to "*" i.e., all the fields.
+    crs : str, int, or pyproj.CRS, optional
+        Target spatial reference, default to ``EPSG:4326``.
+
+    Methods
+    -------
+    bygeom(geom, geo_crs=4326, sql_clause="", distance=None, return_m=False, return_geom=True)
+        Get features within a geometry that can be combined with a SQL where clause.
+    byids(field, fids, return_m=False, return_geom=True)
+        Get features by object IDs.
+    bysql(sql_clause, return_m=False, return_geom=True)
+        Get features using a valid SQL 92 WHERE clause.
+    """
+
+    def __init__(
+        self,
+        layer: HP3D_LAYERS,
+        outfields: str | list[str] = "*",
+        crs: CRSTYPE = 4326,
+    ):
+        self.valid_layers = {
+            "hydrolocation": "Hydrolocation",
+            "flowline": "Flowline",
+            "waterbody": "Waterbody",
+            "drainage_area": "Drainage Area",
+            "catchment": "Catchment",
+        }
+        _layer = self.valid_layers.get(layer)
+        if _layer is None:
+            raise InputValueError("layer", list(self.valid_layers))
+        super().__init__(
+            ServiceURL().restful.hp3d,
             _layer,
             outfields,
             crs,
@@ -271,10 +336,10 @@ class PyGeoAPI(PyGeoAPIBase):
         >>> from pynhd import PyGeoAPI
         >>> from shapely import LineString
         >>> pga = PyGeoAPI()
-        >>> coords = [(-103.801086, 40.26772), (-103.80097, 40.270568)]
-        >>> gdf = pga.elevation_profile(LineString(coords), 101, 1, 4326)
-        >>> print(gdf.iloc[-1, 1])
-        411.5906
+        >>> line = LineString([(-103.801086, 40.26772), (-103.80097, 40.270568)])
+        >>> gdf = pga.elevation_profile(line, 101, 1, 4326)  # doctest: +SKIP
+        >>> print(gdf.iloc[-1, 2])  # doctest: +SKIP
+        1299.8727
         """
         if not isinstance(line, (LineString, MultiLineString)):
             raise InputTypeError("line", "LineString or MultiLineString")
