@@ -7,6 +7,9 @@ History
 
 New Features
 ~~~~~~~~~~~~
+- Add access to USGS 3D Hydrography Program (3DHP) service. The new
+  class is called ``HP3D``. It can be queried by IDs, geometry, or
+  SQL where clause.
 - Add support for the new PyGeoAPI endpoints called ``xsatpathpts``.
   This new endpoint is useful for getting elevation profile along A
   ``shapely.LineString``. You can use ``pygeoapi`` function with
