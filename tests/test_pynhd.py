@@ -7,10 +7,10 @@ from pathlib import Path
 import geopandas as gpd
 import numpy as np
 import pytest
-from shapely import MultiPoint, Point, box
+from shapely import LineString, MultiPoint, Point, box
 
 import pynhd
-from pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData
+from pynhd import NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData, HP3D
 
 is_ci = os.environ.get("GH_CI") == "true"
 STA_ID = "01031500"
@@ -88,6 +88,27 @@ class TestPyGeoAPI:
         assert gdf.catchmentID.iloc[0] == gdfb.catchmentID.iloc[0] == "22294818"
 
     def test_elevation_profile(self):
+        line = LineString([(-103.801086, 40.26772), (-103.80097, 40.270568)])
+        gs = gpd.GeoDataFrame(
+            {
+                "numpts": [
+                    101,
+                ],
+                "dem_res": [
+                    1,
+                ],
+            },
+            geometry=[line],
+            crs=4326,
+        )
+        gdf = self.pygeoapi.elevation_profile(line, numpts=101, dem_res=1, crs=4326)
+        gdfb = pynhd.pygeoapi(gs, "elevation_profile")
+
+        expected = 1299.8728
+        assert_close(gdf.iloc[-1, 2], expected)
+        assert_close(gdfb.iloc[-1, 2], expected)
+
+    def test_endpoints_profile(self):
         coords = [(-103.801086, 40.26772), (-103.80097, 40.270568)]
         gs = gpd.GeoDataFrame(
             {
@@ -101,7 +122,7 @@ class TestPyGeoAPI:
             geometry=[MultiPoint(coords)],
             crs=4326,
         )
-        gdf = self.pygeoapi.elevation_profile(coords, numpts=101, dem_res=1, crs=4326)
+        gdf = self.pygeoapi.endpoints_profile(coords, numpts=101, dem_res=1, crs=4326)
         gdfb = pynhd.pygeoapi(gs, "elevation_profile")
 
         expected = 1299.8842
@@ -247,6 +268,12 @@ class TestGCX:
         gcx = pynhd.GeoConnex("ua10")
         awa = gcx.bycql({"gt": [{"property": "awater10"}, 100e6]})
         assert len(awa) == 14
+
+
+def test_3dhp():
+    nhd3d = HP3D("flowline")
+    flw = nhd3d.bygeom(Point(-89.441, 43.487), distance=10)
+    assert flw.shape[0] == 1
 
 
 def test_nhdphr():
