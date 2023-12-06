@@ -1040,7 +1040,7 @@ def nhdplus_l48(
     if not nhdfile.exists():
         url = "/".join(
             (
-                "https://edap-ow-data-commons.s3.amazonaws.com/NHDPlusV21/Data",
+                "https://dmap-data-commons-ow.s3.amazonaws.com/NHDPlusV21/Data",
                 "NationalData/NHDPlusV21_NationalData_Seamless_Geodatabase_Lower48_07.7z",
             )
         )
