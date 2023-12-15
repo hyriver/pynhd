@@ -123,7 +123,7 @@ class TestPyGeoAPI:
             crs=4326,
         )
         gdf = self.pygeoapi.endpoints_profile(coords, numpts=101, dem_res=1, crs=4326)
-        gdfb = pynhd.pygeoapi(gs, "elevation_profile")
+        gdfb = pynhd.pygeoapi(gs, "endpoints_profile")
 
         expected = 1299.8842
         assert_close(gdf.iloc[-1, 2], expected)
