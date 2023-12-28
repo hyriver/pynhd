@@ -568,8 +568,7 @@ class WaterData:
             self.layer = f"{self.layer}_20201006"
         self.crs = crs
         self.wfs = WFS(
-            # ServiceURL().wfs.waterdata,
-            "https://nhgf.wma.chs.usgs.gov/geoserver/wmadata/ows",
+            ServiceURL().wfs.waterdata,
             layer=self.layer,
             outformat="application/json",
             version="2.0.0",
