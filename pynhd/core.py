@@ -293,9 +293,9 @@ class PyGeoAPIBase:
                 "json": {
                     "inputs": [
                         {
-                            "id": f"{i}",
+                            "id": i,
                             "type": "text/plain",
-                            "value": list(v) if isinstance(v, (list, tuple)) else f"{v}",
+                            "value": list(v) if isinstance(v, (list, tuple)) else str(v),
                         }
                         for i, v in iv.items()
                     ]
@@ -510,8 +510,7 @@ class ScienceBase:
             tlz.pluck("url", resp[0]["files"]),
             tlz.pluck("metadataHtmlViewUri", resp[0]["files"], default=None),
         )
-        files = pd.DataFrame(urls, columns=["name", "url", "metadata_url"])
-        return files.set_index("name")
+        return pd.DataFrame(urls, columns=["name", "url", "metadata_url"]).set_index("name")
 
 
 class GCXURL(NamedTuple):

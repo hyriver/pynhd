@@ -1,4 +1,5 @@
 """Access NLDI and WaterData databases."""
+# pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 
 import contextlib
@@ -114,8 +115,7 @@ def enhd_attrs(
         output = get_parquet(parquet_path)
 
     sb = ScienceBase()
-    files = sb.get_file_urls("63cb311ed34e06fef14f40a3")
-    url = files.loc["enhd_nhdplusatts.parquet"].url
+    url = sb.get_file_urls("63cb311ed34e06fef14f40a3").loc["enhd_nhdplusatts.parquet"].url
     fname = ogc.streaming_download(url, file_extention=".parquet")
 
     enhd = pd.read_parquet(fname)
@@ -262,7 +262,7 @@ def nhdplus_attrs(attr_name: str | None = None) -> pd.DataFrame:
     try:
         url = meta[meta.name == attr_name].url.values[0]
     except IndexError as ex:
-        raise InputValueError("name", meta.name.unique()) from ex
+        raise InputValueError("name", meta.name.unique().tolist()) from ex
 
     fname = ogc.streaming_download(url, file_extention="zip")
     return pd.read_csv(fname, engine="pyarrow")
@@ -347,9 +347,11 @@ def nhdplus_h12pp(gpkg_path: Path | str | None = None) -> pd.DataFrame:
     gpkg_path = Path("cache", "102020wbd_outlets.gpkg") if gpkg_path is None else Path(gpkg_path)
     _ = ogc.streaming_download(files, fnames=gpkg_path)
     h12pp = gpd.read_file(gpkg_path, engine="pyogrio")
-    h12pp = h12pp[["COMID", "REACHCODE", "REACH_meas", "offset", "HUC12", "LevelPathI", "geometry"]]
+    h12pp = h12pp[
+        ["COMID", "REACHCODE", "REACH_meas", "offset", "HUC12", "LevelPathI", "geometry"]
+    ].copy()
     h12pp[["COMID", "LevelPathI"]] = h12pp[["COMID", "LevelPathI"]].astype("uint32")
-    return h12pp  # pyright: ignore[reportGeneralTypeIssues]
+    return h12pp
 
 
 def nhd_fcode() -> pd.DataFrame:
@@ -515,9 +517,9 @@ class StreamCat:
         names.loc[names["SLOPE"] == "", "SLOPE"] = np.nan
         slp = ~names["SLOPE"].isna()
         names.loc[slp, "METRIC_NAME"] = [f"{n}[Slope]" for n in names.loc[slp, "METRIC_NAME"]]
-        names = names.drop_duplicates("METRIC_NAME")
-        names = names.reset_index(drop=True)  # pyright: ignore[reportOptionalMemberAccess]
-        names = names.drop(columns="WEBTOOL_NAME")
+        names = (
+            names.drop_duplicates("METRIC_NAME").reset_index(drop=True).drop(columns="WEBTOOL_NAME")
+        )
         self.metrics_df = names
 
         years = names.set_index("METRIC_NAME").YEAR.dropna()

@@ -1,6 +1,7 @@
 """Access NLDI and WaterData databases."""
 # pyright: reportGeneralTypeIssues=false
 # pyright: reportOptionalMemberAccess=false
+# pyright: reportMissingTypeArgument=false
 from __future__ import annotations
 
 import io
@@ -529,9 +530,11 @@ def vector_accumulation(
         if n in outflow:
             outflow[n] = func(sum(outflow[i] for i in graph.predecessors(n)), *attrs[n])
 
-    acc = pd.Series({m_int2str[i]: outflow[i] for i in topo_sorted if i in outflow})
-    acc = acc.rename_axis(id_col).rename(f"acc_{attr_col}")
-    return acc
+    return (
+        pd.Series({m_int2str[i]: outflow[i] for i in topo_sorted if i in outflow})
+        .rename_axis(id_col)
+        .rename(f"acc_{attr_col}")
+    )
 
 
 def _get_idx(d_sp: npt.NDArray[np.float64], distance: float) -> npt.NDArray[np.int64]:
@@ -890,14 +893,19 @@ def mainstem_huc12_nx() -> tuple[nx.DiGraph, dict[int, str], list[str]]:
         A topologically sorted list of the HUC12s which strings of length 12.
     """
     sb = ScienceBase()
-    files = sb.get_file_urls("63cb38b2d34e06fef14f40ad")
-    resp = ar.retrieve_text([files.loc["nhdplusv2wbd.csv"].url])
+    resp = ar.retrieve_text(
+        [sb.get_file_urls("63cb38b2d34e06fef14f40ad").loc["nhdplusv2wbd.csv"].url]
+    )
     ms = pd.read_csv(io.StringIO(resp[0]))
     str_cols = ["HUC12", "TOHUC", "head_HUC12", "outlet_HUC12"]
     for col in str_cols:
-        ms[col] = ms[col].astype(str)
-        ms[col] = pd.to_numeric(ms[col], errors="coerce")
-        ms[col] = ms[col].astype("Int64").fillna(0).astype(str).str.zfill(12)
+        ms[col] = (
+            pd.to_numeric(ms[col].astype(str), errors="coerce")
+            .astype("Int64")
+            .fillna(0)
+            .astype(str)
+            .str.zfill(12)
+        )
 
     int_cols = ["intersected_LevelPathI", "corrected_LevelPathI"]
     ms[int_cols] = ms[int_cols].astype(int)

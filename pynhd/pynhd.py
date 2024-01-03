@@ -1,4 +1,5 @@
 """Access NLDI and WaterData databases."""
+# pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 
 import warnings
@@ -504,7 +505,7 @@ def pygeoapi(
         feat = gdf[~gdf.comid.isna()].set_index("req_idx")
         raindrop = gdf.loc[gdf.comid.isna(), ["req_idx", "geometry"]].set_index("req_idx")
         feat["raindrop_path"] = raindrop.geometry
-        return feat.reset_index()  # pyright: ignore[reportGeneralTypeIssues]
+        return feat.reset_index()
     return gdf
 
 
@@ -1327,7 +1328,7 @@ class NLDI:
         if source not in valid_sources:
             raise InputValueError("source", list(valid_sources))
 
-        payload = {"distance": f"{round(distance)}", "trimStart": f"{trim_start}".lower()}
+        payload = {"distance": str(round(distance)), "trimStart": str(trim_start).lower()}
         if stop_comid:
             payload["stopComid"] = str(stop_comid)
         url = f"{valid_sources[source]}?{URL.build(query=payload).query_string}"

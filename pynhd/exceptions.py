@@ -76,7 +76,7 @@ class MissingItemError(Exception):
     """
 
     def __init__(self, missing: list[str]) -> None:
-        self.message = "The following items are missing:\n" + f"{', '.join(missing)}"
+        self.message = f"The following items are missing:\n{', '.join(missing)}"
         super().__init__(self.message)
 
     def __str__(self) -> str:
