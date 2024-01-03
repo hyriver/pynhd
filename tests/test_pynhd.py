@@ -27,8 +27,7 @@ def assert_close(a: float, b: float) -> bool:
 @pytest.fixture()
 def trib():
     comids = NLDI().navigate_byid(site, station_id, UT, "flowlines")
-    wd = WaterData("nhdflowline_network")
-    return wd.byid("comid", comids.nhdplus_comid.tolist())
+    return WaterData("nhdflowline_network").byid("comid", comids.nhdplus_comid.tolist())
 
 
 def test_epa():
