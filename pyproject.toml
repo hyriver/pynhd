@@ -33,15 +33,15 @@ dynamic = [
   "version",
 ]
 dependencies = [
-  "async-retriever<0.16,>=0.15.2",
+  "async-retriever<0.17,>=0.16",
   "cytoolz",
   "geopandas>=0.10",
   "networkx",
   "numpy>=1.21",
   "pandas>=1",
   "pyarrow>=1.0.1",
-  "pygeoogc<0.16,>=0.15.2",
-  "pygeoutils<0.16,>=0.15.2",
+  "pygeoogc<0.17,>=0.16",
+  "pygeoutils<0.17,>=0.16",
   "shapely>=2",
 ]
 [project.optional-dependencies]
@@ -265,3 +265,7 @@ formatter = "ufmt"
 [tool.refurb]
 python_version = "3.8"
 quiet = true
+
+[[tool.refurb.amend]]
+path = "tests"
+ignore = ["FURB184"]
