@@ -560,12 +560,12 @@ def _get_spline_params(
     x, y, phi = spline.x[idx], spline.y[idx], spline.phi[idx]
     spacing = np.diff(spline.distance[idx])
 
-    if spacing[0] < 0.25 * distance:
+    if len(x) > 2 and spacing[0] < 0.25 * distance:
         x = np.delete(x, 1)
         y = np.delete(y, 1)
         phi = np.delete(phi, 1)
 
-    if spacing[-1] < 0.25 * distance:
+    if len(x) > 2 and spacing[-1] < 0.25 * distance:
         x = np.delete(x, -2)
         y = np.delete(y, -2)
         phi = np.delete(phi, -2)
@@ -608,6 +608,9 @@ def _xs_planar(
     """
     if not isinstance(line, LineString):
         raise InputTypeError("line", "LineString")
+
+    if shapely.get_num_points(line) < 4:
+        line = shapely.segmentize(line, line.length / 4)
     x, y, phi = _get_spline_params(line, n_seg, distance, crs, smoothing)
 
     xy = np.c_[x, y]
@@ -643,9 +646,7 @@ def __check_flw(flw: gpd.GeoDataFrame, req_cols: list[str]) -> None:
 
 def __merge_flowlines(flw: gpd.GeoDataFrame) -> LineString:
     """Merge flowlines."""
-    line = flw.geometry.unary_union
-    if isinstance(line, MultiLineString):
-        line = ops.linemerge(line)
+    line = shapely.line_merge(flw.geometry.unary_union)
 
     if not isinstance(line, LineString):
         raise InputValueError("flw.geometry", "mergeable to a single line")
@@ -771,7 +772,7 @@ def flowline_xsection(
     """
     __check_flw(flw, ["geometry", id_col])
     half_width = width * 0.5
-    lines = flw.geometry.unary_union
+    lines = shapely.line_merge(flw.geometry.unary_union)
     if isinstance(lines, LineString):
         lines = [lines]
     elif isinstance(lines, MultiLineString):
@@ -892,9 +893,8 @@ def mainstem_huc12_nx() -> tuple[nx.DiGraph, dict[int, str], list[str]]:
     list
         A topologically sorted list of the HUC12s which strings of length 12.
     """
-    sb = ScienceBase()
     resp = ar.retrieve_text(
-        [sb.get_file_urls("63cb38b2d34e06fef14f40ad").loc["nhdplusv2wbd.csv"].url]
+        [ScienceBase.get_file_urls("63cb38b2d34e06fef14f40ad").loc["nhdplusv2wbd.csv"].url]
     )
     ms = pd.read_csv(io.StringIO(resp[0]))
     str_cols = ["HUC12", "TOHUC", "head_HUC12", "outlet_HUC12"]
