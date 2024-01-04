@@ -114,8 +114,7 @@ def enhd_attrs(
     else:
         output = get_parquet(parquet_path)
 
-    sb = ScienceBase()
-    url = sb.get_file_urls("63cb311ed34e06fef14f40a3").loc["enhd_nhdplusatts.parquet"].url
+    url = ScienceBase.get_file_urls("63cb311ed34e06fef14f40a3").loc["enhd_nhdplusatts.parquet"].url
     fname = ogc.streaming_download(url, file_extention=".parquet")
 
     enhd = pd.read_parquet(fname)
@@ -342,8 +341,7 @@ def nhdplus_h12pp(gpkg_path: Path | str | None = None) -> pd.DataFrame:
     geopandas.GeoDataFrame
         A geodataframe of HUC12 pour points.
     """
-    sb = ScienceBase()
-    files = sb.get_file_urls("60cb5edfd34e86b938a373f4").loc["102020wbd_outlets.gpkg"].url
+    files = ScienceBase.get_file_urls("60cb5edfd34e86b938a373f4").loc["102020wbd_outlets.gpkg"].url
     gpkg_path = Path("cache", "102020wbd_outlets.gpkg") if gpkg_path is None else Path(gpkg_path)
     _ = ogc.streaming_download(files, fnames=gpkg_path)
     h12pp = gpd.read_file(gpkg_path, engine="pyogrio")
