@@ -2,6 +2,15 @@
 History
 =======
 
+0.16.1 (2024-01-03)
+-------------------
+
+Bug Fixes
+~~~~~~~~~
+- Fix an issue in ``network_xsection`` and ``flowline_xsection`` related
+  to the changes in ``shapely`` 2 API. Now, these functions should return
+  the correct cross-sections.
+
 0.16.0 (2024-01-03)
 -------------------
 
