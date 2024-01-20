@@ -1,10 +1,12 @@
 """Base classes for PyNHD functions."""
+
 # pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 
 import warnings
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterator, Literal, NamedTuple, Union, cast, overload
+from typing import TYPE_CHECKING, Any, Iterator, Literal, Union, cast, overload
 
 import cytoolz.curried as tlz
 import geopandas as gpd
@@ -53,7 +55,8 @@ def get_parquet(parquet_path: Path | str) -> Path:
     return output
 
 
-class ServiceInfo(NamedTuple):
+@dataclass(frozen=True)
+class ServiceInfo:
     """Information about a web service."""
 
     url: str
@@ -513,12 +516,14 @@ class ScienceBase:
         return pd.DataFrame(urls, columns=["name", "url", "metadata_url"]).set_index("name")
 
 
-class GCXURL(NamedTuple):
+@dataclass(frozen=True)
+class GCXURL:
     items: str
     queryables: str
 
 
-class EndPoints(NamedTuple):
+@dataclass(frozen=True)
+class EndPoints:
     name: str
     description: str
     url: str
