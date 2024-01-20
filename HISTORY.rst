@@ -2,6 +2,14 @@
 History
 =======
 
+0.16.2 (2024-XX-XX)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- In ``nhdplus_l48`` function, when the layer is ``NHDFlowline_Network``
+  or ``NHDFlowline_NonNetwork``, merge all ``MultiLineString`` geometries to ``LineString``.
+
 0.16.1 (2024-01-03)
 -------------------
 
