@@ -1060,4 +1060,7 @@ def nhdplus_l48(
 
     pyogrio.set_gdal_config_options({"OGR_ORGANIZE_POLYGONS": "CCW_INNER_JUST_AFTER_CW_OUTER"})
     kwargs["use_arrow"] = kwargs.pop("use_arrow", True)
-    return gpd.read_file(nhdfile, layer=layer, engine="pyogrio", **kwargs)
+    nhdp = gpd.read_file(nhdfile, layer=layer, engine="pyogrio", **kwargs)
+    if layer in ("NHDFlowline_Network", "NHDFlowline_NonNetwork"):
+        nhdp["geometry"] = shapely.force_2d(shapely.line_merge(nhdp.geometry))
+    return nhdp
