@@ -843,6 +843,15 @@ def network_xsection(
 def enhd_flowlines_nx() -> tuple[nx.DiGraph, dict[int, int], list[int]]:
     """Get a ``networkx.DiGraph`` of the entire NHD flowlines.
 
+    .. versionchanged:: 0.16.2
+
+        The function now replaces all 0 values in the ``tocomid`` column of ENHD
+        with the negative of their corresponding ``comid`` values. This ensures
+        all sinks are unique and treated accordingly for topological sorting
+        and other network analysis. The difference are in the returned
+        ``label2comid`` dictionary and ``onnetwork_sorted`` which will contain
+        the negative values for the sinks.
+
     Notes
     -----
     The graph is directed and has the all the attributes of the flowlines
@@ -851,25 +860,30 @@ def enhd_flowlines_nx() -> tuple[nx.DiGraph, dict[int, int], list[int]]:
 
     Returns
     -------
-    tuple of networkx.DiGraph, dict, and list
-        The first element is the graph, the second element is a dictionary
-        mapping the COMIDs to the node IDs in the graph, and the third element
-        is a topologically sorted list of the COMIDs.
+    graph : networkx.DiGraph
+        The generated directed graph
+    label2comid : dict
+        A mapping of COMIDs to the node IDs in the graph
+    onnetwork_sorted : list
+        A topologically sorted list of the COMIDs.
     """
     enhd = derived.enhd_attrs()
+    id_col, toid_col = "comid", "tocomid"
+    tocomid_na = enhd[toid_col] == 0
+    enhd.loc[tocomid_na, toid_col] = -enhd.loc[tocomid_na, id_col]
     graph = nx.relabel.convert_node_labels_to_integers(
         nx.from_pandas_edgelist(
             enhd,
-            source="comid",
-            target="tocomid",
+            source=id_col,
+            target=toid_col,
             create_using=nx.DiGraph,
-            edge_attr=enhd.columns.drop(["comid", "tocomid"]).tolist(),
+            edge_attr=enhd.columns.drop([id_col, toid_col]).tolist(),
         ),
         label_attribute="str_id",
     )
     label2comid = nx.get_node_attributes(graph, "str_id")
     s_map = {label2comid[i]: r for i, r in zip(nx.topological_sort(graph), range(len(graph)))}
-    onnetwork_sorted = sorted(set(enhd["comid"]).intersection(s_map), key=lambda i: s_map[i])
+    onnetwork_sorted = sorted(set(enhd[id_col]).intersection(s_map), key=lambda i: s_map[i])
     return graph, label2comid, onnetwork_sorted
 
 
