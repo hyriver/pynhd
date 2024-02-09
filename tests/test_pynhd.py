@@ -239,7 +239,7 @@ class TestWaterData:
         wb = wd.byfilter("huc12 LIKE '17030001%'", sort_attr="huc12")
         huc12 = wb[wb.huc12 == "170300010602"].geometry
         coords = (huc12.centroid.x, huc12.centroid.y)
-        hucs = wd.bydistance(coords, 100, crs)
+        hucs = wd.bydistance(coords, 100, crs, sort_attr="huc12")
         assert wb.shape[0] == 52
         assert hucs.name[0] == "Upper Wenas River"
 
