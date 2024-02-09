@@ -15,6 +15,7 @@ import shapely
 import ujson
 from shapely import MultiPoint, MultiPolygon, Polygon
 from shapely import box as shapely_box
+from shapely.geometry import mapping as shapely_mapping
 
 import async_retriever as ar
 import pygeoutils as geoutils
@@ -288,7 +289,7 @@ class PyGeoAPIBase:
 
     @staticmethod
     def request_body(
-        id_value: list[dict[str, Any]]
+        id_value: list[dict[str, Any]],
     ) -> list[dict[str, dict[str, list[dict[str, Any]]]]]:
         """Return a valid request body."""
         return [
@@ -318,7 +319,11 @@ class PyGeoAPIBase:
             idx, resp = zip(*((i, r) for i, r in enumerate(resp) if "code" not in r))
             idx = cast("tuple[int]", idx)
             if len(idx) != nfeat:
-                _ = [ar.delete_url_cache(url, **p) for i, p in enumerate(payload) if i not in idx]
+                _ = [
+                    ar.delete_url_cache(url, **p)  # pyright: ignore[reportArgumentType]
+                    for i, p in enumerate(payload)
+                    if i not in idx
+                ]
             resp = cast("tuple[dict[str, Any]]", resp)
 
             if len(resp) < nfeat:
@@ -332,7 +337,7 @@ class PyGeoAPIBase:
                     UserWarning,
                     stacklevel=2,
                 )
-            gdf = gpd.GeoDataFrame(
+            gdf = gpd.GeoDataFrame(  # pyright: ignore[reportCallIssue]
                 pd.concat(
                     (geoutils.json2geodf(r) for r in resp), keys=[self.req_idx[i] for i in idx]
                 ),
@@ -344,7 +349,9 @@ class PyGeoAPIBase:
         except EmptyResponseError as ex:
             raise ZeroMatchedError from ex
         drop_cols = ["level_1", "spatial_ref"] if "spatial_ref" in gdf else ["level_1"]
-        return gdf.reset_index().rename(columns={"level_0": "req_idx"}).drop(columns=drop_cols)
+        return (  # pyright: ignore[reportReturnType]
+            gdf.reset_index().rename(columns={"level_0": "req_idx"}).drop(columns=drop_cols)
+        )
 
     @staticmethod
     def check_coords(
@@ -513,7 +520,10 @@ class ScienceBase:
             tlz.pluck("url", resp[0]["files"]),
             tlz.pluck("metadataHtmlViewUri", resp[0]["files"], default=None),
         )
-        return pd.DataFrame(urls, columns=["name", "url", "metadata_url"]).set_index("name")
+        return pd.DataFrame(
+            urls,
+            columns=["name", "url", "metadata_url"],  # pyright: ignore[reportArgumentType]
+        ).set_index("name")
 
 
 @dataclass(frozen=True)
@@ -632,8 +642,8 @@ class GeoConnex:
             ep[0]: EndPoints(
                 name=ep[0],
                 description=ep[1],
-                **get_links(ep[2]),
-                extent=tuple(ep[3]["spatial"]["bbox"][0]),
+                **get_links(ep[2]),  # pyright: ignore[reportArgumentType]
+                extent=tuple(ep[3]["spatial"]["bbox"][0]),  # pyright: ignore[reportArgumentType]
             )
             for ep in eps
         }
@@ -782,7 +792,7 @@ class GeoConnex:
         try:
             geom1_json = ujson.loads(shapely.to_geojson(geom1))
         except AttributeError:
-            geom1_json = shapely.geometry.mapping(geom1)
+            geom1_json = shapely_mapping(geom1)
 
         if geometry2 is None:
             return self._get_geodf(
@@ -798,7 +808,7 @@ class GeoConnex:
         try:
             geom_json2 = ujson.loads(shapely.to_geojson(geom2))
         except AttributeError:
-            geom_json2 = shapely.geometry.mapping(geom2)
+            geom_json2 = shapely_mapping(geom2)
         return self._get_geodf(
             {
                 "json": {predicate.lower(): [geom1_json, geom_json2]},

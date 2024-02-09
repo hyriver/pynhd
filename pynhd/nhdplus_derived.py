@@ -349,6 +349,7 @@ def nhdplus_h12pp(gpkg_path: Path | str | None = None) -> pd.DataFrame:
         ["COMID", "REACHCODE", "REACH_meas", "offset", "HUC12", "LevelPathI", "geometry"]
     ].copy()
     h12pp[["COMID", "LevelPathI"]] = h12pp[["COMID", "LevelPathI"]].astype("uint32")
+    h12pp = cast("gpd.GeoDataFrame", h12pp)
     return h12pp
 
 
@@ -426,7 +427,7 @@ def epa_nhd_catchments(
         {i: pd.Series(r["metadata"]) for i, r in zip(clist, resp)}, orient="index"
     )
     for c in info:
-        info[c] = pd.to_numeric(info[c], errors="ignore")
+        info[c] = pd.to_numeric(info[c], errors="coerce")
 
     if feature == "catchment_metrics":
         meta = pd.DataFrame(resp[0]["streamcat"]["metrics"]).drop(columns=["id", "metric_value"])

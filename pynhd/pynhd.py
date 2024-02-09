@@ -505,7 +505,8 @@ def pygeoapi(
         feat = gdf[~gdf.comid.isna()].set_index("req_idx")
         raindrop = gdf.loc[gdf.comid.isna(), ["req_idx", "geometry"]].set_index("req_idx")
         feat["raindrop_path"] = raindrop.geometry
-        return feat.reset_index()
+        feat = cast("gpd.GeoDataFrame", feat.reset_index())
+        return feat
     return gdf
 
 
@@ -643,8 +644,8 @@ class WaterData:
 
         Parameters
         ----------
-        geometry : shapely.geometry
-            The input geometry
+        geometry : shapely.Polygon or shapely.MultiPolygon
+            The input (multi)polygon to request the data.
         geo_crs : str, int, or pyproj.CRS, optional
             The CRS of the input geometry, default to epsg:4326.
         xy : bool, optional
@@ -1135,7 +1136,7 @@ class NLDI:
         index, resp = self._get_urls(urls, True)
         basins = geoutils.json2geodf(resp, 4269, 4326)
         basins.index = pd.Index([feature_ids[i] for i in index], name="identifier")
-        basins = basins[~basins.geometry.isnull()].reset_index(drop=True)
+        basins = basins[~basins.geometry.isnull()].copy()
         basins = cast("gpd.GeoDataFrame", basins)
         return basins
 
