@@ -1,5 +1,5 @@
 """Access NLDI and WaterData databases."""
-# pyright: reportGeneralTypeIssues=false, reportAttributeAccessIssue=false, reportMissingTypeArgument=false
+# pyright: reportGeneralTypeIssues=false, reportMissingTypeArgument=false
 from __future__ import annotations
 
 import io

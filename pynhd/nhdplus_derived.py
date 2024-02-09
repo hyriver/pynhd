@@ -667,8 +667,7 @@ def streamcat(
     """
     sc = StreamCatValidator()
     names = [metric_names] if isinstance(metric_names, str) else metric_names
-    lower = (n.lower() for n in names)
-    names = [sc.alt_names[s] if s in sc.alt_names else s for s in lower]
+    names = [sc.alt_names.get(s.lower(), s.lower()) for s in names]
     sc.validate(name=names)
     params = {"name": ",".join(n for n in names)}
 
