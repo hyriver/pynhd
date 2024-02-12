@@ -5,6 +5,12 @@ History
 0.16.2 (2024-XX-XX)
 -------------------
 
+Bug Fixes
+~~~~~~~~~
+- In ``NLDI.get_basins``, the indices used to be station IDs but in the
+  previous release they were reset by mistake. This version retains the
+  correct indices.
+
 New Features
 ~~~~~~~~~~~~
 - In ``nhdplus_l48`` function, when the layer is ``NHDFlowline_Network``
