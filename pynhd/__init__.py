@@ -1,4 +1,7 @@
 """Top-level package for PyNHD."""
+
+from __future__ import annotations
+
 from importlib.metadata import PackageNotFoundError, version
 
 from pynhd.core import AGRBase, GeoConnex, ScienceBase

@@ -1,4 +1,5 @@
 """Access NLDI and WaterData databases."""
+
 # pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 
@@ -903,14 +904,12 @@ class NLDI:
     @overload
     def _get_urls(
         self, url_parts: Generator[tuple[str, ...], None, None] | str, raw: Literal[True] = ...
-    ) -> tuple[list[int], list[dict[str, Any]] | dict[str, Any]]:
-        ...
+    ) -> tuple[list[int], list[dict[str, Any]] | dict[str, Any]]: ...
 
     @overload
     def _get_urls(
         self, url_parts: Generator[tuple[str, ...], None, None] | str, raw: Literal[False] = ...
-    ) -> gpd.GeoDataFrame:
-        ...
+    ) -> gpd.GeoDataFrame: ...
 
     def _get_urls(
         self, url_parts: Generator[tuple[str, ...], None, None] | str, raw: bool = False
@@ -1148,8 +1147,7 @@ class NLDI:
         fsource: str = ...,
         char_ids: str | list[str] = ...,
         values_only: Literal[True] = ...,
-    ) -> pd.DataFrame:
-        ...
+    ) -> pd.DataFrame: ...
 
     @overload
     def getcharacteristic_byid(
@@ -1159,8 +1157,7 @@ class NLDI:
         fsource: str = ...,
         char_ids: str | list[str] = ...,
         values_only: Literal[False] = ...,
-    ) -> tuple[pd.DataFrame, pd.DataFrame]:
-        ...
+    ) -> tuple[pd.DataFrame, pd.DataFrame]: ...
 
     def getcharacteristic_byid(
         self,

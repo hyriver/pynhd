@@ -627,7 +627,7 @@ class GeoConnex:
                 "timestamp": "datetime64[ns]",
                 "boolean": "bool",
             }
-            dtypes = {str(v["title"]): type_map[v["type"]] for v in prop.values()}
+            dtypes = {v["title"]: type_map[v["type"]] for v in prop.values()}
 
             return {
                 "url": f"{urls['self']}/items",
@@ -717,8 +717,7 @@ class GeoConnex:
         predicate: str = ...,
         crs: CRSTYPE = ...,
         skip_geometry: Literal[False] = False,
-    ) -> gpd.GeoDataFrame:
-        ...
+    ) -> gpd.GeoDataFrame: ...
 
     @overload
     def bygeometry(
@@ -728,8 +727,7 @@ class GeoConnex:
         predicate: str = ...,
         crs: CRSTYPE = ...,
         skip_geometry: Literal[True] = True,
-    ) -> pd.DataFrame:
-        ...
+    ) -> pd.DataFrame: ...
 
     def bygeometry(
         self,
@@ -822,8 +820,7 @@ class GeoConnex:
         feature_name: str,
         feature_ids: list[str] | str,
         skip_geometry: Literal[False] = False,
-    ) -> gpd.GeoDataFrame:
-        ...
+    ) -> gpd.GeoDataFrame: ...
 
     @overload
     def byid(
@@ -831,8 +828,7 @@ class GeoConnex:
         feature_name: str,
         feature_ids: list[str] | str,
         skip_geometry: Literal[True],
-    ) -> pd.DataFrame:
-        ...
+    ) -> pd.DataFrame: ...
 
     def byid(
         self,
@@ -866,16 +862,14 @@ class GeoConnex:
         self,
         cql_dict: dict[str, Any],
         skip_geometry: Literal[False] = False,
-    ) -> gpd.GeoDataFrame:
-        ...
+    ) -> gpd.GeoDataFrame: ...
 
     @overload
     def bycql(
         self,
         cql_dict: dict[str, Any],
         skip_geometry: Literal[True],
-    ) -> pd.DataFrame:
-        ...
+    ) -> pd.DataFrame: ...
 
     def bycql(
         self,

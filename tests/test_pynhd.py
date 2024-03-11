@@ -1,4 +1,7 @@
 """Tests for PyNHD package."""
+
+from __future__ import annotations
+
 import io
 import operator
 import os
