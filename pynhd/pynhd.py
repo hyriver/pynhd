@@ -89,7 +89,9 @@ if TYPE_CHECKING:
         "huc12",
     ]
     HP3D_LAYERS = Literal[
-        "hydrolocation",
+        "hydrolocation_waterbody",
+        "hydrolocation_flowline",
+        "hydrolocation_reach",
         "flowline",
         "waterbody",
         "drainage_area",
@@ -190,11 +192,13 @@ class HP3D(AGRBase):
         non-conus areas, i.e., Alaska, Hawaii, Puerto Rico, the Virgin Islands , and
         the Pacific Islands. Valid layers are:
 
-        - ``hydrolocation``
-        - ``flowline``
-        - ``waterbody``
-        - ``drainage_area``
-        - ``catchment``
+        - ``hydrolocation_waterbody`` for Sink, Spring, Waterbody Outlet
+        - ``hydrolocation_flowline`` for Headwater, Terminus, Divergence, Confluence, Catchment Outlet
+        - ``hydrolocation_reach`` for Reach Code, External Connection
+        - ``flowline`` for river flowlines
+        - ``waterbody`` for waterbodies
+        - ``drainage_area`` for drainage areas
+        - ``catchment`` for catchments
 
     outfields : str or list, optional
         Target field name(s), default to "*" i.e., all the fields.
@@ -218,7 +222,9 @@ class HP3D(AGRBase):
         crs: CRSTYPE = 4326,
     ):
         self.valid_layers = {
-            "hydrolocation": "Hydrolocation",
+            "hydrolocation_waterbody": "Sink, Spring, Waterbody Outlet",
+            "hydrolocation_flowline": "Headwater, Terminus, Divergence, Confluence, Catchment Outlet",
+            "hydrolocation_reach": "Reach Code, External Connection",
             "flowline": "Flowline",
             "waterbody": "Waterbody",
             "drainage_area": "Drainage Area",
