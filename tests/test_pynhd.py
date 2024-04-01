@@ -23,8 +23,8 @@ UM = "upstreamMain"
 UT = "upstreamTributaries"
 
 
-def assert_close(a: float, b: float) -> bool:
-    assert np.isclose(a, b, rtol=1e-3).all()
+def assert_close(a: float, b: float) -> None:
+    np.testing.assert_allclose(a, b, rtol=1e-3)
 
 
 @pytest.fixture()
@@ -174,15 +174,15 @@ class TestNLDI:
 
     def test_comid_loc(self):
         station = self.nldi.getfeature_byid(site, station_id)
-        lon = station.geometry[0].centroid.x
-        lat = station.geometry[0].centroid.y
+        lon = station.geometry.iloc[0].centroid.x
+        lat = station.geometry.iloc[0].centroid.y
         comid = self.nldi.comid_byloc((lon, lat))
         assert station.comid.values[0] == comid.comid.values[0] == "1722317"
 
     def test_feature_loc(self):
         station = self.nldi.getfeature_byid(site, station_id)
-        lon = round(station.geometry[0].centroid.x, 1)
-        lat = round(station.geometry[0].centroid.y, 1)
+        lon = round(station.geometry.iloc[0].centroid.x, 1)
+        lat = round(station.geometry.iloc[0].centroid.y, 1)
         comid = self.nldi.feature_byloc((lon, lat))
         assert station.comid.values[0] == "1722317"
         assert comid.comid.values[0] == "1722211"
@@ -232,7 +232,7 @@ class TestWaterData:
     def test_bybox(self):
         wd = WaterData("wbd12")
         assert "wbd12" in wd.__repr__()
-        wb_g = wd.bygeom(box(-118.72, 34.118, -118.31, 34.518), predicate="INTERSECTS", xy=True)
+        wb_g = wd.bygeom(box(-118.72, 34.118, -118.31, 34.518), predicate="intersects", xy=True)
         wb_b = wd.bybox((-118.72, 34.118, -118.31, 34.518))
         assert_close(wb_b.areasqkm.sum(), wb_g.areasqkm.sum())
 
