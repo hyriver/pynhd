@@ -2,6 +2,18 @@
 History
 =======
 
+0.16.3 (2024-XX-XX)
+-------------------
+
+Bug Fixes
+~~~~~~~~~
+- Modify ``HP3D`` class based on the latest changes to the 3D Hydrography Program
+  service. Hydrolocation layer has now three sub-layers:
+
+  - ``hydrolocation_waterbody`` for Sink, Spring, Waterbody Outlet,
+  - ``hydrolocation_flowline`` for Headwater, Terminus, Divergence, Confluence, Catchment Outlet,
+  - ``hydrolocation_reach`` for Reach Code, External Connection.
+
 0.16.2 (2024-02-12)
 -------------------
 
