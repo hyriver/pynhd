@@ -33,6 +33,11 @@ def trib():
     return WaterData("nhdflowline_network").byid("comid", comids.nhdplus_comid.tolist())
 
 
+def test_streamcat():
+    nhd_area = pynhd.streamcat("fert", comids=13212248)
+    assert_close(nhd_area["FERTWS"].item(), 14.358)
+
+
 def test_epa():
     data = pynhd.epa_nhd_catchments(9533477, "curve_number")
     assert_close(data["curve_number"].mean(axis=1), 75.576)
