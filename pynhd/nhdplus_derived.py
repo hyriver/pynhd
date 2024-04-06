@@ -508,7 +508,7 @@ class StreamCat:
         )
 
         url_vars = f"{self.base_url}/variable_info.csv"
-        names = pd.read_csv(io.StringIO(ar.retrieve_text([url_vars])[0]))
+        names = pd.read_csv(io.BytesIO(ar.retrieve_binary([url_vars])[0]), encoding="latin1")
         names["METRIC_NAME"] = names["METRIC_NAME"].str.replace(r"\[AOI\]|Slp[12]0", "", regex=True)
         names["SLOPE"] = [
             ", ".join(self.valid_slopes.get(m.replace("[Year]", "").lower(), []))
