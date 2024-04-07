@@ -277,7 +277,7 @@ Quick start
 
 Let's explore the capabilities of ``NLDI``. We need to instantiate the class first:
 
-.. code:: python
+.. code-block:: python
 
     from pynhd import NLDI, WaterData, NHDPlusHR
     import pynhd as nhd
@@ -285,7 +285,7 @@ Let's explore the capabilities of ``NLDI``. We need to instantiate the class fir
 First, let's get the watershed geometry of the contributing basin of a
 USGS station using ``NLDI``:
 
-.. code:: python
+.. code-block:: python
 
     nldi = NLDI()
     station_id = "01031500"
@@ -296,7 +296,7 @@ The ``navigate_byid`` class method can be used to navigate NHDPlus in
 both upstream and downstream of any point in the database. Let's get the ComIDs and flowlines
 of the tributaries and the main river channel upstream of the station.
 
-.. code:: python
+.. code-block:: python
 
     flw_main = nldi.navigate_byid(
         fsource="nwissite",
@@ -317,7 +317,7 @@ of the tributaries and the main river channel upstream of the station.
 We can get other USGS stations upstream (or downstream) of the station
 and even set a distance limit (in km):
 
-.. code:: python
+.. code-block:: python
 
     st_all = nldi.navigate_byid(
         fsource="nwissite",
@@ -337,7 +337,7 @@ and even set a distance limit (in km):
 
 We can get more information about these stations using GeoConnex:
 
-.. code:: python
+.. code-block:: python
 
     gcx = GeoConnex("gauges")
     stations = st_all.identifier.str.split("-").str[1].unique()
@@ -348,7 +348,7 @@ We can get more information about these stations using GeoConnex:
 
 Instead, we can carry out a spatial query within the basin of interest:
 
-.. code:: python
+.. code-block:: python
 
     gauges = pynhd.geoconnex(
         item="gauges",
@@ -358,7 +358,7 @@ Instead, we can carry out a spatial query within the basin of interest:
 Now, let's get the
 `HUC12 pour points <https://www.sciencebase.gov/catalog/item/5762b664e4b07657d19a71ea>`__:
 
-.. code:: python
+.. code-block:: python
 
     pp = nldi.navigate_byid(
         fsource="nwissite",
@@ -374,7 +374,7 @@ Now, let's get the
 
 Also, we can get the slope data for each river segment from the NHDPlus VAA database:
 
-.. code:: python
+.. code-block:: python
 
     vaa = nhd.nhdplus_vaa("input_data/nhdplus_vaa.parquet")
 
@@ -388,7 +388,7 @@ Also, we can get the slope data for each river segment from the NHDPlus VAA data
 Additionally, we can obtain cross-section lines along the main river channel with 4 km spacing
 and width of 2 km using ``network_xsection`` as follows:
 
-.. code:: python
+.. code-block:: python
 
     from pynhd import NHD
 
@@ -413,7 +413,7 @@ versions, the ``PyGeoAPI`` class will be deprecated and the ``pygeoapi`` functio
 will be the only way to access the database. Let's compare the two, starting by
 ``PyGeoAPI``:
 
-.. code:: python
+.. code-block:: python
 
     pygeoapi = PyGeoAPI()
 
@@ -432,7 +432,7 @@ will be the only way to access the database. Let's compare the two, starting by
 
 Now, let's do the same operations using ``pygeoapi``:
 
-.. code:: python
+.. code-block:: python
 
     import geopandas as gpd
     import shapely.geometry as sgeom
@@ -479,7 +479,7 @@ Next, we retrieve mid- and high-resolution flowlines within the bounding box of 
 watershed and compare them using ``WaterData`` for mid-resolution, ``NHDPlusHR`` for
 high-resolution.
 
-.. code:: python
+.. code-block:: python
 
     mr = WaterData("nhdflowline_network")
     nhdp_mr = mr.bybox(basin.geometry[0].bounds)
@@ -494,7 +494,7 @@ high-resolution.
 An alternative to ``WaterData`` and ``NHDPlusHR`` is the ``NHD`` class that
 supports both the mid- and high-resolution NHDPlus V2 data:
 
-.. code:: python
+.. code-block:: python
 
     mr = NHD("flowline_mr")
     nhdp_mr = mr.bygeom(basin.geometry[0].bounds)
@@ -504,7 +504,7 @@ supports both the mid- and high-resolution NHDPlus V2 data:
 
 Moreover, ``WaterData`` can find features within a given radius (in meters) of a point:
 
-.. code:: python
+.. code-block:: python
 
     eck4 = "+proj=eck4 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
     coords = (-5727797.427596455, 5584066.49330473)
@@ -515,7 +515,7 @@ Moreover, ``WaterData`` can find features within a given radius (in meters) of a
 Instead of getting all features within a radius of the coordinate, we can snap to the closest
 feature ID using NLDI:
 
-.. code:: python
+.. code-block:: python
 
     comid_closest = nldi.comid_byloc((x, y), eck4)
     flw_closest = nhdp_mr.byid("comid", comid_closest.comid.values[0])
@@ -538,7 +538,7 @@ and ComIDs which is useful for navigating the vector river network data.
 For getting the NHDPlus database we use ``WaterData``. Let's use the
 ``nhdflowline_network`` layer to get required info.
 
-.. code:: python
+.. code-block:: python
 
     wd = WaterData("nhdflowline_network")
 
@@ -549,7 +549,7 @@ For getting the NHDPlus database we use ``WaterData``. Let's use the
 To demonstrate the use of routing, let's use ``nhdplus_attrs`` function to get a list of available
 NHDPlus attributes
 
-.. code:: python
+.. code-block:: python
 
     char = "CAT_RECHG"
     area = "areasqkm"
@@ -579,7 +579,7 @@ Since these are catchment-scale characteristics, let's get the catchments
 then add the accumulated characteristic as a new column and plot the
 results.
 
-.. code:: python
+.. code-block:: python
 
     wd = WaterData("catchmentsp")
     catchments = wd.byid("featureid", comids)
