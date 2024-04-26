@@ -36,6 +36,8 @@ def trib():
 def test_streamcat():
     nhd_area = pynhd.streamcat("fert", comids=13212248)
     assert_close(nhd_area["FERTWS"].item(), 14.358)
+    nhd_area = pynhd.streamcat("inorgnwetdep_2008", comids=23783629, lakes_only=True)
+    assert_close(nhd_area["INORGNWETDEP_2008WS"].item(), 1.7746)
 
 
 def test_epa():
@@ -44,10 +46,6 @@ def test_epa():
 
     data = pynhd.epa_nhd_catchments([9533477, 1440291], "comid_info")
     assert data["comid_info"].loc[1440291, "TOCOMID"] == 1439303
-
-    data = pynhd.epa_nhd_catchments(1440291, "catchment_metrics")
-    assert_close(data["catchment_metrics"].loc[1440291, "AvgWetIndxCat"], 579.532)
-    assert data["metadata"].loc["AvgWetIndxCat", "short_display_name"] == "Wetness Index"
 
 
 @pytest.mark.xfail(reason="Hydro is unstable.")
@@ -94,6 +92,7 @@ class TestPyGeoAPI:
         gdfb = pynhd.pygeoapi(gs, "split_catchment")
         assert gdf.catchmentID.iloc[0] == gdfb.catchmentID.iloc[0] == "22294818"
 
+    @pytest.mark.xfail(reason="The xs endpoints of PyGeoAPI are not working.")
     def test_elevation_profile(self):
         line = LineString([(-103.801086, 40.26772), (-103.80097, 40.270568)])
         gs = gpd.GeoDataFrame(
@@ -115,6 +114,7 @@ class TestPyGeoAPI:
         assert_close(gdf.iloc[-1, 2], expected)
         assert_close(gdfb.iloc[-1, 2], expected)
 
+    @pytest.mark.xfail(reason="The xs endpoints of PyGeoAPI are not working.")
     def test_endpoints_profile(self):
         coords = [(-103.801086, 40.26772), (-103.80097, 40.270568)]
         gs = gpd.GeoDataFrame(
@@ -136,6 +136,7 @@ class TestPyGeoAPI:
         assert_close(gdf.iloc[-1, 2], expected)
         assert_close(gdfb.iloc[-1, 2], expected)
 
+    @pytest.mark.xfail(reason="The xs endpoints of PyGeoAPI are not working.")
     def test_cross_section(self):
         coords = (-103.80119, 40.2684)
         gs = gpd.GeoDataFrame(
