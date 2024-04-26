@@ -7,7 +7,7 @@ import contextlib
 import io
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import cytoolz.curried as tlz
 import geopandas as gpd
@@ -367,7 +367,7 @@ def nhd_fcode() -> pd.DataFrame:
 
 def epa_nhd_catchments(
     comids: int | str | list[int | str],
-    feature: str,
+    feature: Literal["curve_number", "comid_info"],
 ) -> dict[str, pd.DataFrame]:
     """Get NHDPlus catchment-scale data from EPA's HMS REST API.
 
@@ -384,7 +384,6 @@ def epa_nhd_catchments(
     feature : str
         The feature of interest. Available options are:
 
-        - ``catchment_metrics``: 414 catchment-scale metrics.
         - ``curve_number``: 16-day average Curve Number.
         - ``comid_info``: ComID information.
 
@@ -397,12 +396,11 @@ def epa_nhd_catchments(
     Examples
     --------
     >>> import pynhd
-    >>> data = nhd.epa_nhd_catchments(1440291, "catchment_metrics")
-    >>> data["catchment_metrics"].loc[1440291, "AvgWetIndxCat"]
-    579.532
+    >>> data = pynhd.epa_nhd_catchments(9533477, "curve_number")
+    >>> data["curve_number"].mean(axis=1).item()
+    75.576
     """
     feature_names = {
-        "catchment_metrics": "streamcat",
         "curve_number": "cn",
         "comid_info": "",
     }
@@ -430,19 +428,6 @@ def epa_nhd_catchments(
     for c in info:
         info[c] = pd.to_numeric(info[c], errors="coerce")
 
-    if feature == "catchment_metrics":
-        meta = pd.DataFrame(resp[0]["streamcat"]["metrics"]).drop(columns=["id", "metric_value"])
-        meta = meta.set_index("metric_alias")
-
-        def get_metrics(resp: dict[str, Any]) -> pd.Series:
-            df = pd.DataFrame(resp["streamcat"]["metrics"])[["metric_alias", "metric_value"]]
-            return df.set_index("metric_alias").metric_value
-
-        data = pd.DataFrame.from_dict(
-            {i: get_metrics(r) for i, r in zip(clist, resp)}, orient="index"
-        )
-        return {"comid_info": info, "catchment_metrics": data, "metadata": meta}
-
     if feature == "curve_number":
         data = pd.DataFrame.from_dict(
             {i: r["curve_number"] for i, r in zip(clist, resp)}, orient="index", dtype="f8"
@@ -454,6 +439,12 @@ def epa_nhd_catchments(
 
 class StreamCat:
     """Get StreamCat API's properties.
+
+    Parameters
+    ----------
+    lakes_only : bool, optional
+        If ``True``, only return metrics for lakes and their associated catchments
+        from the LakeCat dataset.
 
     Attributes
     ----------
@@ -477,8 +468,12 @@ class StreamCat:
         A dictionary of the valid years for annual metrics.
     """
 
-    def __init__(self) -> None:
-        self.base_url = "https://java.epa.gov/StreamCAT/metrics"
+    def __init__(self, lakes_only: bool = False) -> None:
+        self.lakes_only = lakes_only
+        if self.lakes_only:
+            self.base_url = "https://java.epa.gov/StreamCAT/LakeCat/metrics"
+        else:
+            self.base_url = "https://java.epa.gov/StreamCAT/metrics"
         resp = ar.retrieve_json([self.base_url])
         resp = cast("list[dict[str, Any]]", resp)
         params = resp[0]["parameters"]
@@ -532,8 +527,8 @@ class StreamCat:
 
 
 class StreamCatValidator(StreamCat):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, lakes_only: bool = False) -> None:
+        super().__init__(lakes_only)
 
     def validate(
         self,
@@ -606,6 +601,7 @@ def streamcat(
     conus: bool = False,
     percent_full: bool = False,
     area_sqkm: bool = False,
+    lakes_only: bool = False,
 ) -> pd.DataFrame:
     """Get various metrics for NHDPlusV2 catchments from EPA's StreamCat.
 
@@ -660,13 +656,16 @@ def streamcat(
         the metric.
     area_sqkm : bool, optional
         If ``True``, return the area in square kilometers.
+    lakes_only : bool, optional
+        If ``True``, only return metrics for lakes and their associated catchments
+        from the LakeCat dataset.
 
     Returns
     -------
     pandas.DataFrame
         A dataframe with the requested metrics.
     """
-    sc = StreamCatValidator()
+    sc = StreamCatValidator(lakes_only)
     names = [metric_names] if isinstance(metric_names, str) else metric_names
     names = [sc.alt_names.get(s.lower(), s.lower()) for s in names]
     sc.validate(name=names)
