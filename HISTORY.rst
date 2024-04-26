@@ -2,8 +2,15 @@
 History
 =======
 
-0.16.3 (2024-XX-XX)
+0.16.3 (2024-04-26)
 -------------------
+
+New Features
+~~~~~~~~~~~~
+- Add support for LakeCat dataset in ``streamcat`` function. A new argument
+  called ``lakes_only`` is added to the function. If set to ``True``, only
+  metrics for lake and their associated catchments will be returned. The default
+  is ``False`` to retain backward compatibility.
 
 Bug Fixes
 ~~~~~~~~~
@@ -13,6 +20,14 @@ Bug Fixes
   - ``hydrolocation_waterbody`` for Sink, Spring, Waterbody Outlet,
   - ``hydrolocation_flowline`` for Headwater, Terminus, Divergence, Confluence, Catchment Outlet,
   - ``hydrolocation_reach`` for Reach Code, External Connection.
+
+Breaking Changes
+~~~~~~~~~~~~~~~~
+- EPA's HMS no longer supports the StreamCat dataset, since they have a dedicated
+  service for it. Thus, the ``epa_nhd_catchments`` function no longer accepts
+  "streamcat" as an input for the ``feature`` argument. For all StreamCat queries,
+  use the ``streamcat`` function instead. Now, the ``epa_nhd_catchments`` function
+  is essentially useful for getting Curve Number data.
 
 0.16.2 (2024-02-12)
 -------------------
