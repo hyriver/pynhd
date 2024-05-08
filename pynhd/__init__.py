@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
+from pynhd import exceptions
 from pynhd.core import AGRBase, GeoConnex, ScienceBase
 from pynhd.exceptions import (
     DependencyError,
@@ -72,7 +73,6 @@ __all__ = [
     "nhdplus_l48",
     "StreamCat",
     "streamcat",
-    "show_versions",
     "NLDI",
     "NHDTools",
     "AGRBase",
@@ -91,4 +91,7 @@ __all__ = [
     "enhd_attrs",
     "nhdplus_vaa",
     "nhdplus_h12pp",
+    "show_versions",
+    "exceptions",
+    "__version__",
 ]
