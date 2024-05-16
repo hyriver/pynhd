@@ -29,6 +29,7 @@ from pynhd.exceptions import (
     MissingCRSError,
     MissingItemError,
     NoTerminalError,
+    ServiceError,
 )
 
 try:
@@ -918,9 +919,9 @@ def mainstem_huc12_nx() -> tuple[nx.DiGraph, dict[int, str], list[str]]:
     list
         A topologically sorted list of the HUC12s which strings of length 12.
     """
-    resp = ar.retrieve_text(
-        [ScienceBase.get_file_urls("63cb38b2d34e06fef14f40ad").loc["nhdplusv2wbd.csv"].url]
-    )
+    url = ScienceBase.get_file_urls("63cb38b2d34e06fef14f40ad").loc["nhdplusv2wbd.csv"].url
+    url = cast("str", url)
+    resp = ar.retrieve_text([url])
     ms = pd.read_csv(io.StringIO(resp[0]))
     str_cols = ["HUC12", "TOHUC", "head_HUC12", "outlet_HUC12"]
     for col in str_cols:
@@ -1079,7 +1080,17 @@ def nhdplus_l48(
             )
         )
         nhd7z = Path(root, Path(url).name)
-        _ = streaming_download(url, fnames=nhd7z)
+        nhd7z = streaming_download(url, fnames=nhd7z)
+        if nhd7z is None:
+            msg = " ".join(
+                (
+                    "The download was interrupted. Please try again.",
+                    "If the problem persists, please download the file manually",
+                    "from the following link and place it in the cache directory:",
+                    f"{url}",
+                )
+            )
+            raise ServiceError(msg)
         with py7zr.SevenZipFile(nhd7z, mode="r") as z:
             z.extractall(path=root.resolve())
         nhd7z.unlink()

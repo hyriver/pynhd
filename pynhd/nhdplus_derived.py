@@ -116,7 +116,18 @@ def enhd_attrs(
         output = get_parquet(parquet_path)
 
     url = ScienceBase.get_file_urls("63cb311ed34e06fef14f40a3").loc["enhd_nhdplusatts.parquet"].url
+    url = cast("str", url)
     fname = ogc.streaming_download(url, file_extention=".parquet")
+    if fname is None:
+        msg = " ".join(
+            (
+                "The download was interrupted. Please try again.",
+                "If the problem persists, please download the file manually",
+                "from the following link and place it in the cache directory:",
+                f"{url}",
+            )
+        )
+        raise ServiceError(msg)
 
     enhd = pd.read_parquet(fname)
     dtype = {k: v for k, v in NHDP_DTYPES.items() if k in enhd.columns}
@@ -160,6 +171,16 @@ def nhdplus_vaa(
     fpath = "data/contents/nhdplusVAA.parquet"
     url = f"https://www.hydroshare.org/resource/{rid}/{fpath}"
     fname = ogc.streaming_download(url, file_extention=".parquet")
+    if fname is None:
+        msg = " ".join(
+            (
+                "The download was interrupted. Please try again.",
+                "If the problem persists, please download the file manually",
+                "from the following link and place it in the cache directory:",
+                f"{url}",
+            )
+        )
+        raise ServiceError(msg)
 
     vaa = pd.read_parquet(fname)
     dtype = {k: v for k, v in NHDP_DTYPES.items() if k in vaa.columns}
@@ -265,6 +286,16 @@ def nhdplus_attrs(attr_name: str | None = None) -> pd.DataFrame:
         raise InputValueError("name", meta.name.unique().tolist()) from ex
 
     fname = ogc.streaming_download(url, file_extention="zip")
+    if fname is None:
+        msg = " ".join(
+            (
+                "The download was interrupted. Please try again.",
+                "If the problem persists, please download the file manually",
+                "from the following link and place it in the cache directory:",
+                f"{url}",
+            )
+        )
+        raise ServiceError(msg)
     return pd.read_csv(fname, engine="pyarrow")
 
 
@@ -342,9 +373,20 @@ def nhdplus_h12pp(gpkg_path: Path | str | None = None) -> pd.DataFrame:
     geopandas.GeoDataFrame
         A geodataframe of HUC12 pour points.
     """
-    files = ScienceBase.get_file_urls("60cb5edfd34e86b938a373f4").loc["102020wbd_outlets.gpkg"].url
+    url = ScienceBase.get_file_urls("60cb5edfd34e86b938a373f4").loc["102020wbd_outlets.gpkg"].url
+    url = cast("str", url)
     gpkg_path = Path("cache", "102020wbd_outlets.gpkg") if gpkg_path is None else Path(gpkg_path)
-    _ = ogc.streaming_download(files, fnames=gpkg_path)
+    gpkg_path = ogc.streaming_download(url, fnames=gpkg_path)
+    if gpkg_path is None:
+        msg = " ".join(
+            (
+                "The download was interrupted. Please try again.",
+                "If the problem persists, please download the file manually",
+                "from the following link and place it in the cache directory:",
+                f"{url}",
+            )
+        )
+        raise ServiceError(msg)
     h12pp = gpd.read_file(gpkg_path, engine="pyogrio")
     h12pp = h12pp[
         ["COMID", "REACHCODE", "REACH_meas", "offset", "HUC12", "LevelPathI", "geometry"]
