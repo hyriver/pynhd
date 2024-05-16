@@ -1087,7 +1087,7 @@ def nhdplus_l48(
                     "The download was interrupted. Please try again.",
                     "If the problem persists, please download the file manually",
                     "from the following link and place it in the cache directory:",
-                    f"{url}",
+                    url,
                 )
             )
             raise ServiceError(msg)
