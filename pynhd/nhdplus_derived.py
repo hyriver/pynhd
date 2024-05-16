@@ -124,7 +124,7 @@ def enhd_attrs(
                 "The download was interrupted. Please try again.",
                 "If the problem persists, please download the file manually",
                 "from the following link and place it in the cache directory:",
-                f"{url}",
+                url,
             )
         )
         raise ServiceError(msg)
@@ -177,7 +177,7 @@ def nhdplus_vaa(
                 "The download was interrupted. Please try again.",
                 "If the problem persists, please download the file manually",
                 "from the following link and place it in the cache directory:",
-                f"{url}",
+                url,
             )
         )
         raise ServiceError(msg)
@@ -189,6 +189,17 @@ def nhdplus_vaa(
         output.unlink()
     vaa.to_parquet(output)
     return vaa
+
+
+def _get_files(item: str) -> dict[str, tuple[str, str]]:
+    """Get all the available zip files in an item."""
+    url = "https://www.sciencebase.gov/catalog/item"
+    payload = {"fields": "files,downloadUri", "format": "json"}
+    resp = ar.retrieve_json([f"{url}/{item}"], [{"params": payload}])
+    resp = cast("list[dict[str, Any]]", resp)
+    files_url = zip(tlz.pluck("name", resp[0]["files"]), tlz.pluck("url", resp[0]["files"]))
+    meta = list(tlz.pluck("metadataHtmlViewUri", resp[0]["files"], default=""))[-1]
+    return {f.replace("_CONUS.zip", ""): (u, meta) for f, u in files_url if ".zip" in f}
 
 
 def nhdplus_attrs(attr_name: str | None = None) -> pd.DataFrame:
@@ -219,16 +230,6 @@ def nhdplus_attrs(attr_name: str | None = None) -> pd.DataFrame:
 
     main_items = dict(zip(titles, tlz.pluck("id", r["items"])))
 
-    def get_files(item: str) -> dict[str, tuple[str, str]]:
-        """Get all the available zip files in an item."""
-        url = "https://www.sciencebase.gov/catalog/item"
-        payload = {"fields": "files,downloadUri", "format": "json"}
-        resp = ar.retrieve_json([f"{url}/{item}"], [{"params": payload}])
-        resp = cast("list[dict[str, Any]]", resp)
-        files_url = zip(tlz.pluck("name", resp[0]["files"]), tlz.pluck("url", resp[0]["files"]))
-        meta = list(tlz.pluck("metadataHtmlViewUri", resp[0]["files"], default=""))[-1]
-        return {f.replace("_CONUS.zip", ""): (u, meta) for f, u in files_url if ".zip" in f}
-
     files = {}
     soil = main_items.pop("Soil")
     for i, item in main_items.items():
@@ -238,7 +239,7 @@ def nhdplus_attrs(attr_name: str | None = None) -> pd.DataFrame:
         titles = tlz.map(lambda s: s.split(":")[1].strip() if ":" in s else s, titles)
 
         child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-        files[i] = {t: get_files(c) for t, c in child_items.items()}
+        files[i] = {t: _get_files(c) for t, c in child_items.items()}
 
     r = sb.get_children(soil)
     titles = tlz.pluck("title", r["items"])
@@ -247,19 +248,19 @@ def nhdplus_attrs(attr_name: str | None = None) -> pd.DataFrame:
     child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
     stat = child_items.pop("STATSGO Soil Characteristics")
     ssur = child_items.pop("SSURGO Soil Characteristics")
-    files["Soil"] = {t: get_files(c) for t, c in child_items.items()}
+    files["Soil"] = {t: _get_files(c) for t, c in child_items.items()}
 
     r = sb.get_children(stat)
     titles = tlz.pluck("title", r["items"])
     titles = tlz.map(lambda s: s.split(":")[1].split(",")[1].strip(), titles)
     child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-    files["STATSGO"] = {t: get_files(c) for t, c in child_items.items()}
+    files["STATSGO"] = {t: _get_files(c) for t, c in child_items.items()}
 
     r = sb.get_children(ssur)
     titles = tlz.pluck("title", r["items"])
     titles = tlz.map(lambda s: s.split(":")[1].strip(), titles)
     child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-    files["SSURGO"] = {t: get_files(c) for t, c in child_items.items()}
+    files["SSURGO"] = {t: _get_files(c) for t, c in child_items.items()}
 
     chars = []
     types = {"CAT": "local", "TOT": "upstream_acc", "ACC": "div_routing"}
@@ -292,7 +293,7 @@ def nhdplus_attrs(attr_name: str | None = None) -> pd.DataFrame:
                 "The download was interrupted. Please try again.",
                 "If the problem persists, please download the file manually",
                 "from the following link and place it in the cache directory:",
-                f"{url}",
+                url,
             )
         )
         raise ServiceError(msg)
@@ -383,7 +384,7 @@ def nhdplus_h12pp(gpkg_path: Path | str | None = None) -> pd.DataFrame:
                 "The download was interrupted. Please try again.",
                 "If the problem persists, please download the file manually",
                 "from the following link and place it in the cache directory:",
-                f"{url}",
+                url,
             )
         )
         raise ServiceError(msg)
