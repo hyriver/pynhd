@@ -5,6 +5,11 @@ History
 0.16.4 (2024-XX-XX)
 -------------------
 
+New Features
+~~~~~~~~~~~~
+- The function ``pynhd.streamcat`` now can be called without any arguments
+  to get a dataframe of all available metrics and their descriptions.
+
 Internal Changes
 ~~~~~~~~~~~~~~~~
 - Add the ``exceptions`` module to the high-level API to declutter
