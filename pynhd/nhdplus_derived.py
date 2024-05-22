@@ -635,7 +635,7 @@ class StreamCatValidator(StreamCat):
 
 
 def streamcat(
-    metric_names: str | list[str],
+    metric_names: str | list[str] | None = None,
     metric_areas: str | list[str] | None = None,
     comids: int | list[int] | None = None,
     regions: str | list[str] | None = None,
@@ -656,7 +656,7 @@ def streamcat(
 
     Parameters
     ----------
-    metric_names : str or list of str
+    metric_names : str or list of str, optional
         Metric name(s) to retrieve. There are 567 metrics available.
         to get a full list check out :meth:`StreamCat.valid_names`.
         To get a description of each metric, check out
@@ -664,7 +664,8 @@ def streamcat(
         to be specified, which have ``[Year]`` and/or ``[Slope]`` in their name.
         For convenience all these variables and their years/slopes are converted
         to a dict that can be accessed via :meth:`StreamCat.valid_years` and
-        :meth:`StreamCat.valid_slopes`.
+        :meth:`StreamCat.valid_slopes`. Defaults to ``None``, which will return
+        a dataframe of the metrics metadata.
     metric_areas : str or list of str, optional
         Areas to return the metrics for, defaults to ``None``, i.e. all areas.
         Valid options are: ``catchment``, ``watershed``, ``riparian_catchment``,
@@ -708,6 +709,8 @@ def streamcat(
     pandas.DataFrame
         A dataframe with the requested metrics.
     """
+    if metric_names is None:
+        return StreamCat().metrics_df
     sc = StreamCatValidator(lakes_only)
     names = [metric_names] if isinstance(metric_names, str) else metric_names
     names = [sc.alt_names.get(s.lower(), s.lower()) for s in names]
