@@ -655,7 +655,7 @@ def __check_flw(flw: gpd.GeoDataFrame, req_cols: list[str]) -> None:
 
 def __merge_flowlines(flw: gpd.GeoDataFrame) -> LineString:
     """Merge flowlines."""
-    line = shapely.line_merge(flw.geometry.unary_union)
+    line = shapely.line_merge(flw.geometry)
 
     if not isinstance(line, LineString):
         raise InputValueError("flw.geometry", "mergeable to a single line")
@@ -783,7 +783,7 @@ def flowline_xsection(
     """
     __check_flw(flw, ["geometry", id_col])
     half_width = width * 0.5
-    lines = shapely.line_merge(flw.geometry.unary_union)
+    lines = shapely.line_merge(flw.geometry)
     if isinstance(lines, LineString):
         lines = [lines]
     elif isinstance(lines, MultiLineString):
