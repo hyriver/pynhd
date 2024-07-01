@@ -899,12 +899,10 @@ class NLDI:
 
     @staticmethod
     def _check_resp(resp: dict[str, Any] | list[dict[str, Any]] | None) -> bool:
-        if resp is None:
+        if not resp:
             return False
-        if isinstance(resp, dict) and resp.get("type") == "error":
-            return False
-        if isinstance(resp, dict) and "features" in resp and not resp["features"]:
-            return False
+        if isinstance(resp, dict):
+            return resp.get("type") != "error" and (resp.get("features") or "features" not in resp)
         return True
 
     @overload
