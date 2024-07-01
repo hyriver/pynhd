@@ -213,7 +213,6 @@ filterwarnings = [
 ]
 testpaths = [
   "tests",
-  "src/pynhd",
 ]
 
 [tool.coverage.report]
