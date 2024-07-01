@@ -1,8 +1,9 @@
 [build-system]
-build-backend = "setuptools.build_meta"
+build-backend = "hatchling.build"
+
 requires = [
-  "setuptools>=60",
-  "setuptools-scm>=8",
+  "hatch-vcs",
+  "hatchling",
 ]
 
 [project]
@@ -60,26 +61,13 @@ urls.CI = "https://github.com/hyriver/pynhd/actions"
 urls.Homepage = "https://docs.hyriver.io/readme/pynhd.html"
 urls.Issues = "https://github.com/hyriver/pynhd/issues"
 
-[tool.setuptools]
-include-package-data = true
-license-files = [
-  "LICENSE",
-]
-platforms = [
-  "any",
-]
-zip-safe = false
+[tool.hatch.version]
+source = "vcs"
 
-[tool.setuptools.package-data]
-pynhd = [
-  "py.typed",
+[tool.hatch.build.targets.wheel]
+packages = [
+  "src/pynhd",
 ]
-
-[tool.setuptools.packages]
-find = { namespaces = false }
-
-[tool.setuptools_scm]
-fallback_version = "999"
 
 [tool.ruff]
 target-version = "py38"
@@ -225,7 +213,7 @@ filterwarnings = [
 ]
 testpaths = [
   "tests",
-  "pynhd",
+  "src/pynhd",
 ]
 
 [tool.coverage.report]
@@ -243,7 +231,7 @@ omit = [
 ]
 parallel = true
 source = [
-  'pynhd',
+  'src/pynhd',
 ]
 
 [tool.pyright]
@@ -254,7 +242,7 @@ exclude = [
   "tests/",
 ]
 include = [
-  "pynhd",
+  "src/pynhd",
 ]
 reportMissingTypeStubs = false
 reportUnknownArgumentType = false
