@@ -1,4 +1,4 @@
-.. image:: https://raw.githubusercontent.com/hyriver/HyRiver-examples/main/notebooks/_static/pygeoutils_logo.png
+.. image:: https://raw.githubusercontent.com/hyriver/HyRiver-examples/main/notebooks/_static/pynhd_logo.png
     :target: https://github.com/hyriver/HyRiver
 
 |
