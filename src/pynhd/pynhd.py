@@ -352,7 +352,7 @@ class PyGeoAPI(PyGeoAPIBase):
         """
         if not isinstance(line, (LineString, MultiLineString)):
             raise InputTypeError("line", "LineString or MultiLineString")
-        line = geoutils.geometry_reproject(line, crs, 4326)
+        line = geoutils.geometry_reproject(line, crs, 4326)  # pyright: ignore[reportArgumentType]
         if isinstance(line, LineString):
             coords = line.coords
         else:

@@ -522,6 +522,7 @@ def vector_accumulation(
         ),
         label_attribute="str_id",
     )
+    graph = cast("nx.DiGraph", graph)
 
     m_int2str = nx.get_node_attributes(graph, "str_id")
     m_str2int = {v: k for k, v in m_int2str.items()}
@@ -588,7 +589,7 @@ def _xs_planar(
     distance: float,
     crs: CRSTYPE,
     smoothing: float | None,
-) -> npt.NDArray[LineString]:
+) -> npt.NDArray[LineString]:  # pyright: ignore
     """Get cross-sections along a line at a given spacing.
 
     Parameters
@@ -628,7 +629,7 @@ def _xs_planar(
     vn_left = np.c_[-np.sin(phi), np.cos(phi)]
 
     _lines = zip(xy + half_width * vn_left, xy + half_width * vn_right)
-    return shapely.linestrings(list(_lines))
+    return shapely.linestrings(list(_lines))  # pyright: ignore[reportReturnType]
 
 
 def __check_flw(flw: gpd.GeoDataFrame, req_cols: list[str]) -> None:
@@ -892,6 +893,7 @@ def enhd_flowlines_nx() -> tuple[nx.DiGraph, dict[int, int], list[int]]:
         ),
         label_attribute="str_id",
     )
+    graph = cast("nx.DiGraph", graph)
 
     label2comid = nx.get_node_attributes(graph, "str_id")
     s_map = {label2comid[i]: r for i, r in zip(nx.topological_sort(graph), range(len(graph)))}
@@ -948,6 +950,7 @@ def mainstem_huc12_nx() -> tuple[nx.DiGraph, dict[int, str], list[str]]:
         ),
         label_attribute="str_id",
     )
+    graph = cast("nx.DiGraph", graph)
 
     label2huc = nx.get_node_attributes(graph, "str_id")
     s_map = {label2huc[i]: r for i, r in zip(nx.topological_sort(graph), range(len(graph)))}

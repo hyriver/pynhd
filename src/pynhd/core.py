@@ -360,7 +360,7 @@ class PyGeoAPIBase:
     ) -> list[tuple[float, float]]:
         """Check the coordinates."""
         try:
-            mps = MultiPoint(coords)
+            mps = MultiPoint(coords)  # pyright: ignore[reportArgumentType]
         except (TypeError, AttributeError):
             try:
                 mps = MultiPoint([coords])
@@ -784,7 +784,7 @@ class GeoConnex:
         if predicate.upper() not in valid_predicates:
             raise InputValueError("predicate", valid_predicates)
 
-        geom1 = geoutils.geo2polygon(geometry1, crs, 4326)
+        geom1 = geoutils.geo2polygon(geometry1, crs, 4326)  # pyright: ignore[reportArgumentType]
         if not geom1.intersects(shapely_box(*self.item_extent)):
             raise InputRangeError("geometry", f"within {self.item_extent}")
         try:
@@ -800,7 +800,7 @@ class GeoConnex:
                 }
             )
 
-        geom2 = geoutils.geo2polygon(geometry2, crs, 4326)
+        geom2 = geoutils.geo2polygon(geometry2, crs, 4326)  # pyright: ignore[reportArgumentType]
         if not geom2.intersects(shapely_box(*self.item_extent)):
             raise InputRangeError("geometry", f"within {self.item_extent}")
         try:
