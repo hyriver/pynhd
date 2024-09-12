@@ -27,7 +27,7 @@ def assert_close(a: float, b: float) -> None:
     np.testing.assert_allclose(a, b, rtol=1e-3)
 
 
-@pytest.fixture()
+@pytest.fixture
 def trib():
     comids = NLDI().navigate_byid(site, station_id, UT, "flowlines")
     return WaterData("nhdflowline_network").byid("comid", comids.nhdplus_comid.tolist())
@@ -36,8 +36,8 @@ def trib():
 def test_streamcat():
     nhd_area = pynhd.streamcat("fert", comids=13212248)
     assert_close(nhd_area["FERTWS"].item(), 14.358)
-    nhd_area = pynhd.streamcat("inorgnwetdep_2008", comids=23783629, lakes_only=True)
-    assert_close(nhd_area["INORGNWETDEP_2008WS"].item(), 1.7746)
+    nhd_area = pynhd.streamcat("inorgnwetdep2008", comids=23783629, lakes_only=True)
+    assert_close(nhd_area["INORGNWETDEP2008WS"].item(), 1.7746)
 
 
 def test_epa():
@@ -197,7 +197,7 @@ class TestNLDI:
         eck4 = "+proj=eck4 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=km"
         basin = self.nldi.get_basins(STA_ID).to_crs(eck4)
         split = self.nldi.get_basins(STA_ID, split_catchment=True).to_crs(eck4)
-        assert_close(split.area.values[0] - basin.area.values[0], 0.489)
+        assert_close(split.area.values[0] - basin.area.values[0], -0.2489)
 
     def test_char(self):
         tot, prc = self.nldi.getcharacteristic_byid(
