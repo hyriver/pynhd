@@ -22,7 +22,6 @@ classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -146,10 +145,10 @@ lint.ignore = [
   "E501",
   # conflict with ruff-formatter
   "ISC001",
-  "PLR0913",
-  "PLR2004",
   # specific pyright rules
   "PGH003",
+  "PLR0913",
+  "PLR2004",
 ]
 
 lint.per-file-ignores."tests/*.py" = [
