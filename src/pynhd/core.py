@@ -785,6 +785,7 @@ class GeoConnex:
             raise InputValueError("predicate", valid_predicates)
 
         geom1 = geoutils.geo2polygon(geometry1, crs, 4326)  # pyright: ignore[reportArgumentType]
+        geom1 = shapely.set_precision(geom1, 1e-6)
         if not geom1.intersects(shapely_box(*self.item_extent)):
             raise InputRangeError("geometry", f"within {self.item_extent}")
         try:
@@ -801,15 +802,16 @@ class GeoConnex:
             )
 
         geom2 = geoutils.geo2polygon(geometry2, crs, 4326)  # pyright: ignore[reportArgumentType]
+        geom2 = shapely.set_precision(geom2, 1e-6)
         if not geom2.intersects(shapely_box(*self.item_extent)):
             raise InputRangeError("geometry", f"within {self.item_extent}")
         try:
-            geom_json2 = ujson.loads(shapely.to_geojson(geom2))
+            geom2_json = ujson.loads(shapely.to_geojson(geom2))
         except AttributeError:
-            geom_json2 = shapely_mapping(geom2)
+            geom2_json = shapely_mapping(geom2)
         return self._get_geodf(
             {
-                "json": {predicate.lower(): [geom1_json, geom_json2]},
+                "json": {predicate.lower(): [geom1_json, geom2_json]},
                 "skipGeometry": str(skip_geometry).lower(),
             }
         )
