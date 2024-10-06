@@ -2,12 +2,25 @@
 History
 =======
 
-0.17.1 (2024-09-14)
+0.18.0 (2024-10-05)
 -------------------
 
-Internal Changes
+New Features
+~~~~~~~~~~~~
+- Replace the links to NLDI and PyGeoAPI web services to their new URLs.
+- Add two new methods to ``GeoConnex`` class for querying ``bybox`` and
+  ``byfilter``. Note that CQL query is still not working due to an issue
+  with the GeoConnex service. For now, it's recommended to use the ``byfilter``
+  method for most of the queries, including spatial queries. For simple spatial
+  queries, you can use the ``bybox`` method then filter the results based on
+  the actual geometry.
+
+Breaking Changes
 ~~~~~~~~~~~~~~~~
 - Drop support for Python 3.8 since its end-of-life date is October 2024.
+- Remove all exceptions from the main module and raise them from the
+  ``exceptions`` module. This is to declutter the public API and make
+  it easier to maintain.
 
 0.17.0 (2024-05-07)
 -------------------
