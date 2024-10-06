@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any, Generator, Literal, Sequence, Union, cast, overload
+from typing import TYPE_CHECKING, Any, Literal, Union, cast, overload
 
 import cytoolz.curried as tlz
 import numpy as np
@@ -15,12 +15,20 @@ from yarl import URL
 import async_retriever as ar
 import pygeoogc as ogc
 import pygeoutils as geoutils
-from pygeoogc import WFS, InputValueError, ServiceURL
-from pygeoutils import EmptyResponseError, InputTypeError
+from pygeoogc import WFS, ServiceURL
+from pygeoutils.exceptions import EmptyResponseError
 from pynhd.core import AGRBase, PyGeoAPIBase, PyGeoAPIBatch
-from pynhd.exceptions import InputRangeError, MissingItemError, ZeroMatchedError
+from pynhd.exceptions import (
+    InputRangeError,
+    InputTypeError,
+    InputValueError,
+    MissingItemError,
+    ZeroMatchedError,
+)
 
 if TYPE_CHECKING:
+    from collections.abc import Generator, Sequence
+
     import geopandas as gpd
     import pyproj
     from shapely import MultiPoint, MultiPolygon, Point, Polygon
@@ -907,7 +915,7 @@ class NLDI:
 
     @overload
     def _get_urls(
-        self, url_parts: Generator[tuple[str, ...], None, None] | str, raw: Literal[True] = ...
+        self, url_parts: Generator[tuple[str, ...], None, None] | str, raw: Literal[True] = True
     ) -> tuple[list[int], list[dict[str, Any]] | dict[str, Any]]: ...
 
     @overload
@@ -1150,7 +1158,7 @@ class NLDI:
         char_type: str,
         fsource: str = ...,
         char_ids: str | list[str] = ...,
-        values_only: Literal[True] = ...,
+        values_only: Literal[True] = True,
     ) -> pd.DataFrame: ...
 
     @overload

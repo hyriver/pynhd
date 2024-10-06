@@ -456,7 +456,7 @@ def epa_nhd_catchments(
         *[
             (
                 "https://qed.epa.gov/hms/rest/api/info/catchment",
-                {"params": {**f_kwd, "comid": comid}},
+                {"params": f_kwd | {"comid": comid}},
             )
             for comid in clist
         ]

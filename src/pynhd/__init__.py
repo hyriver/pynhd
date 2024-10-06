@@ -6,17 +6,6 @@ from importlib.metadata import PackageNotFoundError, version
 
 from pynhd import exceptions
 from pynhd.core import AGRBase, GeoConnex, ScienceBase
-from pynhd.exceptions import (
-    DependencyError,
-    InputRangeError,
-    InputTypeError,
-    InputValueError,
-    MissingColumnError,
-    MissingCRSError,
-    MissingItemError,
-    NoTerminalError,
-    ZeroMatchedError,
-)
 from pynhd.network_tools import (
     NHDTools,
     enhd_flowlines_nx,
@@ -51,15 +40,6 @@ except PackageNotFoundError:
     __version__ = "999"
 
 __all__ = [
-    "DependencyError",
-    "InputRangeError",
-    "InputValueError",
-    "InputTypeError",
-    "MissingItemError",
-    "MissingColumnError",
-    "MissingCRSError",
-    "ZeroMatchedError",
-    "NoTerminalError",
     "prepare_nhdplus",
     "topoogical_sort",
     "vector_accumulation",

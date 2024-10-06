@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Generator
+from typing import TYPE_CHECKING
 
-import async_retriever as ar
-import pygeoogc as ogc
-import pygeoutils as pgu
+import async_retriever.exceptions as ar
+import pygeoogc.exceptions as ogc
+import pygeoutils.exceptions as pgu
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 class ZeroMatchedError(ogc.ZeroMatchedError):

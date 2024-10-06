@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import io
 import warnings
+from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Union, cast
 
 import cytoolz.curried as tlz
 import geopandas as gpd
@@ -20,7 +21,7 @@ from shapely import LineString, MultiLineString, ops
 import async_retriever as ar
 import pygeoutils as pgu
 from pygeoogc import streaming_download
-from pygeoutils import InputTypeError
+from pygeoutils.exceptions import InputTypeError
 from pynhd import nhdplus_derived as derived
 from pynhd.core import ScienceBase
 from pynhd.exceptions import (
@@ -553,7 +554,7 @@ def _get_idx(d_sp: npt.NDArray[np.float64], distance: float) -> npt.NDArray[np.i
 
 
 def _get_spline_params(
-    line: LineString, n_seg: int, distance: float, crs: CRSTYPE, smoothing: float | None
+    line: LineString, n_seg: int, distance: float, smoothing: float | None
 ) -> tuple[
     npt.NDArray[np.float64],
     npt.NDArray[np.float64],
@@ -561,11 +562,11 @@ def _get_spline_params(
 ]:
     """Get Spline parameters (x, y, phi)."""
     _n_seg = n_seg
-    spline = pgu.spline_linestring(line, crs, _n_seg, smoothing=smoothing)
+    spline = pgu.spline_linestring(line, _n_seg, smoothing=smoothing)
     idx = _get_idx(spline.distance, distance)
     while np.isnan(idx).any():
         _n_seg *= 2
-        spline = pgu.spline_linestring(line, crs, _n_seg, smoothing=smoothing)
+        spline = pgu.spline_linestring(line, _n_seg, smoothing=smoothing)
         idx = _get_idx(spline.distance, distance)
     x, y, phi = spline.x[idx], spline.y[idx], spline.phi[idx]
     spacing = np.diff(spline.distance[idx])
@@ -587,7 +588,6 @@ def _xs_planar(
     n_seg: int,
     half_width: float,
     distance: float,
-    crs: CRSTYPE,
     smoothing: float | None,
 ) -> npt.NDArray[LineString]:  # pyright: ignore
     """Get cross-sections along a line at a given spacing.
@@ -621,7 +621,7 @@ def _xs_planar(
 
     if shapely.get_num_points(line) < 4:
         line = shapely.segmentize(line, line.length / 4)
-    x, y, phi = _get_spline_params(line, n_seg, distance, crs, smoothing)
+    x, y, phi = _get_spline_params(line, n_seg, distance, smoothing)
 
     xy = np.c_[x, y]
     # Normal vector of the centerline at each point.
@@ -794,7 +794,7 @@ def flowline_xsection(
 
     n_segments = (int(np.ceil(ln.length / distance)) * 100 for ln in lines)
     main_split = tlz.concat(
-        _xs_planar(ln, n_seg, half_width, distance, flw.crs, smoothing)
+        _xs_planar(ln, n_seg, half_width, distance, smoothing)
         for ln, n_seg in zip(lines, n_segments)
     )
 
