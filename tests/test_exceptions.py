@@ -3,7 +3,8 @@ from __future__ import annotations
 import pytest
 
 import pynhd
-from pynhd import NLDI, InputRangeError, InputValueError, ZeroMatchedError
+from pynhd import NLDI
+from pynhd.exceptions import InputRangeError, InputValueError, ZeroMatchedError
 
 
 class TestNLDI:

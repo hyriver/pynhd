@@ -40,6 +40,7 @@ def test_streamcat():
     assert_close(nhd_area["INORGNWETDEP2008WS"].item(), 1.7746)
 
 
+@pytest.mark.xfail(reason="EPA's HMS is unstable.")
 def test_epa():
     data = pynhd.epa_nhd_catchments(9533477, "curve_number")
     assert_close(data["curve_number"].mean(axis=1), 75.576)
@@ -114,7 +115,6 @@ class TestPyGeoAPI:
         assert_close(gdf.iloc[-1, 2], expected)
         assert_close(gdfb.iloc[-1, 2], expected)
 
-    @pytest.mark.xfail(reason="The xs endpoints of PyGeoAPI are not working.")
     def test_endpoints_profile(self):
         coords = [(-103.801086, 40.26772), (-103.80097, 40.270568)]
         gs = gpd.GeoDataFrame(
@@ -263,15 +263,22 @@ class TestGCX:
         gcx = pynhd.GeoConnex()
         gcx.item = "hu02"
         h2 = gcx.byid("huc2", "02")
-        h3 = gcx.byid("huc2", "03")
+        h3 = gcx.byid("huc2", ("02", "03"))
         assert (h2["gnis_id"] == 2730132).sum() == (h3["gnis_id"] == 2730133).sum() == 1
 
-    def test_many_features(self):
+    def test_many_features_box(self):
         gcx = pynhd.GeoConnex(max_nfeatures=10)
         gcx.item = "mainstems"
-        ms = gcx.bygeometry((-69.77, 45.07, -69.31, 45.45))
-        assert len(ms) == 20
+        ms = gcx.bybox((-69.77, 45.07, -69.31, 45.45))
+        assert len(ms) == 24
 
+    @pytest.mark.xfail(reason="CQL is not working.")
+    def test_geom(self):
+        gcx = pynhd.GeoConnex()
+        ms = gcx.bygeometry((-69.77, 45.07, -69.31, 45.45))
+        assert len(ms) == 24
+
+    @pytest.mark.xfail(reason="CQL is not working.")
     def test_cql(self):
         gcx = pynhd.GeoConnex("ua10")
         awa = gcx.bycql({"gt": [{"property": "awater10"}, 100e6]})
