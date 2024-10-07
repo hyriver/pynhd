@@ -2,6 +2,18 @@
 History
 =======
 
+0.18.1 (2024-10-08)
+-------------------
+
+Bug Fixes
+~~~~~~~~~
+- In ``GeoConnex``, set the ``request_type='POST'`` for all CQL queries. While
+  non-spatial CQL queries are working, spatial CQL queries are still not working
+  due to an issue with the GeoConnex service. For now, it's recommended to use
+  the ``byfilter`` method for most of the queries, including spatial queries.
+  For simple spatial queries, you can use the ``bybox`` method then filter the
+  results based on the actual geometry.
+
 0.18.0 (2024-10-05)
 -------------------
 
