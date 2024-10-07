@@ -263,7 +263,7 @@ class TestGCX:
         gcx = pynhd.GeoConnex()
         gcx.item = "hu02"
         h2 = gcx.byid("huc2", "02")
-        h3 = gcx.byid("huc2", ("02", "03"))
+        h3 = gcx.byid("huc2", ["02", "03"])
         assert (h2["gnis_id"] == 2730132).sum() == (h3["gnis_id"] == 2730133).sum() == 1
 
     def test_many_features_box(self):
@@ -272,13 +272,12 @@ class TestGCX:
         ms = gcx.bybox((-69.77, 45.07, -69.31, 45.45))
         assert len(ms) == 24
 
-    @pytest.mark.xfail(reason="CQL is not working.")
+    @pytest.mark.xfail(reason="Spatial CQL is not working.")
     def test_geom(self):
-        gcx = pynhd.GeoConnex()
+        gcx = pynhd.GeoConnex("mainstems")
         ms = gcx.bygeometry((-69.77, 45.07, -69.31, 45.45))
         assert len(ms) == 24
 
-    @pytest.mark.xfail(reason="CQL is not working.")
     def test_cql(self):
         gcx = pynhd.GeoConnex("ua10")
         awa = gcx.bycql({"gt": [{"property": "awater10"}, 100e6]})
