@@ -181,7 +181,7 @@ class AGRBase:
 
     def bygeom(
         self,
-        geom: Polygon | list[tuple[float, float]] | tuple[float, float, float, float],
+        geom: LineString | Polygon | Point | MultiPoint | tuple[float, float] | list[tuple[float, float]] | tuple[float, float, float, float],
         geo_crs: CRSTYPE = 4326,
         sql_clause: str = "",
         distance: int | None = None,
@@ -688,8 +688,10 @@ class GeoConnex:
             params = kwds | {"headers": {"Content-Type": "application/json"}}
         else:
             params = kwds
-
-        request_method = "POST" if len(ujson.dumps(params)) > 1000 else "GET"
+        if len(ujson.dumps(params)) > 1000 or "json" in kwds or "data" in kwds:
+            request_method = "POST"
+        else:
+            request_method = "GET"
 
         def _get_url(offset: int) -> str:
             url_kwds["offset"] = offset
