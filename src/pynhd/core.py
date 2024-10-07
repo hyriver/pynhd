@@ -181,7 +181,13 @@ class AGRBase:
 
     def bygeom(
         self,
-        geom: LineString | Polygon | Point | MultiPoint | tuple[float, float] | list[tuple[float, float]] | tuple[float, float, float, float],
+        geom: LineString
+        | Polygon
+        | Point
+        | MultiPoint
+        | tuple[float, float]
+        | list[tuple[float, float]]
+        | tuple[float, float, float, float],
         geo_crs: CRSTYPE = 4326,
         sql_clause: str = "",
         distance: int | None = None,
