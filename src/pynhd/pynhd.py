@@ -581,8 +581,8 @@ class WaterData:
         ]
         if layer not in self.valid_layers:
             raise InputValueError("layer", self.valid_layers)
-        self.layer = layer if ":" in layer else f"wmadata:{layer}"
-        if "wbd" in self.layer and "20201006" not in self.layer:
+        self.layer = f"wmadata:{layer}"
+        if "wbd" in self.layer:
             self.layer = f"{self.layer}_20201006"
         self.crs = crs
         self.wfs = WFS(
