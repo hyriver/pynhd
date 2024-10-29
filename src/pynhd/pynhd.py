@@ -549,9 +549,8 @@ class WaterData:
 
         Note that all ``wbd*`` layers provide access to the October 2020
         snapshot of the Watershed Boundary Dataset (WBD). If you need the
-        latest version, please use
-        `WBD <https://docs.hyriver.io/autoapi/pygeohydro/watershed/index.html#pygeohydro.watershed.WBD>`__
-        class from the `PyGeoHydro <https://docs.hyriver.io/readme/pygeohydro.html>`__
+        latest version, please use the ``WBD`` class from the
+        `PyGeoHydro <https://docs.hyriver.io/autoapi/pygeohydro/watershed/index.html#pygeohydro.watershed.WBD>`__
         package.
     crs : str, int, or pyproj.CRS, optional
         The target spatial reference system, defaults to ``epsg:4326``.
