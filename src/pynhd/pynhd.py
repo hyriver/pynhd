@@ -526,7 +526,7 @@ def pygeoapi(
 
 
 class WaterData:
-    """Access to `WaterData <https://labs.waterdata.usgs.gov/geoserver>`__ service.
+    """Access `WaterData <https://labs.waterdata.usgs.gov/geoserver>`__ service.
 
     Parameters
     ----------
@@ -547,13 +547,14 @@ class WaterData:
         - ``wbd10``
         - ``wbd12``
 
-        Note that the layers' namespace for the WaterData service is
-        ``wmadata`` and will be added to the given ``layer`` argument
-        if it is not provided.
+        Note that all ``wbd*`` layers provide access to the October 2020
+        snapshot of the Watershed Boundary Dataset (WBD). If you need the
+        latest version, please use
+        `WBD <https://docs.hyriver.io/autoapi/pygeohydro/watershed/index.html#pygeohydro.watershed.WBD>`__
+        class from the `PyGeoHydro <https://docs.hyriver.io/readme/pygeohydro.html>`__
+        package.
     crs : str, int, or pyproj.CRS, optional
         The target spatial reference system, defaults to ``epsg:4326``.
-    validation : bool, optional
-        Whether to validate the input data, defaults to ``True``.
     """
 
     def __init__(
@@ -594,18 +595,7 @@ class WaterData:
         )
 
     def _to_geodf(self, resp: list[dict[str, Any]]) -> gpd.GeoDataFrame:
-        """Convert a response from WaterData to a GeoDataFrame.
-
-        Parameters
-        ----------
-        resp : list of dicts
-            A ``json`` response from a WaterData request.
-
-        Returns
-        -------
-        geopandas.GeoDataFrame
-            The requested features in a GeoDataFrames.
-        """
+        """Convert a response from WaterData to a GeoDataFrame."""
         try:
             features = geoutils.json2geodf(resp, self.wfs.crs, self.crs)
         except EmptyResponseError as ex:
