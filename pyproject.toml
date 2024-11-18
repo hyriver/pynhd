@@ -26,6 +26,7 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Scientific/Engineering",
   "Topic :: Scientific/Engineering :: GIS",
   "Topic :: Scientific/Engineering :: Hydrology",
@@ -35,15 +36,15 @@ dynamic = [
   "version",
 ]
 dependencies = [
-  "async-retriever<0.19,>=0.18",
+  "async-retriever>=0.18,<0.19",
   "cytoolz",
   "geopandas>=1",
   "networkx",
   "numpy>=2",
   "pandas>=1",
   "pyarrow>=1.0.1",
-  "pygeoogc<0.19,>=0.18",
-  "pygeoutils<0.19,>=0.18",
+  "pygeoogc>=0.18,<0.19",
+  "pygeoutils>=0.18,<0.19",
   "shapely>=2",
 ]
 optional-dependencies.nhdplus = [
