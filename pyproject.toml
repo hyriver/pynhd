@@ -178,11 +178,6 @@ lint.extend-safe-fixes = [
   # absolute imports
   "TID252",
 ]
-lint.flake8-bugbear.extend-immutable-calls = [
-  "chr",
-  "typer.Argument",
-  "typer.Option",
-]
 lint.isort.known-first-party = [
   "async_retriever",
   "pygeoogc",
@@ -268,9 +263,3 @@ reportUnnecessaryIsInstance = false
 reportUntypedFunctionDecorator = false
 reportAttributeAccessIssue = false
 typeCheckingMode = "strict"
-
-[[tool.refurb.amend]]
-path = "tests"
-ignore = [
-  "FURB184",
-]
