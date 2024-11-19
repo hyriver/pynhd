@@ -1,6 +1,5 @@
 """Access NLDI and WaterData databases."""
 
-# pyright: reportGeneralTypeIssues=false, reportMissingTypeArgument=false
 from __future__ import annotations
 
 import io
@@ -47,18 +46,18 @@ if TYPE_CHECKING:
 
 
 __all__ = [
+    "NHDTools",
+    "enhd_flowlines_nx",
+    "flowline_resample",
+    "flowline_xsection",
+    "mainstem_huc12_nx",
+    "network_resample",
+    "network_xsection",
+    "nhdflw2nx",
+    "nhdplus_l48",
     "prepare_nhdplus",
     "topoogical_sort",
     "vector_accumulation",
-    "flowline_resample",
-    "network_resample",
-    "flowline_xsection",
-    "network_xsection",
-    "nhdflw2nx",
-    "enhd_flowlines_nx",
-    "mainstem_huc12_nx",
-    "nhdplus_l48",
-    "NHDTools",
 ]
 
 

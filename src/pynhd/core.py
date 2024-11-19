@@ -1,6 +1,5 @@
 """Base classes for PyNHD functions."""
 
-# pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 
 import warnings
@@ -44,7 +43,7 @@ if TYPE_CHECKING:
         Polygon, MultiPolygon, MultiPoint, LineString, Point, "tuple[float, float, float, float]"
     ]
 
-__all__ = ["AGRBase", "ScienceBase", "GeoConnex"]
+__all__ = ["AGRBase", "GeoConnex", "ScienceBase"]
 
 
 def get_parquet(parquet_path: Path | str) -> Path:

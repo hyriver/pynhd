@@ -1,6 +1,5 @@
 """Access NLDI and WaterData databases."""
 
-# pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 
 import warnings
@@ -106,7 +105,7 @@ if TYPE_CHECKING:
         "catchment",
     ]
 
-__all__ = ["NHD", "HP3D", "PyGeoAPI", "pygeoapi", "WaterData", "NHDPlusHR", "NLDI"]
+__all__ = ["HP3D", "NHD", "NHDPlusHR", "NLDI", "PyGeoAPI", "WaterData", "pygeoapi"]
 
 
 class NHD(AGRBase):

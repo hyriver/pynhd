@@ -1,6 +1,5 @@
 """Access NLDI and WaterData databases."""
 
-# pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 
 import contextlib
@@ -25,14 +24,14 @@ if TYPE_CHECKING:
     from pyarrow.dataset import FileSystemDataset
 
 __all__ = [
+    "StreamCat",
     "enhd_attrs",
-    "nhdplus_vaa",
-    "nhdplus_h12pp",
+    "epa_nhd_catchments",
+    "nhd_fcode",
     "nhdplus_attrs",
     "nhdplus_attrs_s3",
-    "nhd_fcode",
-    "epa_nhd_catchments",
-    "StreamCat",
+    "nhdplus_h12pp",
+    "nhdplus_vaa",
     "streamcat",
 ]
 
