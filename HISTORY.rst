@@ -2,6 +2,20 @@
 History
 =======
 
+New Features
+~~~~~~~~~~~~
+- Update StreamCat features to comply with the new StreamCat API.
+  Changed the base URL to  epa.api.gov/StreamCat/streams for StreamCat 
+  and epa.api.gov/StreamCat/lakes for lakecat.
+- Changed all valid attributes in StreamCat object to work with new /metrics
+  route.
+- Converted async-retriever to get json instead of text for streamcat function
+  new api always returns a json object called ``items`` so we grab that and create
+  a dataframe using the from_records constructor in pandas.
+
+By Travis Hudson (https://github.com/TravisH18/pynhd) 12/30/2024
+
+
 0.18.1 (2024-10-08)
 -------------------
 

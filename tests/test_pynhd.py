@@ -35,9 +35,9 @@ def trib():
 
 def test_streamcat():
     nhd_area = pynhd.streamcat("fert", comids=13212248)
-    assert_close(nhd_area["FERTWS"].item(), 14.358)
+    assert_close(nhd_area["fertws"].item(), 14.358)
     nhd_area = pynhd.streamcat("inorgnwetdep2008", comids=23783629, lakes_only=True)
-    assert_close(nhd_area["INORGNWETDEP2008WS"].item(), 1.7746)
+    assert_close(nhd_area["inorgnwetdep2008ws"].item(), 1.7746)
 
 
 @pytest.mark.xfail(reason="EPA's HMS is unstable.")

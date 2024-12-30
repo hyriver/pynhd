@@ -7,12 +7,13 @@ import contextlib
 import io
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast, List
 
 import cytoolz.curried as tlz
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+from pandas.errors import EmptyDataError
 import pyarrow.dataset as pds
 from pyarrow import ArrowInvalid, fs
 
@@ -514,14 +515,14 @@ class StreamCat:
     def __init__(self, lakes_only: bool = False) -> None:
         self.lakes_only = lakes_only
         if self.lakes_only:
-            self.base_url = "https://java.epa.gov/StreamCAT/LakeCat/metrics"
+            self.base_url = "https://api.epa.gov/StreamCat/lakes"
         else:
-            self.base_url = "https://java.epa.gov/StreamCAT/metrics"
-        resp = ar.retrieve_json([self.base_url])
+            self.base_url = "https://api.epa.gov/StreamCat/streams"
+        resp = ar.retrieve_json([f"{self.base_url}/metrics"])
         resp = cast("list[dict[str, Any]]", resp)
-        params = resp[0]["parameters"]
+        params = resp[0]["items"][0]
 
-        self.valid_names = cast("list[str]", params["name"]["options"])
+        self.valid_names: List[str] = [i["name"] for i in params["name_options"]]
         self.alt_names = {
             n.replace("_", ""): n for n in self.valid_names if n.split("_")[-1].isdigit()
         }
@@ -533,10 +534,10 @@ class StreamCat:
                 "tmean2009": "tmean09",
             }
         )
-        self.valid_regions = params["region"]["options"]
-        self.valid_states = pd.DataFrame.from_dict(params["state"]["options"], orient="index")
-        self.valid_counties = pd.DataFrame.from_dict(params["county"]["options"], orient="index")
-        self.valid_aois = params["areaOfInterest"]["options"]
+        self.valid_regions: List[str] = [r["regionid"] for r in params["region_options"]]
+        self.valid_states = pd.DataFrame.from_records(params["state_options"])
+        self.valid_counties = pd.DataFrame.from_records(params["county_options"])
+        self.valid_aois: List[str] = [aoi["id"] for aoi in params["areas_of_interest"]]
         self.valid_slopes = tlz.merge_with(
             list,
             (
@@ -545,7 +546,7 @@ class StreamCat:
             ),
         )
 
-        url_vars = f"{self.base_url}/variable_info.csv"
+        url_vars = f"{self.base_url}/variable_info"
         names = pd.read_csv(io.BytesIO(ar.retrieve_binary([url_vars])[0]), encoding="latin1")
         names["METRIC_NAME"] = names["METRIC_NAME"].str.replace(r"\[AOI\]|Slp[12]0", "", regex=True)
         names["SLOPE"] = [
@@ -720,25 +721,25 @@ def streamcat(
     if metric_areas:
         aoi = [metric_areas] if isinstance(metric_areas, str) else metric_areas
         sc.validate(aoi=aoi)
-        params["areaOfInterest"] = ",".join(aoi)
+        params["aoi"] = ",".join(aoi)
 
     ids = sc.id_kwds(comids, regions, states, counties, conus)
     if ids:
         params.update(ids)
 
     if percent_full:
-        params["showPctFull"] = "true"
+        params["showpctfull"] = "true"
 
     if area_sqkm:
-        params["showAreaSqKm"] = "true"
+        params["showareasqkm"] = "true"
 
     params_str = "&".join(f"{k}={v}" for k, v in params.items())
     if len(params_str) < 7000:
-        resp = ar.retrieve_text([f"{sc.base_url}?{params_str}"])
+        resp = ar.retrieve_json([f"{sc.base_url}/metrics?{params_str}"])
     else:
-        resp = ar.retrieve_text([sc.base_url], [{"data": params_str}], request_method="post")
-
+        resp = ar.retrieve_json([f"{sc.base_url}/metrics"], [{"data": params_str}], request_method="post")
+    print(resp)
     try:
-        return pd.read_csv(io.StringIO(resp[0]), engine="pyarrow")
-    except ArrowInvalid as ex:
+        return pd.DataFrame.from_records(resp[0]["items"])
+    except EmptyDataError as ex:
         raise ServiceError(resp[0]) from ex
