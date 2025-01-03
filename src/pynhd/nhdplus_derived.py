@@ -670,8 +670,8 @@ def streamcat(
         a dataframe of the metrics metadata.
     metric_areas : str or list of str, optional
         Areas to return the metrics for, defaults to ``None``, i.e. all areas.
-        Valid options are: ``catchment``, ``watershed``, ``riparian_catchment``,
-        ``riparian_watershed``, ``other``.
+        Valid options are: ``cat`` for catchment, ``catrp100`` for 100-m riparian
+        catchment, ``ws`` for watershed, ``wsrp100`` for 100-m riparian watershed,
     comids : int or list of int, optional
         NHDPlus COMID(s), defaults to ``None``. Either ``comids``, ``regions``,
         ``states``, ``counties``, or ``conus`` must be passed. They are
@@ -721,17 +721,17 @@ def streamcat(
     if metric_areas:
         aoi = [metric_areas] if isinstance(metric_areas, str) else metric_areas
         sc.validate(aoi=aoi)
-        params["areaOfInterest"] = ",".join(aoi)
+        params["aoi"] = ",".join(aoi)
 
     ids = sc.id_kwds(comids, regions, states, counties, conus)
     if ids:
         params.update(ids)
 
     if percent_full:
-        params["showPctFull"] = "true"
+        params["showpctfull"] = "true"
 
     if area_sqkm:
-        params["showAreaSqKm"] = "true"
+        params["showareasqkm"] = "true"
 
     params_str = "&".join(f"{k}={v}" for k, v in params.items())
     if len(params_str) < 7000:
