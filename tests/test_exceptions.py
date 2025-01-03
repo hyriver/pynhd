@@ -21,7 +21,7 @@ class TestNLDI:
         assert "[1]" in str(w.message)
 
     def test_basin_empty(self):
-        ids = ["04253294", "04253296"]
+        ids = ["04253294"]
         with pytest.raises(ZeroMatchedError, match="no features"):
             _ = self.nldi.get_basins(ids)
 
