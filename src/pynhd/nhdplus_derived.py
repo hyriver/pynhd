@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import io
 import re
+from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
@@ -510,42 +511,44 @@ class StreamCat:
         A dictionary of the valid years for annual metrics.
     """
 
+    @staticmethod
+    def _get_slopes(valid_names: list[str]) -> dict[str, list[str]]:
+        """Get the valid slopes for the metrics."""
+        variables = (s for s in valid_names if "slp" in s)
+
+        slopes = defaultdict(set)
+        for var in variables:
+            if "pctimp" in var:
+                slope = re.search(r"slp(\d+)", var).group(0)
+                slopes["pctimp"].add(slope)
+            else:
+                match = re.match(r"([a-z]+)((?:slp(?:high|mid|\d+))|(?:slpwtd))", var)
+                if match:
+                    base_name, slope = match.groups()
+                    slopes[base_name].add(slope)
+        return {k: sorted(v) for k, v in slopes.items()}
+
     def __init__(self, lakes_only: bool = False) -> None:
+        url = "https://api.epa.gov/StreamCat/{}/{}"
         self.lakes_only = lakes_only
         if self.lakes_only:
-            self.base_url = "https://java.epa.gov/StreamCAT/LakeCat/metrics"
+            self.url_metrics = url.format("lakes", "metrics")
+            url_vars = url.format("lakes", "variable_info")
         else:
-            self.base_url = "https://java.epa.gov/StreamCAT/metrics"
-        resp = ar.retrieve_json([self.base_url])
+            self.url_metrics = url.format("streams", "metrics")
+            url_vars = url.format("streams", "variable_info")
+        resp = ar.retrieve_json([self.url_metrics])
         resp = cast("list[dict[str, Any]]", resp)
-        params = resp[0]["parameters"]
+        params = resp[0]["items"][0]
 
-        self.valid_names = cast("list[str]", params["name"]["options"])
-        self.alt_names = {
-            n.replace("_", ""): n for n in self.valid_names if n.split("_")[-1].isdigit()
-        }
-        self.alt_names.update(
-            {
-                "precip2008": "precip08",
-                "precip2009": "precip09",
-                "tmean2008": "tmean08",
-                "tmean2009": "tmean09",
-            }
-        )
-        self.valid_regions = params["region"]["options"]
-        self.valid_states = pd.DataFrame.from_dict(params["state"]["options"], orient="index")
-        self.valid_counties = pd.DataFrame.from_dict(params["county"]["options"], orient="index")
-        self.valid_aois = params["areaOfInterest"]["options"]
-        self.valid_slopes = tlz.merge_with(
-            list,
-            (
-                {s[:-9]: f"slp{slp}" for s in self.valid_names if f"slp{slp}" in s}
-                for slp in (10, 20)
-            ),
-        )
+        self.valid_names = list(tlz.pluck("name", params["name_options"]))
+        self.valid_regions = list(tlz.pluck("regionid", params["region_options"]))
+        self.valid_states = pd.DataFrame(params["state_options"])
+        self.valid_counties = pd.DataFrame(params["county_options"])
+        self.valid_aois = list(tlz.pluck("id", params["areas_of_interest"]))
+        self.valid_slopes = self._get_slopes(self.valid_names)
 
-        url_vars = f"{self.base_url}/variable_info.csv"
-        names = pd.read_csv(io.BytesIO(ar.retrieve_binary([url_vars])[0]), encoding="latin1")
+        names = pd.read_csv(io.StringIO(ar.retrieve_text([url_vars])[0]))
         names["METRIC_NAME"] = names["METRIC_NAME"].str.replace(r"\[AOI\]|Slp[12]0", "", regex=True)
         names["SLOPE"] = [
             ", ".join(self.valid_slopes.get(m.replace("[Year]", "").lower(), []))
@@ -712,7 +715,6 @@ def streamcat(
         return StreamCat().metrics_df
     sc = StreamCatValidator(lakes_only)
     names = [metric_names] if isinstance(metric_names, str) else metric_names
-    names = [sc.alt_names.get(s.lower(), s.lower()) for s in names]
     sc.validate(name=names)
     params = {"name": ",".join(n for n in names)}
 
@@ -733,11 +735,11 @@ def streamcat(
 
     params_str = "&".join(f"{k}={v}" for k, v in params.items())
     if len(params_str) < 7000:
-        resp = ar.retrieve_text([f"{sc.base_url}?{params_str}"])
+        resp = ar.retrieve_json([f"{sc.url_metrics}?{params_str}"])
     else:
-        resp = ar.retrieve_text([sc.base_url], [{"data": params_str}], request_method="post")
+        resp = ar.retrieve_json([sc.url_metrics], [{"data": params_str}], request_method="post")
 
     try:
-        return pd.read_csv(io.StringIO(resp[0]), engine="pyarrow")
-    except ArrowInvalid as ex:
+        return pd.DataFrame(resp[0]["items"])
+    except (ArrowInvalid, KeyError) as ex:
         raise ServiceError(resp[0]) from ex
