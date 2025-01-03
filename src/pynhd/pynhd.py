@@ -105,7 +105,7 @@ if TYPE_CHECKING:
         "catchment",
     ]
 
-__all__ = ["HP3D", "NHD", "NHDPlusHR", "NLDI", "PyGeoAPI", "WaterData", "pygeoapi"]
+__all__ = ["HP3D", "NHD", "NLDI", "NHDPlusHR", "PyGeoAPI", "WaterData", "pygeoapi"]
 
 
 class NHD(AGRBase):
@@ -525,7 +525,7 @@ def pygeoapi(
 
 
 class WaterData:
-    """Access `WaterData <https://labs.waterdata.usgs.gov/geoserver>`__ service.
+    """Access `WaterData <https://api.water.usgs.gov/geoserver>`__ service.
 
     Parameters
     ----------
@@ -903,12 +903,12 @@ class NLDI:
 
     @overload
     def _get_urls(
-        self, url_parts: Generator[tuple[str, ...], None, None] | str, raw: Literal[True] = True
+        self, url_parts: Generator[tuple[str, ...], None, None] | str, raw: Literal[False] = False
     ) -> tuple[list[int], list[dict[str, Any]] | dict[str, Any]]: ...
 
     @overload
     def _get_urls(
-        self, url_parts: Generator[tuple[str, ...], None, None] | str, raw: Literal[False] = ...
+        self, url_parts: Generator[tuple[str, ...], None, None] | str, raw: Literal[True]
     ) -> gpd.GeoDataFrame: ...
 
     def _get_urls(
