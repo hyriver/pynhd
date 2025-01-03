@@ -617,16 +617,20 @@ class GeoConnex:
 
         def get_links(links: list[dict[str, Any]]) -> dict[str, str | list[str] | dict[str, str]]:
             """Get links."""
-            urls = {
-                lk["rel"]: lk["href"].replace("?f=json", "")
-                for lk in links
-                if lk["type"] == "application/json"
-            }
-            resp = ar.retrieve_json([f"{urls['self']}/queryables"], [{"params": {"f": "json"}}])
+            query_url = next(
+                (
+                    lk["href"]
+                    for lk in links
+                    if lk["type"] == "application/schema+json" and "queryables" in lk["rel"]
+                ),
+                None,
+            )
+            if query_url is None:
+                raise ServiceError("The service doesn't have a valid queryable link.")
+            resp = ar.retrieve_json([query_url])
             resp = cast("list[dict[str, Any]]", resp)
             prop: dict[str, dict[str, str]] = resp[0]["properties"]
             _ = prop.pop("geometry", None)
-            fields = list(prop)
             type_map = {
                 "integer": "int64",
                 "string": "str",
@@ -637,8 +641,8 @@ class GeoConnex:
             dtypes = {v["title"]: type_map[v["type"]] for v in prop.values()}
 
             return {
-                "url": f"{urls['self']}/items",
-                "query_fields": fields,
+                "url": f"{query_url.rsplit('/', 1)[0]}/items",
+                "query_fields": tuple(prop),
                 "dtypes": dtypes,
             }
 
@@ -649,8 +653,8 @@ class GeoConnex:
             ep[0]: EndPoints(
                 name=ep[0],
                 description=ep[1],
-                **get_links(ep[2]),  # pyright: ignore[reportArgumentType]
-                extent=tuple(ep[3]["spatial"]["bbox"][0]),  # pyright: ignore[reportArgumentType]
+                **get_links(ep[2]),
+                extent=tuple(ep[3]["spatial"]["bbox"][0]),
             )
             for ep in eps
         }
