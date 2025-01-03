@@ -40,13 +40,13 @@ except PackageNotFoundError:
     __version__ = "999"
 
 __all__ = [
-    "AGRBase",
-    "GeoConnex",
     "HP3D",
     "NHD",
+    "NLDI",
+    "AGRBase",
+    "GeoConnex",
     "NHDPlusHR",
     "NHDTools",
-    "NLDI",
     "PyGeoAPI",
     "ScienceBase",
     "StreamCat",
