@@ -54,7 +54,6 @@ optional-dependencies.nhdplus = [
 optional-dependencies.test = [
   "pytest-cov",
   "pytest-sugar",
-  "pytest-xdist[psutil]",
 ]
 urls.Changelog = "https://docs.hyriver.io/changelogs/pynhd.html"
 urls.CI = "https://github.com/hyriver/pynhd/actions"
@@ -206,10 +205,7 @@ ignore-words-list = "gage,gages,paramss,trough"
 addopts = [
   "--import-mode=importlib",
   "--doctest-modules",
-  "-n=auto",
   "-v",
-  "--cov",
-  "--junitxml=junit.xml",
   "--durations=5",
 ]
 doctest_optionflags = 'NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER'
@@ -234,24 +230,21 @@ ignore_errors = true
 
 [tool.coverage.paths]
 source = [ "src", "*/site-packages" ]
-omit = [
-  "**/__init__.py",
-  "**/print_versions.py",
-]
 
 [tool.coverage.run]
 branch = true
 parallel = true
-source = [
+source_pkgs = [
   "pynhd",
+]
+omit = [
+  "**/__init__.py",
 ]
 
 [tool.pyright]
 exclude = [
-  ".nox/",
   "**/__pycache__",
   "**/__init__.py",
-  "tests/",
 ]
 include = [
   "src/pynhd",
