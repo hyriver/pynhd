@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any, Literal, Union, cast, overload
+from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 import cytoolz.curried as tlz
-import numpy as np
 import pandas as pd
+import pyarrow.compute as pc
 from shapely import LineString, MultiLineString
 from yarl import URL
 
 import async_retriever as ar
 import pygeoogc as ogc
 import pygeoutils as geoutils
+import pynhd.nhdplus_derived as derived
 from pygeoogc import WFS, ServiceURL
 from pygeoutils.exceptions import EmptyResponseError
 from pynhd.core import AGRBase, PyGeoAPIBase, PyGeoAPIBatch
@@ -29,14 +30,14 @@ if TYPE_CHECKING:
     from collections.abc import Generator, Sequence
 
     import geopandas as gpd
-    import pyproj
+    from pyproj import CRS
     from shapely import MultiPoint, MultiPolygon, Point, Polygon
 
-    CRSTYPE = Union[int, str, pyproj.CRS]
-    GTYPE = Union[
-        Polygon, MultiPolygon, MultiPoint, LineString, Point, "tuple[float, float, float, float]"
-    ]
-    NHD_LAYERS = Literal[
+    CRSType = int | str | CRS
+    GeoType = (
+        Polygon | MultiPolygon | MultiPoint | LineString | Point | tuple[float, float, float, float]
+    )
+    NHDLayers = Literal[
         "point",
         "point_event",
         "line_hr",
@@ -51,7 +52,7 @@ if TYPE_CHECKING:
         "waterbody_hr_nonconus",
         "waterbody_hr",
     ]
-    WD_LAYERS = Literal[
+    WDLayers = Literal[
         "catchmentsp",
         "gagesii",
         "gagesii_basins",
@@ -68,7 +69,7 @@ if TYPE_CHECKING:
         "wbd10",
         "wbd12",
     ]
-    PREDICATES = Literal[
+    Predicates = Literal[
         "equals",
         "disjoint",
         "intersects",
@@ -80,7 +81,7 @@ if TYPE_CHECKING:
         "relate",
         "beyond",
     ]
-    NHDHR_LAYERS = Literal[
+    NHDHRLayers = Literal[
         "gauge",
         "sink",
         "point",
@@ -95,7 +96,7 @@ if TYPE_CHECKING:
         "boundary_unit",
         "huc12",
     ]
-    HP3D_LAYERS = Literal[
+    HP3DLayers = Literal[
         "hydrolocation_waterbody",
         "hydrolocation_flowline",
         "hydrolocation_reach",
@@ -154,9 +155,9 @@ class NHD(AGRBase):
 
     def __init__(
         self,
-        layer: NHD_LAYERS,
+        layer: NHDLayers,
         outfields: str | list[str] = "*",
-        crs: CRSTYPE = 4326,
+        crs: CRSType = 4326,
     ):
         self.valid_layers = {
             "point": "point",
@@ -224,9 +225,9 @@ class HP3D(AGRBase):
 
     def __init__(
         self,
-        layer: HP3D_LAYERS,
+        layer: HP3DLayers,
         outfields: str | list[str] = "*",
-        crs: CRSTYPE = 4326,
+        crs: CRSType = 4326,
     ):
         self.valid_layers = {
             "hydrolocation_waterbody": "Sink, Spring, Waterbody Outlet",
@@ -254,7 +255,7 @@ class PyGeoAPI(PyGeoAPIBase):
     def flow_trace(
         self,
         coord: tuple[float, float],
-        crs: CRSTYPE = 4326,
+        crs: CRSType = 4326,
         direction: Literal["down", "up", "none"] = "none",
     ) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame from the flowtrace service.
@@ -290,7 +291,7 @@ class PyGeoAPI(PyGeoAPIBase):
         return self.get_response(url, payload)
 
     def split_catchment(
-        self, coord: tuple[float, float], crs: CRSTYPE = 4326, upstream: bool = False
+        self, coord: tuple[float, float], crs: CRSType = 4326, upstream: bool = False
     ) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame from the splitcatchment service.
 
@@ -327,7 +328,7 @@ class PyGeoAPI(PyGeoAPIBase):
         line: LineString | MultiLineString,
         numpts: int,
         dem_res: int,
-        crs: CRSTYPE = 4326,
+        crs: CRSType = 4326,
     ) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame from the xsatpathpts service.
 
@@ -382,7 +383,7 @@ class PyGeoAPI(PyGeoAPIBase):
         coords: list[tuple[float, float]],
         numpts: int,
         dem_res: int,
-        crs: CRSTYPE = 4326,
+        crs: CRSType = 4326,
     ) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame from the xsatendpts service.
 
@@ -422,7 +423,7 @@ class PyGeoAPI(PyGeoAPIBase):
         return self.get_response(url, payload)
 
     def cross_section(
-        self, coord: tuple[float, float], width: float, numpts: int, crs: CRSTYPE = 4326
+        self, coord: tuple[float, float], width: float, numpts: int, crs: CRSType = 4326
     ) -> gpd.GeoDataFrame:
         """Return a GeoDataFrame from the xsatpoint service.
 
@@ -557,8 +558,8 @@ class WaterData:
 
     def __init__(
         self,
-        layer: WD_LAYERS,
-        crs: CRSTYPE = 4326,
+        layer: WDLayers,
+        crs: CRSType = 4326,
     ) -> None:
         self.valid_layers = [
             "catchmentsp",
@@ -606,7 +607,7 @@ class WaterData:
     def bybox(
         self,
         bbox: tuple[float, float, float, float],
-        box_crs: CRSTYPE = 4326,
+        box_crs: CRSType = 4326,
         sort_attr: str | None = None,
     ) -> gpd.GeoDataFrame:
         """Get features within a bounding box.
@@ -638,9 +639,9 @@ class WaterData:
     def bygeom(
         self,
         geometry: Polygon | MultiPolygon,
-        geo_crs: CRSTYPE = 4326,
+        geo_crs: CRSType = 4326,
         xy: bool = True,
-        predicate: PREDICATES = "intersects",
+        predicate: Predicates = "intersects",
         sort_attr: str | None = None,
     ) -> gpd.GeoDataFrame:
         """Get features within a geometry.
@@ -687,7 +688,7 @@ class WaterData:
         self,
         coords: tuple[float, float],
         distance: int,
-        loc_crs: CRSTYPE = 4326,
+        loc_crs: CRSType = 4326,
         sort_attr: str | None = None,
     ) -> gpd.GeoDataFrame:
         """Get features within a radius (in meters) of a point.
@@ -840,9 +841,9 @@ class NHDPlusHR(AGRBase):
 
     def __init__(
         self,
-        layer: NHDHR_LAYERS,
+        layer: NHDHRLayers,
         outfields: str | list[str] = "*",
-        crs: CRSTYPE = 4326,
+        crs: CRSType = 4326,
     ):
         self.valid_layers = {
             "gauge": "NHDPlusGage",
@@ -886,40 +887,39 @@ class NLDI:
 
         resp = ar.retrieve_json([r["characteristics"] for r in resp[0]])
         resp = cast("list[dict[str, Any]]", resp)
-        char_types = (
-            ogc.traverse_json(r, ["characteristicMetadata", "characteristic"]) for r in resp
-        )
-        self.valid_characteristics = pd.concat(
-            (pd.DataFrame(c) for c in char_types), ignore_index=True
-        )
+        self.valid_characteristics = derived.nhdplus_attrs_s3()
 
     @staticmethod
     def _check_resp(resp: dict[str, Any] | list[dict[str, Any]] | None) -> bool:
         if not resp:
             return False
         if isinstance(resp, dict):
-            return resp.get("type") != "error" and (resp.get("features") or "features" not in resp)
+            return (
+                resp.get("type") != "error"
+                and "error" not in resp
+                and (resp.get("features") or "features" not in resp)
+            )
         return True
 
     @overload
     def _get_urls(
         self, url_parts: Generator[tuple[str, ...], None, None] | str, raw: Literal[False] = False
-    ) -> tuple[list[int], list[dict[str, Any]] | dict[str, Any]]: ...
+    ) -> gpd.GeoDataFrame: ...
 
     @overload
     def _get_urls(
         self, url_parts: Generator[tuple[str, ...], None, None] | str, raw: Literal[True]
-    ) -> gpd.GeoDataFrame: ...
+    ) -> tuple[list[int], list[dict[str, Any]] | dict[str, Any]]: ...
 
     def _get_urls(
         self, url_parts: Generator[tuple[str, ...], None, None] | str, raw: bool = False
     ) -> tuple[list[int], list[dict[str, Any]] | dict[str, Any]] | gpd.GeoDataFrame:
         """Send a request to the service using GET method."""
         if isinstance(url_parts, str):
-            urls = [URL(url_parts)]
+            urls = [URL(url_parts).human_repr()]
         else:
-            urls = [URL("/".join((self.base_url, *u))) for u in url_parts]
-        resp = ar.retrieve_json([str(u) for u in urls], raise_status=False)
+            urls = [URL("/".join((self.base_url, *u))).human_repr() for u in url_parts]
+        resp = ar.retrieve_json(urls, raise_status=False)
 
         try:
             index, resp = zip(*((i, r) for i, r in enumerate(resp) if self._check_resp(r)))
@@ -928,16 +928,17 @@ class NLDI:
 
         index = cast("list[int]", list(index))
         resp = cast("list[dict[str, Any]] | dict[str, Any]", list(resp))
-        failed = [i for i in range(len(urls)) if i not in index]
+        failed = [u for i, u in enumerate(urls) if i not in index]
 
         if failed:
             msg = ". ".join(
                 (
                     f"{len(failed)} of {len(urls)} requests failed.",
-                    f"Indices of the failed requests are {failed}",
+                    f"The failed URLs are {failed}",
                 )
             )
             warnings.warn(msg, UserWarning, stacklevel=2)
+            _ = [ar.delete_url_cache(u) for u in failed]
 
         if raw:
             return index, resp
@@ -988,7 +989,7 @@ class NLDI:
         self,
         source: str,
         coords: tuple[float, float] | list[tuple[float, float]],
-        loc_crs: CRSTYPE = 4326,
+        loc_crs: CRSType = 4326,
     ) -> gpd.GeoDataFrame:
         """Get the closest feature ID(s) based on coordinates.
 
@@ -1018,7 +1019,7 @@ class NLDI:
     def comid_byloc(
         self,
         coords: tuple[float, float] | list[tuple[float, float]],
-        loc_crs: CRSTYPE = 4326,
+        loc_crs: CRSType = 4326,
     ) -> gpd.GeoDataFrame:
         """Get the closest ComID based on coordinates using ``hydrolocation`` endpoint.
 
@@ -1051,7 +1052,7 @@ class NLDI:
     def feature_byloc(
         self,
         coords: tuple[float, float] | list[tuple[float, float]],
-        loc_crs: CRSTYPE = 4326,
+        loc_crs: CRSType = 4326,
     ) -> gpd.GeoDataFrame:
         """Get the closest feature ID(s) based on coordinates using ``position`` endpoint.
 
@@ -1139,119 +1140,29 @@ class NLDI:
         basins = cast("gpd.GeoDataFrame", basins)
         return basins
 
-    @overload
-    def getcharacteristic_byid(
-        self,
-        feature_ids: str | int | Sequence[str | int],
-        char_type: str,
-        fsource: str = ...,
-        char_ids: str | list[str] = ...,
-        values_only: Literal[True] = True,
-    ) -> pd.DataFrame: ...
-
-    @overload
-    def getcharacteristic_byid(
-        self,
-        feature_ids: str | int | Sequence[str | int],
-        char_type: str,
-        fsource: str = ...,
-        char_ids: str | list[str] = ...,
-        values_only: Literal[False] = ...,
-    ) -> tuple[pd.DataFrame, pd.DataFrame]: ...
-
-    def getcharacteristic_byid(
-        self,
-        feature_ids: str | int | Sequence[str | int],
-        char_type: str,
-        fsource: str = "comid",
-        char_ids: str | list[str] = "all",
-        values_only: bool = True,
-    ) -> pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]:
+    @staticmethod
+    def get_characteristics(
+        char_list: str | list[str],
+        comids: int | list[int] | None = None,
+    ) -> pd.DataFrame:
         """Get characteristics using a list ComIDs.
 
         Parameters
         ----------
-        feature_ids : str or list
-            Target feature ID(s).
-        char_type : str
-            Type of the characteristic. Valid values are ``local`` for
-            individual reach catchments, ``tot`` for network-accumulated values
-            using total cumulative drainage area and ``div`` for network-accumulated values
-            using divergence-routed.
-        fsource : str, optional
-            The name of feature(s) source, defaults to ``comid``.
-            The valid sources are:
-
-            * 'comid' for NHDPlus comid.
-            * 'ca_gages' for Streamgage catalog for CA SB19
-            * 'gfv11_pois' for USGS Geospatial Fabric V1.1 Points of Interest
-            * 'huc12pp' for HUC12 Pour Points
-            * 'nmwdi-st' for New Mexico Water Data Initiative Sites
-            * 'nwisgw' for NWIS Groundwater Sites
-            * 'nwissite' for NWIS Surface Water Sites
-            * 'ref_gage' for geoconnex.us reference gages
-            * 'vigil' for Vigil Network Data
-            * 'wade' for Water Data Exchange 2.0 Sites
-            * 'WQP' for Water Quality Portal
-
-        char_ids : str or list, optional
-            Name(s) of the target characteristics, default to all.
-        values_only : bool, optional
-            Whether to return only ``characteristic_value`` as a series, default to True.
-            If is set to False, ``percent_nodata`` is returned as well.
+        char_list : str or list
+            The list of characteristics to get.
+        comids : int or list, optional
+            The list of ComIDs, defaults to None, i.e., all NHDPlus ComIDs.
 
         Returns
         -------
-        pandas.DataFrame or tuple of pandas.DataFrame
-            Either only ``characteristic_value`` as a dataframe or
-            or if ``values_only`` is Fale return ``percent_nodata`` as well.
+        pandas.DataFrame
+            The characteristics of the requested ComIDs.
         """
-        self._validate_fsource(fsource)
-        if char_type not in self.valid_chartypes:
-            valids = [f'"{s}" for {d}' for s, d in self.valid_chartypes.items()]
-            raise InputValueError("char", valids)
-
-        feature_ids = [feature_ids] if isinstance(feature_ids, (str, int)) else list(feature_ids)
-        feature_ids = [str(c) for c in feature_ids]
-
-        v_dict, nd_dict = {}, {}
-
-        if char_ids == "all":
-            payload = None
-        else:
-            _char_ids = [char_ids] if isinstance(char_ids, str) else list(char_ids)
-            valid_charids = self.valid_characteristics["characteristic_id"].to_list()
-
-            if any(c not in valid_charids for c in _char_ids):
-                raise InputValueError("char_id", valid_charids)
-            payload = {"characteristicId": ",".join(_char_ids)}
-
-        query = URL.build(query=payload).query_string
-        urls = (("linked-data", fsource, c, f"{char_type}?{query}") for c in feature_ids)
-        index, resp = self._get_urls(urls, True)
-        resp = cast("list[dict[str, Any]]", resp)
-        for i in index:
-            char = pd.DataFrame.from_dict(resp[i]["characteristics"], orient="columns").T
-            char.columns = char.iloc[0]
-            char = char.drop(index="characteristic_id")
-
-            v_dict[feature_ids[i]] = char.loc["characteristic_value"]
-            if values_only:
-                continue
-
-            nd_dict[feature_ids[i]] = char.loc["percent_nodata"]
-
-        def todf(df_dict: dict[str, pd.DataFrame]) -> pd.DataFrame:
-            df = pd.DataFrame.from_dict(df_dict, orient="index")
-            df[df == ""] = np.nan
-            df.index = df.index.astype("int64")
-            return df.astype("f4")
-
-        chars = todf(v_dict)
-        if values_only:
-            return chars
-
-        return chars, todf(nd_dict)
+        if comids is not None:
+            comids = pd.Series(comids).astype(int).to_list()
+        pyarrrow_filter = None if comids is None else pc.field("COMID").isin(comids)
+        return derived.nhdplus_attrs_s3(char_list, pyarrrow_filter)
 
     def navigate_byid(
         self,
@@ -1337,7 +1248,7 @@ class NLDI:
         coords: tuple[float, float],
         navigation: str | None = None,
         source: str | None = None,
-        loc_crs: CRSTYPE = 4326,
+        loc_crs: CRSType = 4326,
         distance: int = 500,
         trim_start: bool = False,
         stop_comid: str | int | None = None,
