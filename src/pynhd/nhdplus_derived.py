@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import pyarrow.dataset as pds
 from pyarrow import ArrowInvalid, fs
+from pyarrow.compute import Expression
 
 import async_retriever as ar
 import pygeoogc as ogc
@@ -301,7 +302,9 @@ def nhdplus_attrs(attr_name: str | None = None) -> pd.DataFrame:
 
 
 def nhdplus_attrs_s3(
-    attr_names: str | list[str] | None = None, nodata: bool = False
+    attr_names: str | list[str] | None = None,
+    pyarrow_filter: Expression | None = None,
+    nodata: bool = False,
 ) -> pd.DataFrame:
     """Access NHDPlus V2.1 derived attributes over CONUS.
 
@@ -315,6 +318,10 @@ def nhdplus_attrs_s3(
         Names of NHDPlus attribute(s) to return, defaults to None, i.e.,
         only return a metadata dataframe that includes the attribute names
         and their description and units.
+    pyarrow_filter : pyarrow.compute.Expression, optional
+        A filter expression to apply to the dataset, defaults to None. Please
+        refer to the PyArrow documentation for more information
+        `here <https://arrow.apache.org/docs/python/generated/pyarrow.dataset.Expression.html>`__.
     nodata : bool
         Whether to include NODATA percentages, default is False.
 
@@ -331,6 +338,9 @@ def nhdplus_attrs_s3(
     meta = pd.read_csv(io.StringIO(resp[0]), delimiter="\t")
     if attr_names is None:
         return meta
+
+    if pyarrow_filter is not None and not isinstance(pyarrow_filter, Expression):
+        raise InputTypeError("pyarrow_filter", "pyarrow.compute.Expression")
 
     urls = meta.set_index("ID").datasetURL.str.rsplit("/", n=1).str[-1].to_dict()
 
@@ -350,7 +360,7 @@ def nhdplus_attrs_s3(
             ds_columns = ds.schema.names
             with contextlib.suppress(StopIteration):
                 cols.append(next(c for c in ds_columns if "NODATA" in c))
-        return ds.to_table(columns=cols).to_pandas().set_index("COMID")
+        return ds.to_table(columns=cols, filter=pyarrow_filter).to_pandas().set_index("COMID")
 
     return pd.concat((to_pandas(d, c, nodata) for d, c in zip(datasets, ids.values())), axis=1)
 
@@ -733,12 +743,7 @@ def streamcat(
     if area_sqkm:
         params["showareasqkm"] = "true"
 
-    params_str = "&".join(f"{k}={v}" for k, v in params.items())
-    if len(params_str) < 7000:
-        resp = ar.retrieve_json([f"{sc.url_metrics}?{params_str}"])
-    else:
-        resp = ar.retrieve_json([sc.url_metrics], [{"data": params_str}], request_method="post")
-
+    resp = ar.retrieve_json([sc.url_metrics], [{"json": params}], request_method="post")
     try:
         return pd.DataFrame(resp[0]["items"])
     except (ArrowInvalid, KeyError) as ex:
