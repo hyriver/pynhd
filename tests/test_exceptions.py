@@ -13,12 +13,12 @@ class TestNLDI:
     def test_feature_missing(self, recwarn: pytest.WarningsRecorder):
         _ = self.nldi.feature_byloc([(45.2, -69.3), (-69.3, 45.2)])
         w = recwarn.pop(UserWarning)
-        assert "[0]" in str(w.message)
+        assert "POINT(45.200000 -69.300000)" in str(w.message)
 
     def test_basin_missing(self, recwarn: pytest.WarningsRecorder):
         _ = self.nldi.get_basins(["01031500", "00000000"])
         w = recwarn.pop(UserWarning)
-        assert "[1]" in str(w.message)
+        assert "USGS-00000000" in str(w.message)
 
     def test_basin_empty(self):
         ids = ["04253294"]

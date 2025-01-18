@@ -194,6 +194,7 @@ class TestNLDI:
         assert station.comid.values[0] == "1722317"
         assert comid.comid.values[0] == "1722211"
 
+    @pytest.mark.xfail(reason="Basin endpoint is not working.")
     def test_basin(self):
         eck4 = "+proj=eck4 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=km"
         basin = self.nldi.get_basins(STA_ID).to_crs(eck4)
@@ -201,11 +202,8 @@ class TestNLDI:
         assert_close(split.area.values[0] - basin.area.values[0], -0.2489)
 
     def test_char(self):
-        tot, prc = self.nldi.getcharacteristic_byid(
-            "6710923", "local", char_ids="all", values_only=False
-        )
+        tot = self.nldi.get_characteristics("CAT_BFI", 6710923)
         assert tot.CAT_BFI.values[0] == 57
-        assert prc.CAT_BFI.values[0] == 0
 
 
 class TestNHDAttrs:
@@ -262,10 +260,10 @@ class TestGCX:
 
     def test_multiple(self):
         gcx = pynhd.GeoConnex()
-        gcx.item = "hu02"
-        h2 = gcx.byid("huc2", "02")
-        h3 = gcx.byid("huc2", ["02", "03"])
-        assert (h2["gnis_id"] == 2730132).sum() == (h3["gnis_id"] == 2730133).sum() == 1
+        gcx.item = "nat_aq"
+        h2 = gcx.byitem("N100CMBPLB")
+        h3 = gcx.byid("fid", [3, 12])
+        assert (h2["aq_code"] == 116).sum() == (h3["aq_code"] == 116).sum() == 1
 
     def test_many_features_box(self):
         gcx = pynhd.GeoConnex(max_nfeatures=10)
@@ -273,15 +271,14 @@ class TestGCX:
         ms = gcx.bybox((-69.77, 45.07, -69.31, 45.45))
         assert len(ms) == 24
 
-    @pytest.mark.xfail(reason="Spatial CQL is not working.")
     def test_geom(self):
         gcx = pynhd.GeoConnex("mainstems")
         ms = gcx.bygeometry((-69.77, 45.07, -69.31, 45.45))
-        assert len(ms) == 24
+        assert len(ms) == 20
 
     def test_cql(self):
         gcx = pynhd.GeoConnex("ua10")
-        awa = gcx.bycql({"gt": [{"property": "awater10"}, 100e6]})
+        awa = gcx.bycql({"op": "gt", "args": [{"property": "awater10"}, 100e6]})
         assert len(awa) == 14
 
 
