@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     from pandas._libs.missing import NAType
     from pandas.core.groupby.generic import DataFrameGroupBy
 
-    CRSTYPE = Union[str, int, pyproj.CRS]
+    CRSType = Union[str, int, pyproj.CRS]
 
 
 __all__ = [
@@ -181,7 +181,7 @@ class NHDTools:
 
     def to_linestring(self) -> None:
         """Convert flowlines to shapely LineString objects."""
-        self.flw["geometry"] = self.flw.geometry.apply(ops.linemerge)
+        self.flw["geometry"] = shapely.line_merge(self.flw.geometry)
         self.flw = self.flw.set_crs(self.flw.crs)
 
     def remove_tinynetworks(
@@ -655,7 +655,7 @@ def __check_flw(flw: gpd.GeoDataFrame, req_cols: list[str]) -> None:
 
 def __merge_flowlines(flw: gpd.GeoDataFrame) -> LineString:
     """Merge flowlines."""
-    line = shapely.line_merge(flw.geometry)
+    line = ops.linemerge(flw.geometry.tolist())
 
     if not isinstance(line, LineString):
         raise InputValueError("flw.geometry", "mergeable to a single line")
@@ -704,9 +704,7 @@ def flowline_resample(
     for fi, ci in merged_idx.items():
         resampled.loc[ci, id_col] = flw.iloc[fi][id_col]
     resampled = resampled.dissolve(by=id_col)
-    resampled["geometry"] = [
-        ln if isinstance(ln, LineString) else ops.linemerge(ln) for ln in resampled.geometry
-    ]
+    resampled["geometry"] = shapely.line_merge(resampled.geometry)
     resampled = cast("gpd.GeoDataFrame", resampled)
     return resampled
 
@@ -783,13 +781,13 @@ def flowline_xsection(
     """
     __check_flw(flw, ["geometry", id_col])
     half_width = width * 0.5
-    lines = shapely.line_merge(flw.geometry)
+    lines = ops.linemerge(flw.geometry.tolist())
     if isinstance(lines, LineString):
         lines = [lines]
     elif isinstance(lines, MultiLineString):
         lines = list(lines.geoms)
     else:
-        raise InputValueError("flw.geometry", "LineString or MultiLineString")
+        raise InputTypeError("flw.geometry", "LineString or MultiLineString")
 
     n_segments = (int(np.ceil(ln.length / distance)) * 100 for ln in lines)
     main_split = tlz.concat(
@@ -1032,7 +1030,7 @@ def nhdplus_l48(
         raise DependencyError("nhdplus_l48", ["pyogrio", "py7zr"]) from ex
 
     layers = [
-        "Gauge",
+        "Gage",
         "BurnAddLine",
         "BurnAddWaterbody",
         "LandSea",
