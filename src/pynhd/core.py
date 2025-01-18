@@ -707,9 +707,6 @@ class GeoConnex:
             url_kwds["offset"] = offset
             return f"{self.query_url}?{'&'.join([f'{k}={v}' for k, v in url_kwds.items()])}"
 
-        print(_get_url(0))
-        print(params)
-        print(request_method)
         resp = ar.retrieve_json([_get_url(0)], [params], request_method=request_method)
         resp = cast("list[dict[str, Any]]", resp)
         if resp[0].get("code") is not None:
