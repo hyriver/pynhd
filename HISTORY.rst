@@ -2,6 +2,33 @@
 History
 =======
 
+0.19.0 (2025-01-17)
+-------------------
+
+Breaking Changes
+~~~~~~~~~~~~~~~~
+- Remove ``NLDI.getcharacteristic_byid`` method since its endpoint will be
+  removed from the NLDI service. The characteristics can still be accessed
+  via the ``NLDI.get_characteristics`` method and only requires specifying
+  the characteristic names and optionally the NHDPlus ComIDs. This method
+  calls the ``pynhd.nhdplus_attrs_s3`` function internally.
+- Switch to using the new StreamCat web service
+  `link <https://api.epa.gov/StreamCat>`__. While the public API of the
+  ``pynhd.streamcat`` function did not change the web service itself might
+  return different results and metrics names have been changed. Thus, this
+  change might affect the results of the function and is considered a breaking
+  change.
+
+New Features
+~~~~~~~~~~~~
+- Add a new optional argument to ``pynhd.nhdplus_attrs_s3`` to pass a PyArrow
+  Expression for filtering the query.
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Switch to using the new NLDI web service `link <https://api.water.usgs.gov/nldi>`__.
+  Note that NLDI web service now has a rate limit of 3600 requests per hour per IP.
+
 0.18.1 (2024-10-08)
 -------------------
 
