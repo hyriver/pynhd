@@ -5,7 +5,7 @@ from __future__ import annotations
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, Union, cast, overload
+from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 import cytoolz.curried as tlz
 import geopandas as gpd
@@ -35,13 +35,13 @@ from pynhd.exceptions import (
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    import pyproj
+    from pyproj import CRS
     from shapely import LineString, Point
 
-    CRSTYPE = Union[int, str, pyproj.CRS]
-    GTYPE = Union[
-        Polygon, MultiPolygon, MultiPoint, LineString, Point, "tuple[float, float, float, float]"
-    ]
+    CRSType = int | str | CRS
+    GeoType = (
+        Polygon | MultiPolygon | MultiPoint | LineString | Point | tuple[float, float, float, float]
+    )
 
 __all__ = ["AGRBase", "GeoConnex", "ScienceBase"]
 
@@ -92,7 +92,7 @@ class AGRBase:
         base_url: str,
         layer: str | None = None,
         outfields: str | list[str] = "*",
-        crs: CRSTYPE = 4326,
+        crs: CRSType = 4326,
         outformat: str = "json",
     ) -> None:
         if isinstance(layer, str):
@@ -187,7 +187,7 @@ class AGRBase:
         | tuple[float, float]
         | list[tuple[float, float]]
         | tuple[float, float, float, float],
-        geo_crs: CRSTYPE = 4326,
+        geo_crs: CRSType = 4326,
         sql_clause: str = "",
         distance: int | None = None,
         return_m: bool = False,
@@ -363,7 +363,7 @@ class PyGeoAPIBase:
     @staticmethod
     def check_coords(
         coords: tuple[float, float] | list[tuple[float, float]],
-        crs: CRSTYPE,
+        crs: CRSType,
     ) -> list[tuple[float, float]]:
         """Check the coordinates."""
         try:
@@ -697,15 +697,19 @@ class GeoConnex:
             params = kwds | {"headers": {"Content-Type": "application/json"}}
         else:
             params = kwds
+
         if len(ujson.dumps(params)) > 1000 or "json" in kwds or "data" in kwds:
-            request_method = "POST"
+            request_method = "post"
         else:
-            request_method = "GET"
+            request_method = "get"
 
         def _get_url(offset: int) -> str:
             url_kwds["offset"] = offset
             return f"{self.query_url}?{'&'.join([f'{k}={v}' for k, v in url_kwds.items()])}"
 
+        print(_get_url(0))
+        print(params)
+        print(request_method)
         resp = ar.retrieve_json([_get_url(0)], [params], request_method=request_method)
         resp = cast("list[dict[str, Any]]", resp)
         if resp[0].get("code") is not None:
@@ -733,29 +737,29 @@ class GeoConnex:
     @overload
     def bygeometry(
         self,
-        geometry1: GTYPE,
-        geometry2: GTYPE | None = ...,
+        geometry1: GeoType,
+        geometry2: GeoType | None = ...,
         predicate: str = ...,
-        crs: CRSTYPE = ...,
+        crs: CRSType = ...,
         skip_geometry: Literal[False] = False,
     ) -> gpd.GeoDataFrame: ...
 
     @overload
     def bygeometry(
         self,
-        geometry1: GTYPE,
-        geometry2: GTYPE | None = ...,
+        geometry1: GeoType,
+        geometry2: GeoType | None = ...,
         predicate: str = ...,
-        crs: CRSTYPE = ...,
+        crs: CRSType = ...,
         skip_geometry: Literal[True] = True,
     ) -> pd.DataFrame: ...
 
     def bygeometry(
         self,
-        geometry1: GTYPE,
-        geometry2: GTYPE | None = None,
+        geometry1: GeoType,
+        geometry2: GeoType | None = None,
         predicate: str = "intersects",
-        crs: CRSTYPE = 4326,
+        crs: CRSType = 4326,
         skip_geometry: bool = False,
     ) -> gpd.GeoDataFrame | pd.DataFrame:
         """Query the GeoConnex endpoint by geometry.
@@ -774,9 +778,8 @@ class GeoConnex:
             geometries would be ``CROSSES(geometry1, geometry2)``.
         predicate : str, optional
             The predicate to use, by default ``intersects``. Supported
-            predicates are ``intersects``, ``within``, ``contains``,
-            ``overlaps``, ``crosses``, ``disjoint``, ``touches``, and
-            ``equals``.
+            predicates are ``intersects``, ``equals``, ``disjoint``, ``touches``,
+            ``within``, ``overlaps``, ``crosses`` and ``contains``.
         crs : int or str or pyproj.CRS, optional
             The CRS of the polygon, by default ``EPSG:4326``. If the input
             is a ``geopandas.GeoDataFrame`` or ``geopandas.GeoSeries``,
@@ -793,16 +796,16 @@ class GeoConnex:
             raise MissingItemError(["item"])
 
         valid_predicates = (
-            "INTERSECTS",
-            "WITHIN",
-            "CONTAINS",
-            "OVERLAPS",
-            "CROSSES",
-            "DISJOINT",
-            "TOUCHES",
-            "EQUALS",
+            "intersects",
+            "equals",
+            "disjoint",
+            "touches",
+            "within",
+            "overlaps",
+            "crosses",
+            "contains",
         )
-        if predicate.upper() not in valid_predicates:
+        if predicate.lower() not in valid_predicates:
             raise InputValueError("predicate", valid_predicates)
 
         geom1 = geoutils.geo2polygon(geometry1, crs, 4326)
@@ -817,7 +820,10 @@ class GeoConnex:
         if geometry2 is None:
             return self._query(
                 {
-                    "json": {predicate.lower(): [{"property": "geom"}, geom1_json]},
+                    "json": {
+                        "op": f"s_{predicate.lower()}",
+                        "args": [{"property": "geom"}, geom1_json],
+                    },
                 },
                 skip_geometry,
             )
@@ -832,7 +838,7 @@ class GeoConnex:
             geom2_json = shapely_mapping(geom2)
         return self._query(
             {
-                "json": {predicate.lower(): [geom1_json, geom2_json]},
+                "json": {"op": f"s_{predicate.lower()}", "args": [geom1_json, geom2_json]},
             },
             skip_geometry,
         )
@@ -859,31 +865,60 @@ class GeoConnex:
         feature_ids: list[str] | str,
         skip_geometry: bool = False,
     ) -> gpd.GeoDataFrame | pd.DataFrame:
-        """Query the GeoConnex endpoint."""
+        """Query the GeoConnex endpoint.
+
+        Parameters
+        ----------
+        feature_name : str
+            The name of the feature to query.
+        feature_ids : list or str
+            The IDs of the feature to query.
+        skip_geometry: bool, optional
+            If ``True``, no geometry will not be returned, by default ``False``.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            The query result as a ``geopandas.GeoDataFrame`` or a ``pandas.DataFrame``.
+        """
         if self.item is None or self.query_url is None:
             raise MissingItemError(["item"])
 
         fids = {feature_ids} if isinstance(feature_ids, (str, int)) else set(feature_ids)
-
         valid_keys = self.endpoints[self.item].query_fields
         if feature_name not in valid_keys:
             raise InputValueError("feature_name", valid_keys)
         ftyped = pd.Series(list(fids)).astype(self.endpoints[self.item].dtypes[feature_name])
-        if len(ftyped) == 1:
-            kwds = {"filter": f"{feature_name} = '{ftyped[0]}'"}
-        elif len(ftyped) < 1000:
-            ids = ",".join(f"'{v}'" for v in ftyped)
-            kwds = {"filter": f"{feature_name} IN ({ids})"}
-        else:
-            kwds = {
-                "json": {
-                    "in": {
-                        "value": {"property": feature_name},
-                        "list": ftyped.to_list(),
-                    }
-                }
-            }
+        kwds = {"json": {"op": "in", "args": [{"property": feature_name}, ftyped.to_list()]}}
         return self._query(kwds, skip_geometry)
+
+    def byitem(self, item_id: str) -> gpd.GeoDataFrame:
+        """Query the GeoConnex endpoint by an item ID.
+
+        Parameters
+        ----------
+        item_id : str
+            The ID of the item to query. Note that this GeoConnex's item ID which
+            is not necessarily the same as the provider's item ID. For example,
+            for querying gages, the item ID is not the same as the USGS gage ID
+            but for querying HUC02, the item ID is the same as the HUC02 ID.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            The query result as a ``geopandas.GeoDataFrame``.
+        """
+        if self.item is None or self.query_url is None:
+            raise MissingItemError(["item"])
+        url = f"{self.query_url}/{item_id}"
+        resps = ar.retrieve_json([url], [{"params": {"f": "json"}}])
+        resp = cast("dict[str, Any]", resps[0])
+        if resp.get("code") is not None:
+            msg = f"{resp['code']}: {resp['description']}"
+            raise ServiceError(msg, url)
+        return gpd.GeoDataFrame.from_features(
+            {"type": "FeatureCollection", "features": [resp]}, 4326
+        )
 
     @overload
     def bycql(
@@ -908,8 +943,9 @@ class GeoConnex:
 
         Notes
         -----
-        GeoConnex only supports simple CQL queries. For more information
-        and examples visit https://portal.ogc.org/files/96288#simple-cql-JSON.
+        GeoConnex only supports Basinc CQL2 queries. For more information
+        and examples visit this
+        `link <https://docs.ogc.org/is/21-065r2/21-065r2.html#cql2-core>`__.
         Use this for non-spatial queries, since there's a dedicated method
         for spatial queries, :meth:`.bygeometry`.
 
