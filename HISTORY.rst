@@ -2,6 +2,16 @@
 History
 =======
 
+0.19.3 (2025-02-24)
+-------------------
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Use ``orjson`` instead of ``ujson`` due to the package not being
+  maintained anymore. The developer of ``ujson`` raised conrcerns
+  about security vulnerabilities and recommended using ``orjson``
+  instead.
+
 0.19.0 (2025-01-17)
 -------------------
 
