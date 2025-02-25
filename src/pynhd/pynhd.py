@@ -250,7 +250,7 @@ class HP3D(AGRBase):
 
 
 class PyGeoAPI(PyGeoAPIBase):
-    """Access `PyGeoAPI <https://labs.waterdata.usgs.gov/api/nldi/pygeoapi>`__ service."""
+    """Access `PyGeoAPI <https://api.water.usgs.gov/api/nldi/pygeoapi>`__ service."""
 
     def flow_trace(
         self,

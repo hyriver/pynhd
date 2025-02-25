@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 import cytoolz.curried as tlz
 import geopandas as gpd
+import orjson
 import pandas as pd
 import shapely
-import ujson
 from shapely import MultiPoint, MultiPolygon, Polygon
 from shapely import box as shapely_box
 from shapely.geometry import mapping as shapely_mapping
@@ -284,7 +284,7 @@ class AGRBase:
 
 
 class PyGeoAPIBase:
-    """Access `PyGeoAPI <https://labs.waterdata.usgs.gov/api/nldi/pygeoapi>`__ service."""
+    """Access `PyGeoAPI <https://api.water.usgs.gov/api/nldi/pygeoapi>`__ service."""
 
     def __init__(self) -> None:
         self.base_url = ServiceURL().restful.pygeoapi
@@ -388,7 +388,7 @@ class PyGeoAPIBase:
 
 
 class PyGeoAPIBatch(PyGeoAPIBase):
-    """Access `PyGeoAPI <https://labs.waterdata.usgs.gov/api/nldi/pygeoapi>`__ service.
+    """Access `PyGeoAPI <https://api.water.usgs.gov/api/nldi/pygeoapi>`__ service.
 
     Parameters
     ----------
@@ -698,7 +698,7 @@ class GeoConnex:
         else:
             params = kwds
 
-        if len(ujson.dumps(params)) > 1000 or "json" in kwds or "data" in kwds:
+        if len(orjson.dumps(params)) > 1000 or "json" in kwds or "data" in kwds:
             request_method = "post"
         else:
             request_method = "get"
@@ -810,7 +810,7 @@ class GeoConnex:
         if not geom1.intersects(shapely_box(*self.item_extent)):
             raise InputRangeError("geometry", f"within {self.item_extent}")
         try:
-            geom1_json = ujson.loads(shapely.to_geojson(geom1))
+            geom1_json = orjson.loads(shapely.to_geojson(geom1))
         except AttributeError:
             geom1_json = shapely_mapping(geom1)
 
@@ -830,7 +830,7 @@ class GeoConnex:
         if not geom2.intersects(shapely_box(*self.item_extent)):
             raise InputRangeError("geometry", f"within {self.item_extent}")
         try:
-            geom2_json = ujson.loads(shapely.to_geojson(geom2))
+            geom2_json = orjson.loads(shapely.to_geojson(geom2))
         except AttributeError:
             geom2_json = shapely_mapping(geom2)
         return self._query(
