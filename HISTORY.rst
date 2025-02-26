@@ -11,6 +11,8 @@ Internal Changes
   maintained anymore. The developer of ``ujson`` raised conrcerns
   about security vulnerabilities and recommended using ``orjson``
   instead.
+- Create two new modules called ``nldi`` and ``pygeoapi``
+  for better organization of the codebase.
 
 0.19.0 (2025-01-17)
 -------------------
