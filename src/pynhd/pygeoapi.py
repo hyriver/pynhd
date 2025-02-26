@@ -3,38 +3,28 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any, Literal, cast, overload
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import cytoolz.curried as tlz
+import geopandas as gpd
 import pandas as pd
-import pyarrow.compute as pc
-from shapely import LineString, MultiLineString
-from yarl import URL
+from shapely import LineString, MultiLineString, MultiPoint
 
 import async_retriever as ar
-import pygeoogc as ogc
 import pygeoutils as geoutils
-import pynhd.nhdplus_derived as derived
-from pygeoogc import WFS, ServiceURL
+from pygeoogc import ServiceURL
 from pygeoutils.exceptions import EmptyResponseError
-from pynhd.core import AGRBase
 from pynhd.exceptions import (
-    InputRangeError,
     InputTypeError,
-    InputValueError,
-    MissingItemError,
-    ServiceError,
     MissingColumnError,
     MissingCRSError,
+    ServiceError,
     ZeroMatchedError,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Sequence
-
-    import geopandas as gpd
     from pyproj import CRS
-    from shapely import MultiPoint, MultiPolygon, Point, Polygon
+    from shapely import MultiPolygon, Point, Polygon
 
     CRSType = int | str | CRS
     GeoType = (
@@ -42,6 +32,7 @@ if TYPE_CHECKING:
     )
 
 __all__ = ["PyGeoAPI", "pygeoapi"]
+
 
 class PyGeoAPIBase:
     """Access `PyGeoAPI <https://api.water.usgs.gov/api/nldi/pygeoapi>`__ service."""
@@ -257,6 +248,7 @@ class PyGeoAPIBatch(PyGeoAPIBase):
                 for g, *u in geo_iter
             ]
         )
+
 
 class PyGeoAPI(PyGeoAPIBase):
     """Access `PyGeoAPI <https://api.water.usgs.gov/api/nldi/pygeoapi>`__ service."""

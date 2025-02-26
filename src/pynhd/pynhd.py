@@ -3,35 +3,25 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any, Literal, cast, overload
+from typing import TYPE_CHECKING, Any, Literal, cast
 
-import cytoolz.curried as tlz
-import pandas as pd
-import pyarrow.compute as pc
-from shapely import LineString, MultiLineString
-from yarl import URL
-
-import async_retriever as ar
 import pygeoogc as ogc
 import pygeoutils as geoutils
-import pynhd.nhdplus_derived as derived
 from pygeoogc import WFS, ServiceURL
 from pygeoutils.exceptions import EmptyResponseError
-from pynhd.core import AGRBase, PyGeoAPIBase, PyGeoAPIBatch
+from pynhd.core import AGRBase
 from pynhd.exceptions import (
-    InputRangeError,
     InputTypeError,
     InputValueError,
-    MissingItemError,
     ZeroMatchedError,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Sequence
+    from collections.abc import Sequence
 
     import geopandas as gpd
     from pyproj import CRS
-    from shapely import MultiPoint, MultiPolygon, Point, Polygon
+    from shapely import LineString, MultiPoint, MultiPolygon, Point, Polygon
 
     CRSType = int | str | CRS
     GeoType = (
@@ -106,7 +96,7 @@ if TYPE_CHECKING:
         "catchment",
     ]
 
-__all__ = ["HP3D", "NHD", "NLDI", "NHDPlusHR", "PyGeoAPI", "WaterData", "pygeoapi"]
+__all__ = ["HP3D", "NHD", "NHDPlusHR", "WaterData"]
 
 
 class NHD(AGRBase):
@@ -247,281 +237,6 @@ class HP3D(AGRBase):
             outfields,
             crs,
         )
-
-
-class PyGeoAPI(PyGeoAPIBase):
-    """Access `PyGeoAPI <https://api.water.usgs.gov/api/nldi/pygeoapi>`__ service."""
-
-    def flow_trace(
-        self,
-        coord: tuple[float, float],
-        crs: CRSType = 4326,
-        direction: Literal["down", "up", "none"] = "none",
-    ) -> gpd.GeoDataFrame:
-        """Return a GeoDataFrame from the flowtrace service.
-
-        Parameters
-        ----------
-        coord : tuple
-            The coordinate of the point to trace as a tuple,e.g., (lon, lat).
-        crs : str
-            The coordinate reference system of the coordinates, defaults to EPSG:4326.
-        direction : str, optional
-            The direction of flowpaths, either ``down``, ``up``, or ``none``.
-            Defaults to ``none``.
-
-        Returns
-        -------
-        geopandas.GeoDataFrame
-            A GeoDataFrame containing the traced flowline.
-
-        Examples
-        --------
-        >>> from pynhd import PyGeoAPI
-        >>> pga = PyGeoAPI()
-        >>> gdf = pga.flow_trace(
-        ...     (1774209.63, 856381.68), crs="ESRI:102003", direction="none"
-        ... )  # doctest: +SKIP
-        >>> print(gdf.comid.iloc[0])  # doctest: +SKIP
-        22294818
-        """
-        lon, lat = self.check_coords(coord, crs)[0]
-        url = self.get_url("flowtrace")
-        payload = self.request_body([{"lat": lat, "lon": lon, "direction": direction}])
-        return self.get_response(url, payload)
-
-    def split_catchment(
-        self, coord: tuple[float, float], crs: CRSType = 4326, upstream: bool = False
-    ) -> gpd.GeoDataFrame:
-        """Return a GeoDataFrame from the splitcatchment service.
-
-        Parameters
-        ----------
-        coord : tuple
-            The coordinate of the point to trace as a tuple,e.g., (lon, lat).
-        crs : str, int, or pyproj.CRS, optional
-            The coordinate reference system of the coordinates, defaults to EPSG:4326.
-        upstream : bool, optional
-            If True, return all upstream catchments rather than just the local catchment,
-            defaults to False.
-
-        Returns
-        -------
-        geopandas.GeoDataFrame
-            A GeoDataFrame containing the local catchment or the entire upstream catchments.
-
-        Examples
-        --------
-        >>> from pynhd import PyGeoAPI
-        >>> pga = PyGeoAPI()
-        >>> gdf = pga.split_catchment((-73.82705, 43.29139), crs=4326, upstream=False)  # doctest: +SKIP
-        >>> print(gdf.catchmentID.iloc[0])  # doctest: +SKIP
-        22294818
-        """
-        lon, lat = self.check_coords(coord, crs)[0]
-        url = self.get_url("splitcatchment")
-        payload = self.request_body([{"lat": lat, "lon": lon, "upstream": upstream}])
-        return self.get_response(url, payload)
-
-    def elevation_profile(
-        self,
-        line: LineString | MultiLineString,
-        numpts: int,
-        dem_res: int,
-        crs: CRSType = 4326,
-    ) -> gpd.GeoDataFrame:
-        """Return a GeoDataFrame from the xsatpathpts service.
-
-        Parameters
-        ----------
-        line : shapely.LineString or shapely.MultiLineString
-            The line to extract the elevation profile for.
-        numpts : int
-            The number of points to extract the elevation profile from the DEM.
-        dem_res : int
-            The target resolution for requesting the DEM from 3DEP service.
-        crs : str, int, or pyproj.CRS, optional
-            The coordinate reference system of the coordinates, defaults to EPSG:4326.
-
-        Returns
-        -------
-        geopandas.GeoDataFrame
-            A GeoDataFrame containing the elevation profile along the requested endpoints.
-
-        Examples
-        --------
-        >>> from pynhd import PyGeoAPI
-        >>> from shapely import LineString
-        >>> pga = PyGeoAPI()
-        >>> line = LineString([(-103.801086, 40.26772), (-103.80097, 40.270568)])
-        >>> gdf = pga.elevation_profile(line, 101, 1, 4326)  # doctest: +SKIP
-        >>> print(gdf.iloc[-1, 2])  # doctest: +SKIP
-        1299.8727
-        """
-        if not isinstance(line, (LineString, MultiLineString)):
-            raise InputTypeError("line", "LineString or MultiLineString")
-        line = geoutils.geometry_reproject(line, crs, 4326)  # pyright: ignore[reportArgumentType]
-        if isinstance(line, LineString):
-            coords = line.coords
-        else:
-            coords = list(tlz.concat(c.coords for c in line.geoms))
-
-        url = self.get_url("xsatpathpts")
-        payload = self.request_body(
-            [
-                {
-                    "path": [[round(x, 6), round(y, 6)] for x, y in coords],
-                    "numpts": numpts,
-                    "3dep_res": dem_res,
-                }
-            ]
-        )
-        return self.get_response(url, payload)
-
-    def endpoints_profile(
-        self,
-        coords: list[tuple[float, float]],
-        numpts: int,
-        dem_res: int,
-        crs: CRSType = 4326,
-    ) -> gpd.GeoDataFrame:
-        """Return a GeoDataFrame from the xsatendpts service.
-
-        Parameters
-        ----------
-        coords : list
-            A list of two coordinates to trace as a list of tuples, e.g.,
-            [(x1, y1), (x2, y2)].
-        numpts : int
-            The number of points to extract the elevation profile from the DEM.
-        dem_res : int
-            The target resolution for requesting the DEM from 3DEP service.
-        crs : str, int, or pyproj.CRS, optional
-            The coordinate reference system of the coordinates, defaults to EPSG:4326.
-
-        Returns
-        -------
-        geopandas.GeoDataFrame
-            A GeoDataFrame containing the elevation profile along the requested endpoints.
-
-        Examples
-        --------
-        >>> from pynhd import PyGeoAPI
-        >>> pga = PyGeoAPI()
-        >>> gdf = pga.endpoints_profile(
-        ...     [(-103.801086, 40.26772), (-103.80097, 40.270568)], numpts=101, dem_res=1, crs=4326
-        ... )  # doctest: +SKIP
-        >>> print(gdf.iloc[-1, 1])  # doctest: +SKIP
-        411.5906
-        """
-        lons, lats = zip(*self.check_coords(coords, crs))
-
-        url = self.get_url("xsatendpts")
-        payload = self.request_body(
-            [{"lat": lats, "lon": lons, "numpts": numpts, "3dep_res": dem_res}]
-        )
-        return self.get_response(url, payload)
-
-    def cross_section(
-        self, coord: tuple[float, float], width: float, numpts: int, crs: CRSType = 4326
-    ) -> gpd.GeoDataFrame:
-        """Return a GeoDataFrame from the xsatpoint service.
-
-        Parameters
-        ----------
-        coord : tuple
-            The coordinate of the point to extract the cross-section as a tuple,e.g., (lon, lat).
-        width : float
-            The width of the cross-section in meters.
-        numpts : int
-            The number of points to extract the cross-section from the DEM.
-        crs : str, int, or pyproj.CRS, optional
-            The coordinate reference system of the coordinates, defaults to EPSG:4326.
-
-        Returns
-        -------
-        geopandas.GeoDataFrame
-            A GeoDataFrame containing the cross-section at the requested point.
-
-        Examples
-        --------
-        >>> from pynhd import PyGeoAPI
-        >>> pga = PyGeoAPI()
-        >>> gdf = pga.cross_section((-103.80119, 40.2684), width=1000.0, numpts=101, crs=4326)  # doctest: +SKIP
-        >>> print(gdf.iloc[-1, 1])  # doctest: +SKIP
-        1000.0
-        """
-        lon, lat = self.check_coords(coord, crs)[0]
-        url = self.get_url("xsatpoint")
-        payload = self.request_body([{"lat": lat, "lon": lon, "width": width, "numpts": numpts}])
-        return self.get_response(url, payload)
-
-
-def pygeoapi(
-    geodf: gpd.GeoDataFrame,
-    service: Literal[
-        "flow_trace", "split_catchment", "elevation_profile", "endpoints_profile", "cross_section"
-    ],
-) -> gpd.GeoDataFrame:
-    """Return a GeoDataFrame from the flowtrace service.
-
-    Parameters
-    ----------
-    geodf : geopandas.GeoDataFrame
-        A GeoDataFrame containing geometries to query.
-        The required columns for each service are:
-
-        * ``flow_trace``: ``direction`` that indicates the direction of the flow trace.
-          It can be ``up``, ``down``, or ``none`` (both directions).
-        * ``split_catchment``: ``upstream`` that indicates whether to return all upstream
-          catchments or just the local catchment.
-        * ``elevation_profile``: ``numpts`` that indicates the number of points to extract
-          along the flowpath and ``3dep_res`` that indicates the target resolution for
-          requesting the DEM from 3DEP service.
-        * ``endpoints_profile``: ``numpts`` that indicates the number of points to extract
-          along the flowpath and ``3dep_res`` that indicates the target resolution for
-          requesting the DEM from 3DEP service.
-        * ``cross_section``: ``numpts`` that indicates the number of points to extract
-          along the flowpath and ``width`` that indicates the width of the cross-section
-          in meters.
-
-    service : str
-        The service to query, can be ``flow_trace``, ``split_catchment``, ``elevation_profile``,
-        ``endpoints_profile``, or ``cross_section``.
-
-    Returns
-    -------
-    geopandas.GeoDataFrame
-        A GeoDataFrame containing the results of requested service.
-
-    Examples
-    --------
-    >>> from shapely import Point
-    >>> import geopandas as gpd
-    >>> gdf = gpd.GeoDataFrame(
-    ...     {
-    ...         "direction": [
-    ...             "none",
-    ...         ]
-    ...     },
-    ...     geometry=[Point((1774209.63, 856381.68))],
-    ...     crs="ESRI:102003",
-    ... )
-    >>> trace = nhd.pygeoapi(gdf, "flow_trace")
-    >>> print(trace.comid.iloc[0])
-    22294818
-    """
-    pgab = PyGeoAPIBatch(geodf)
-    url = pgab.get_url(pgab.service[service])
-    payload = pgab.get_payload(service)
-    gdf = pgab.get_response(url, payload)
-    if service == "flow_trace":
-        gdf["comid"] = gdf["comid"].astype("Int64")
-        feat = gdf[~gdf.comid.isna()].set_index("req_idx")
-        raindrop = gdf.loc[gdf.comid.isna(), ["req_idx", "geometry"]].set_index("req_idx")
-        feat["raindrop_path"] = raindrop.geometry
-        return feat.reset_index()
-    return gdf
 
 
 class WaterData:

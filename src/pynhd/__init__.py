@@ -31,8 +31,10 @@ from pynhd.nhdplus_derived import (
     nhdplus_vaa,
     streamcat,
 )
+from pynhd.nldi import NLDI
 from pynhd.print_versions import show_versions
-from pynhd.pynhd import HP3D, NHD, NLDI, NHDPlusHR, PyGeoAPI, WaterData, pygeoapi
+from pynhd.pygeoapi import PyGeoAPI, pygeoapi
+from pynhd.pynhd import HP3D, NHD, NHDPlusHR, WaterData
 
 try:
     __version__ = version("pynhd")

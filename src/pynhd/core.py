@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast, overload
@@ -23,10 +22,7 @@ from pygeoogc import utils as ogc_utils
 from pygeoutils.exceptions import EmptyResponseError
 from pynhd.exceptions import (
     InputRangeError,
-    InputTypeError,
     InputValueError,
-    MissingColumnError,
-    MissingCRSError,
     MissingItemError,
     ServiceError,
     ZeroMatchedError,
@@ -399,7 +395,9 @@ class GeoConnex:
         resp = cast("list[dict[str, Any]]", resp)
         pluck = tlz.partial(tlz.pluck, seqs=resp[0]["collections"])
 
-        def get_links(links: list[dict[str, Any]]) -> dict[str, str | list[str] | dict[str, str]]:
+        def get_links(
+            links: list[dict[str, Any]],
+        ) -> dict[str, str | tuple[str, ...] | dict[str, str]]:
             """Get links."""
             query_url = next(
                 (
@@ -437,7 +435,7 @@ class GeoConnex:
             ep[0]: EndPoints(
                 name=ep[0],
                 description=ep[1],
-                **get_links(ep[2]),
+                **get_links(ep[2]),  # pyright: ignore[reportArgumentType]
                 extent=tuple(ep[3]["spatial"]["bbox"][0]),
             )
             for ep in eps
@@ -669,7 +667,8 @@ class GeoConnex:
         valid_keys = self.endpoints[self.item].query_fields
         if feature_name not in valid_keys:
             raise InputValueError("feature_name", valid_keys)
-        ftyped = pd.Series(list(fids)).astype(self.endpoints[self.item].dtypes[feature_name])
+        dtype = self.endpoints[self.item].dtypes[feature_name]
+        ftyped = pd.Series(list(fids)).astype(dtype)  # pyright: ignore[reportCallIssue,reportArgumentType]
         kwds = {"json": {"op": "in", "args": [{"property": feature_name}, ftyped.to_list()]}}
         return self._query(kwds, skip_geometry)
 
@@ -698,7 +697,8 @@ class GeoConnex:
             msg = f"{resp['code']}: {resp['description']}"
             raise ServiceError(msg, url)
         return gpd.GeoDataFrame.from_features(
-            {"type": "FeatureCollection", "features": [resp]}, 4326
+            {"type": "FeatureCollection", "features": [resp]},  # pyright: ignore[reportArgumentType]
+            crs=4326,
         )
 
     @overload
