@@ -176,8 +176,8 @@ class TestNLDI:
         assert pp.shape[0] == 12
 
     def test_navigate_loc(self):
-        wqp = self.nldi.navigate_byloc((-70, 44), UT, "wqp")
-        assert wqp.comid.iloc[0] == "6710923"
+        wqp = self.nldi.navigate_byloc((-89.509, 43.087), UT, "wqp")
+        assert wqp.comid.iloc[0] == "13293676"
 
     def test_comid_loc(self):
         station = self.nldi.getfeature_byid(site, station_id)
