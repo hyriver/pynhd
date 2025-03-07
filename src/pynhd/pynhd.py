@@ -5,7 +5,8 @@ from __future__ import annotations
 import warnings
 from typing import TYPE_CHECKING, Any, Literal, cast
 
-import pygeoogc as ogc
+import numpy as np
+
 import pygeoutils as geoutils
 from pygeoogc import WFS, ServiceURL
 from pygeoutils.exceptions import EmptyResponseError
@@ -310,7 +311,7 @@ class WaterData:
     def _to_geodf(self, resp: list[dict[str, Any]]) -> gpd.GeoDataFrame:
         """Convert a response from WaterData to a GeoDataFrame."""
         try:
-            features = geoutils.json2geodf(resp, self.wfs.crs, self.crs)
+            features = geoutils.json2geodf(resp, self.wfs.crs, self.crs).drop_duplicates()
         except EmptyResponseError as ex:
             raise ZeroMatchedError from ex
 
@@ -424,10 +425,11 @@ class WaterData:
         geopandas.GeoDataFrame
             Requested features as a GeoDataFrame.
         """
-        if not (isinstance(coords, tuple) and len(coords) == 2):
-            raise InputTypeError("coods", "tuple of length 2", "(x, y)")
+        _coords = np.atleast_1d(coords)
+        if _coords.shape != (2,):
+            raise InputTypeError("coords", "tuple of length 2", "(x, y)")
 
-        x, y = ogc.match_crs([coords], loc_crs, self.wfs.crs)[0]
+        x, y = geoutils.geometry_reproject(_coords, loc_crs, self.wfs.crs)[0]
         geom_name = self.wfs.schema[self.layer].get("geometry_column", "the_geom")
         cql_filter = f"DWITHIN({geom_name},POINT({y:.6f} {x:.6f}),{distance},meters)"
         resp = self.wfs.getfeature_byfilter(

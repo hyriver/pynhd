@@ -10,7 +10,6 @@ import pyarrow.compute as pc
 from yarl import URL
 
 import async_retriever as ar
-import pygeoogc as ogc
 import pygeoutils as geoutils
 import pynhd.nhdplus_derived as derived
 from pygeoogc import ServiceURL
@@ -171,7 +170,7 @@ class NLDI:
             a list of missing coords are returned as well.
         """
         _coords = geoutils.coords_list(coords)
-        _coords = ogc.match_crs(_coords, loc_crs, 4326)
+        _coords = geoutils.geometry_reproject(_coords, loc_crs, 4326)
         endpoint = "comid/position" if source == "feature" else "hydrolocation"
         urls = (
             ("linked-data", f"{endpoint}?coords=POINT({lon:.6f} {lat:.6f})") for lon, lat in _coords

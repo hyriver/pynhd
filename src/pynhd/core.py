@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 import cytoolz.curried as tlz
 import geopandas as gpd
-import orjson
 import pandas as pd
 import shapely
 from shapely import MultiPoint, MultiPolygon, Polygon
@@ -480,7 +480,7 @@ class GeoConnex:
         else:
             params = kwds
 
-        if len(orjson.dumps(params)) > 1000 or "json" in kwds or "data" in kwds:
+        if len(json.dumps(params)) > 1000 or "json" in kwds or "data" in kwds:
             request_method = "post"
         else:
             request_method = "get"
@@ -592,7 +592,7 @@ class GeoConnex:
         if not geom1.intersects(shapely_box(*self.item_extent)):
             raise InputRangeError("geometry", f"within {self.item_extent}")
         try:
-            geom1_json = orjson.loads(shapely.to_geojson(geom1))
+            geom1_json = json.loads(shapely.to_geojson(geom1))
         except AttributeError:
             geom1_json = shapely_mapping(geom1)
 
@@ -612,7 +612,7 @@ class GeoConnex:
         if not geom2.intersects(shapely_box(*self.item_extent)):
             raise InputRangeError("geometry", f"within {self.item_extent}")
         try:
-            geom2_json = orjson.loads(shapely.to_geojson(geom2))
+            geom2_json = json.loads(shapely.to_geojson(geom2))
         except AttributeError:
             geom2_json = shapely_mapping(geom2)
         return self._query(
