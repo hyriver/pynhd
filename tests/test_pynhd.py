@@ -248,7 +248,7 @@ class TestWaterData:
         huc12 = wb[wb.huc12 == "170300010602"].geometry
         coords = huc12.centroid.get_coordinates().to_numpy()[0]
         hucs = wd.bydistance(coords, 100, crs, sort_attr="huc12")
-        assert wb.shape[0] == 156
+        assert wb.shape[0] == 52
         assert hucs.name[0] == "Upper Wenas River"
 
 
