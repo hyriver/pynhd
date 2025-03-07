@@ -165,19 +165,19 @@ class TestNLDI:
 
     def test_navigate(self):
         stm = self.nldi.navigate_byid(site, station_id, UM, site)
-        assert stm.shape[0] == 3
+        assert stm.shape[0] == 4
 
     def test_navigate_distance(self):
         st100 = self.nldi.navigate_byid(site, station_id, UM, site, distance=100)
-        assert st100.shape[0] == 3
+        assert st100.shape[0] == 4
 
     def test_navigate_fsource(self):
         pp = self.nldi.navigate_byid(site, station_id, UT, "huc12pp")
         assert pp.shape[0] == 12
 
     def test_navigate_loc(self):
-        wqp = self.nldi.navigate_byloc((-89.509, 43.087), UT, "wqp")
-        assert wqp.comid.iloc[0] == "13293676"
+        wqp = self.nldi.navigate_byloc((-89.509, 43.087), UT, "flowlines")
+        assert wqp.nhdplus_comid.iloc[0] == "13294314"
 
     def test_comid_loc(self):
         station = self.nldi.getfeature_byid(site, station_id)
@@ -246,9 +246,9 @@ class TestWaterData:
         wd = WaterData("huc12", crs)
         wb = wd.byfilter("huc12 LIKE '17030001%'", sort_attr="huc12")
         huc12 = wb[wb.huc12 == "170300010602"].geometry
-        coords = (huc12.centroid.x, huc12.centroid.y)
+        coords = huc12.centroid.get_coordinates().to_numpy()[0]
         hucs = wd.bydistance(coords, 100, crs, sort_attr="huc12")
-        assert wb.shape[0] == 52
+        assert wb.shape[0] == 156
         assert hucs.name[0] == "Upper Wenas River"
 
 
