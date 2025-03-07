@@ -36,15 +36,15 @@ dynamic = [
   "version",
 ]
 dependencies = [
-  "async-retriever>=0.19,<0.20",
+  "async-retriever>=0.19.3,<0.20",
   "cytoolz",
   "geopandas>=1",
   "networkx",
   "numpy>=2",
   "pandas>=1",
   "pyarrow>=1.0.1",
-  "pygeoogc>=0.19,<0.20",
-  "pygeoutils>=0.19,<0.20",
+  "pygeoogc>=0.19.3,<0.20",
+  "pygeoutils>=0.19.5,<0.20",
   "shapely>=2",
 ]
 optional-dependencies.nhdplus = [
