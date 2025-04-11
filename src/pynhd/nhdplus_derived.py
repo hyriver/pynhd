@@ -371,7 +371,7 @@ def nhdplus_h12pp(gpkg_path: Path | str | None = None) -> pd.DataFrame:
     Notes
     -----
     More info can be found
-    `here <https://www.sciencebase.gov/catalog/item/60cb5edfd34e86b938a373f4>`__.
+    `here <https://www.sciencebase.gov/catalog/item/65cbc0b3d34ef4b119cb37e9>`__.
 
     Parameters
     ----------
@@ -384,7 +384,7 @@ def nhdplus_h12pp(gpkg_path: Path | str | None = None) -> pd.DataFrame:
     geopandas.GeoDataFrame
         A geodataframe of HUC12 pour points.
     """
-    url = ScienceBase.get_file_urls("60cb5edfd34e86b938a373f4").loc["102020wbd_outlets.gpkg"].url
+    url = ScienceBase.get_file_urls("65cbc0b3d34ef4b119cb37e9").loc["102020wbd_outlets.gpkg"].url
     url = cast("str", url)
     gpkg_path = Path("cache", "102020wbd_outlets.gpkg") if gpkg_path is None else Path(gpkg_path)
     gpkg_path = ogc.streaming_download(url, fnames=gpkg_path)
