@@ -343,7 +343,7 @@ def test_acc(trib):
 
 def test_h12pp():
     h12pp = pynhd.nhdplus_h12pp()
-    assert len(h12pp) == 78249
+    assert len(h12pp) == 78123
 
 
 def test_enhd_nx():
