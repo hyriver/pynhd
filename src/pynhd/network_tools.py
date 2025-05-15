@@ -40,7 +40,6 @@ except ImportError:
 if TYPE_CHECKING:
     import pyproj
     from pandas._libs.missing import NAType
-    from pandas.core.groupby.generic import DataFrameGroupBy
 
     CRSType = Union[str, int, pyproj.CRS]
 
@@ -124,7 +123,7 @@ class NHDTools:
         self,
         flowlines: gpd.GeoDataFrame,
     ) -> None:
-        self.flw = cast("gpd.GeoDataFrame", flowlines.copy())
+        self.flw = flowlines.copy()
         self.nrows = flowlines.shape[0]
         self.crs = flowlines.crs
         self.is_hr = "nhdplusid" in flowlines
@@ -182,7 +181,6 @@ class NHDTools:
     def to_linestring(self) -> None:
         """Convert flowlines to shapely LineString objects."""
         self.flw["geometry"] = shapely.line_merge(self.flw.geometry)
-        self.flw = self.flw.set_crs(self.flw.crs)
 
     def remove_tinynetworks(
         self,
@@ -236,9 +234,8 @@ class NHDTools:
         terminal_filter = (self.flw.terminalfl == 1) & (self.flw.totdasqkm < min_network_size)
         start_filter = (self.flw.startflag == 1) & (self.flw.pathlength < min_path_length)
 
-        if any(terminal_filter.dropna()) or any(start_filter.dropna()):
-            tiny_networks = self.flw[terminal_filter].append(self.flw[start_filter])
-            self.flw = self.flw[~self.flw.terminalpa.isin(tiny_networks.terminalpa.unique())]
+        tiny_networks = self.flw[terminal_filter | start_filter]
+        self.flw = self.flw[~self.flw.terminalpa.isin(tiny_networks.terminalpa.unique())]
 
     def remove_isolated(self) -> None:
         """Remove isolated flowlines."""
@@ -271,7 +268,7 @@ class NHDTools:
         if "tocomid" in self.flw:
             self.flw = self.flw.drop(columns="tocomid")
 
-        def tocomid(grp: DataFrameGroupBy) -> pd.DataFrame:
+        def tocomid(grp: pd.DataFrame) -> pd.DataFrame:
             g_merged = pd.merge(
                 grp[["comid", "tonode"]],  # pyright: ignore[reportArgumentType]
                 grp[["comid", "fromnode"]].rename(columns={"comid": "tocomid"}),
