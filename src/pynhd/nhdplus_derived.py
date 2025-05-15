@@ -403,7 +403,6 @@ def nhdplus_h12pp(gpkg_path: Path | str | None = None) -> pd.DataFrame:
         ["COMID", "REACHCODE", "REACH_meas", "offset", "HUC12", "LevelPathI", "geometry"]
     ].copy()
     h12pp[["COMID", "LevelPathI"]] = h12pp[["COMID", "LevelPathI"]].astype("uint32")
-    h12pp = cast("gpd.GeoDataFrame", h12pp)
     return h12pp
 
 
@@ -529,8 +528,9 @@ class StreamCat:
         slopes = defaultdict(set)
         for var in variables:
             if "pctimp" in var:
-                slope = re.search(r"slp(\d+)", var).group(0)
-                slopes["pctimp"].add(slope)
+                slope = re.search(r"slp(\d+)", var)
+                if slope is not None:
+                    slopes["pctimp"].add(slope.group(0))
             else:
                 match = re.match(r"([a-z]+)((?:slp(?:high|mid|\d+))|(?:slpwtd))", var)
                 if match:
