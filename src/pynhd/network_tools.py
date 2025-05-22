@@ -198,14 +198,14 @@ class NHDTools:
 
         Parameters
         ----------
-        min_network_size : float
-            Minimum size of drainage network in sqkm.
-        min_path_length : float
-            Minimum length of terminal level path of a network in km.
         min_path_size : float
             Minimum size of outlet level path of a drainage basin in km.
             Drainage basins with an outlet drainage area smaller than
             this value will be removed.
+        min_path_length : float
+            Minimum length of terminal level path of a network in km.
+        min_network_size : float
+            Minimum size of drainage network in sqkm.
         """
         req_cols = [
             "levelpathi",
