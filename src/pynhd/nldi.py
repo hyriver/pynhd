@@ -33,13 +33,19 @@ __all__ = ["NLDI"]
 
 class NLDI:
     """Access the Hydro Network-Linked Data Index (NLDI) service.
-    
+
     Parameters
     ----------
     dev : bool, optional
         If ``True``, use the development version of the NLDI service.
         Defaults to ``False``.
     """
+
+    def _update_base_url(self) -> None:
+        if self._dev:
+            self.base_url = "https://labs-beta.waterdata.usgs.gov/api/nldi"
+        else:
+            self.base_url = "https://api.water.usgs.gov/nldi"
 
     def __init__(self, dev: bool = False) -> None:
         self._dev = dev
@@ -50,18 +56,14 @@ class NLDI:
 
     @property
     def dev(self) -> bool:
+        """Get the development version of the NLDI service."""
         return self._dev
 
     @dev.setter
     def dev(self, value: bool) -> None:
+        """Set the development version of the NLDI service."""
         self._dev = value
         self._update_base_url()
-
-    def _update_base_url(self) -> None:
-        if self._dev:
-            self.base_url = "https://labs-beta.waterdata.usgs.gov/api/nldi"
-        else:
-            self.base_url = "https://api.water.usgs.gov/nldi"
 
     @staticmethod
     def _check_resp(resp: dict[str, Any] | list[dict[str, Any]] | None) -> bool:
