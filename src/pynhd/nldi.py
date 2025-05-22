@@ -12,7 +12,6 @@ from yarl import URL
 import async_retriever as ar
 import pygeoutils as geoutils
 import pynhd.nhdplus_derived as derived
-from pygeoogc import ServiceURL
 from pynhd.exceptions import (
     InputRangeError,
     InputTypeError,
@@ -33,22 +32,36 @@ __all__ = ["NLDI"]
 
 
 class NLDI:
-    """Access the Hydro Network-Linked Data Index (NLDI) service."""
+    """Access the Hydro Network-Linked Data Index (NLDI) service.
+    
+    Parameters
+    ----------
+    dev : bool, optional
+        If ``True``, use the development version of the NLDI service.
+        Defaults to ``False``.
+    """
 
-    def __init__(self) -> None:
-        self.base_url = ServiceURL().restful.nldi
-
+    def __init__(self, dev: bool = False) -> None:
+        self._dev = dev
+        self._update_base_url()
         resp = ar.retrieve_json([f"{self.base_url}/linked-data"])
         resp = cast("list[list[dict[str, Any]]]", resp)
         self.valid_fsources = {r["source"]: r["sourceName"] for r in resp[0]}
 
-        resp = ar.retrieve_json([f"{self.base_url}/lookups"])
-        resp = cast("list[list[dict[str, Any]]]", resp)
-        self.valid_chartypes = {r["type"]: r["typeName"] for r in resp[0]}
+    @property
+    def dev(self) -> bool:
+        return self._dev
 
-        resp = ar.retrieve_json([r["characteristics"] for r in resp[0]])
-        resp = cast("list[dict[str, Any]]", resp)
-        self.valid_characteristics = derived.nhdplus_attrs_s3()
+    @dev.setter
+    def dev(self, value: bool) -> None:
+        self._dev = value
+        self._update_base_url()
+
+    def _update_base_url(self) -> None:
+        if self._dev:
+            self.base_url = "https://labs-beta.waterdata.usgs.gov/api/nldi"
+        else:
+            self.base_url = "https://api.water.usgs.gov/nldi"
 
     @staticmethod
     def _check_resp(resp: dict[str, Any] | list[dict[str, Any]] | None) -> bool:
