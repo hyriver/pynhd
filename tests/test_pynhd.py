@@ -94,7 +94,6 @@ class TestPyGeoAPI:
         gdfb = pynhd.pygeoapi(gs, "split_catchment")
         assert gdf.catchmentID.iloc[0] == gdfb.catchmentID.iloc[0] == "22294818"
 
-    @pytest.mark.xfail(reason="The xs endpoints of PyGeoAPI are not working.")
     def test_elevation_profile(self):
         line = LineString([(-103.801086, 40.26772), (-103.80097, 40.270568)])
         gs = gpd.GeoDataFrame(
@@ -137,7 +136,6 @@ class TestPyGeoAPI:
         assert_close(gdf.iloc[-1, 2], expected)
         assert_close(gdfb.iloc[-1, 2], expected)
 
-    @pytest.mark.xfail(reason="The xs endpoints of PyGeoAPI are not working.")
     def test_cross_section(self):
         coords = (-103.80119, 40.2684)
         gs = gpd.GeoDataFrame(
@@ -160,8 +158,11 @@ class TestPyGeoAPI:
         assert_close(gdfb.iloc[-1, 2], expected)
 
 
+@pytest.mark.parametrize("dev", [False, True])
 class TestNLDI:
-    nldi: NLDI = NLDI()
+    @pytest.fixture(autouse=True)
+    def _setup_nldi(self, dev: bool):
+        self.nldi = NLDI(dev=dev)
 
     def test_navigate(self):
         stm = self.nldi.navigate_byid(site, station_id, UM, site)
@@ -177,33 +178,37 @@ class TestNLDI:
 
     def test_navigate_loc(self):
         wqp = self.nldi.navigate_byloc((-89.509, 43.087), UT, "flowlines")
-        assert wqp.nhdplus_comid.iloc[0] == "13294314"
+        assert wqp.nhdplus_comid.astype(int).iloc[0] == 13294314
 
     def test_comid_loc(self):
         station = self.nldi.getfeature_byid(site, station_id)
         lon = station.geometry.iloc[0].centroid.x
         lat = station.geometry.iloc[0].centroid.y
         comid = self.nldi.comid_byloc((lon, lat))
-        assert station.comid.values[0] == comid.comid.values[0] == "1722317"
+        assert station.comid.astype(int).iloc[0] == comid.comid.astype(int).iloc[0] == 1722317
 
     def test_feature_loc(self):
         station = self.nldi.getfeature_byid(site, station_id)
         lon = round(station.geometry.iloc[0].centroid.x, 1)
         lat = round(station.geometry.iloc[0].centroid.y, 1)
         comid = self.nldi.feature_byloc((lon, lat))
-        assert station.comid.values[0] == "1722317"
-        assert comid.comid.values[0] == "1722211"
+        assert station.comid.astype(int).iloc[0] == 1722317
+        assert comid.comid.astype(int).iloc[0] == 1722211
 
-    @pytest.mark.xfail(reason="Basin endpoint is not working.")
     def test_basin(self):
         eck4 = "+proj=eck4 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=km"
         basin = self.nldi.get_basins(STA_ID).to_crs(eck4)
+        assert_close(basin.area.iloc[0], 774.3274)
+
+    @pytest.mark.xfail(reason="Basin endpoint is not working.")
+    def test_basin_split(self):
+        eck4 = "+proj=eck4 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=km"
         split = self.nldi.get_basins(STA_ID, split_catchment=True).to_crs(eck4)
-        assert_close(split.area.values[0] - basin.area.values[0], -0.2489)
+        assert_close(split.area.iloc[0], 774.0884)
 
     def test_char(self):
         tot = self.nldi.get_characteristics("CAT_BFI", 6710923)
-        assert tot.CAT_BFI.values[0] == 57
+        assert tot.CAT_BFI.iloc[0] == 57
 
 
 class TestNHDAttrs:
