@@ -51,6 +51,7 @@ optional-dependencies.nhdplus = [
   "py7zr",
 ]
 optional-dependencies.test = [
+  "coverage[toml]",
   "pytest-cov",
   "pytest-sugar",
 ]
@@ -266,3 +267,56 @@ reportUntypedFunctionDecorator = false
 reportAttributeAccessIssue = false
 reportInvalidTypeForm = false
 typeCheckingMode = "strict"
+
+[tool.pixi.project]
+channels = [ "conda-forge" ]
+platforms = [ "linux-64", "osx-64", "osx-arm64", "win-64" ]
+
+[tool.pixi.pypi-dependencies]
+pynhd = { path = ".", editable = true }
+
+[tool.pixi.feature.dev.pypi-dependencies]
+async_retriever = { git = "https://github.com/hyriver/async-retriever" }
+pygeoutils = { git = "https://github.com/hyriver/pygeoutils" }
+pygeoogc = { git = "https://github.com/hyriver/pygeoogc" }
+
+[tool.pixi.feature.py39.dependencies]
+python = "~=3.9.0"
+libgdal-core = "*"
+hdf5 = "*"
+libnetcdf = "*"
+tomli = "*"
+
+[tool.pixi.feature.py313.dependencies]
+python = "~=3.13.0"
+libgdal-core = "*"
+hdf5 = "*"
+libnetcdf = "*"
+
+[tool.pixi.environments]
+test39 = { features = [ "test", "py39" ] }
+test313 = { features = [ "test", "py313" ] }
+dev = { features = [ "dev", "test", "py313" ] }
+typecheck = { features = [ "typecheck", "py313" ] }
+lint = { features = [ "lint", "py313" ], no-default-feature = true }
+
+[tool.pixi.feature.test.tasks]
+test = { cmd = [
+  "pytest",
+  "--cov",
+  "--cov-append",
+  "--cov-branch",
+  "--cov-report=xml",
+  "--junitxml=junit.xml",
+  "--durations=5",
+] }
+report = { cmd = [ "coverage", "report" ], depends-on = [ "test" ] }
+html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
+
+[tool.pixi.feature.lint.tasks]
+lint = "pre-commit run --all-files"
+pcupdate = "pre-commit autoupdate"
+spell = "codespell -w"
+
+[tool.pixi.feature.typecheck.tasks]
+typecheck = "pyright"
