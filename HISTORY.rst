@@ -2,6 +2,15 @@
 History
 =======
 
+0.19.4 (2025-XX-XX)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Add the development version of the NLDI web service to the ``NLDI`` class.
+  This version is not stable and is intended for testing purposes only. The
+  default version is still the production version.
+
 0.19.3 (2025-03-07)
 -------------------
 
