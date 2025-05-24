@@ -11,6 +11,11 @@ New Features
   This version is not stable and is intended for testing purposes only. The
   default version is still the production version.
 
+Bug Fixes
+~~~~~~~~~
+- Fix the issue with normalizing variables in ``streamcat`` functionc caused by 
+  changes in the StreamCat web service.
+
 0.19.3 (2025-03-07)
 -------------------
 
