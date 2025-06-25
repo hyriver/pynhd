@@ -344,7 +344,7 @@ class NLDI:
         fid: str | int,
         navigation: str,
         source: str,
-        distance: int = 500,
+        distance: float = 500,
         trim_start: bool = False,
         stop_comid: str | int | None = None,
     ) -> gpd.GeoDataFrame:
@@ -374,7 +374,7 @@ class NLDI:
         source : str
             Return the data from another source after navigating
             features from ``fsource``.
-        distance : int, optional
+        distance : float, optional
             Limit the search for navigation up to a distance in km,
             defaults is 500 km. Note that this is an expensive request so you
             have be mindful of the value that you provide. The value must be
