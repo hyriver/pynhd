@@ -47,6 +47,10 @@ dependencies = [
   "pygeoutils>=0.19.5,<0.20",
   "shapely>=2",
 ]
+optional-dependencies.lint = [
+  "codespell",
+  "pre-commit",
+]
 optional-dependencies.nhdplus = [
   "py7zr",
 ]
@@ -54,6 +58,9 @@ optional-dependencies.test = [
   "coverage[toml]",
   "pytest-cov",
   "pytest-sugar",
+]
+optional-dependencies.typecheck = [
+  "pyright",
 ]
 urls.Changelog = "https://docs.hyriver.io/changelogs/pynhd.html"
 urls.CI = "https://github.com/hyriver/pynhd/actions"
@@ -151,6 +158,8 @@ lint.ignore = [
   "ISC001",
   # specific type error ignored
   "PGH003",
+  # top-level imports
+  "PLC0415",
   "PLR0913",
   "PLR2004",
   # url schema
@@ -162,7 +171,6 @@ lint.ignore = [
   # custom exception
   "TRY003",
 ]
-
 lint.per-file-ignores."tests/*.py" = [
   "D100",
   "D101",
@@ -276,6 +284,11 @@ platforms = [ "linux-64", "osx-64", "osx-arm64", "win-64" ]
 pynhd = { path = ".", editable = true }
 
 [tool.pixi.feature.dev.pypi-dependencies]
+async_retriever = { git = "https://github.com/hyriver/async-retriever" }
+pygeoutils = { git = "https://github.com/hyriver/pygeoutils" }
+pygeoogc = { git = "https://github.com/hyriver/pygeoogc" }
+
+[tool.pixi.feature.test.pypi-dependencies]
 async_retriever = { git = "https://github.com/hyriver/async-retriever" }
 pygeoutils = { git = "https://github.com/hyriver/pygeoutils" }
 pygeoogc = { git = "https://github.com/hyriver/pygeoogc" }
