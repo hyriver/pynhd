@@ -13,7 +13,7 @@ New Features
 
 Bug Fixes
 ~~~~~~~~~
-- Fix the issue with normalizing variables in ``streamcat`` functionc caused by 
+- Fix the issue with normalizing variables in ``streamcat`` functionc caused by
   changes in the StreamCat web service.
 
 0.19.3 (2025-03-07)
