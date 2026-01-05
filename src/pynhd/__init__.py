@@ -5,7 +5,7 @@ from __future__ import annotations
 from importlib.metadata import PackageNotFoundError, version
 
 from pynhd import exceptions
-from pynhd.core import AGRBase, GeoConnex, ScienceBase
+from pynhd.core import AGRBase, ScienceBase
 from pynhd.network_tools import (
     NHDTools,
     enhd_flowlines_nx,
@@ -32,6 +32,7 @@ from pynhd.nhdplus_derived import (
     streamcat,
 )
 from pynhd.nldi import NLDI
+from pynhd.ogcapi import GeoConnex, HydroFabric
 from pynhd.print_versions import show_versions
 from pynhd.pygeoapi import PyGeoAPI, pygeoapi
 from pynhd.pynhd import HP3D, NHD, NHDPlusHR, WaterData
@@ -47,6 +48,7 @@ __all__ = [
     "NLDI",
     "AGRBase",
     "GeoConnex",
+    "HydroFabric",
     "NHDPlusHR",
     "NHDTools",
     "PyGeoAPI",
