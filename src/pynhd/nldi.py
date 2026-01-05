@@ -95,6 +95,7 @@ class NLDI:
             urls = [URL(url_parts).human_repr()]
         else:
             urls = [URL("/".join((self.base_url, *u))).human_repr() for u in url_parts]
+
         resp = ar.retrieve_json(urls, raise_status=False)
 
         try:
