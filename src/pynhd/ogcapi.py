@@ -27,7 +27,6 @@ from pynhd.exceptions import (
 )
 
 if TYPE_CHECKING:
-
     from pyproj import CRS
     from shapely import LineString, Point
 
@@ -97,7 +96,7 @@ class GeoConnex:
         if max_nfeatures > 1000:
             raise InputRangeError("max_nfeatures", "<= 1000")
         self.max_nfeatures = max_nfeatures
-        self.dev_url = ServiceURL().restful.geoconnex.replace('.us', '.dev')
+        self.dev_url = ServiceURL().restful.geoconnex.replace(".us", ".dev")
         self.prod_url = ServiceURL().restful.geoconnex
         self.dev = dev
         self.item = item
@@ -182,7 +181,7 @@ class GeoConnex:
             self.item_extent = self.endpoints[value].extent
         else:
             self.query_url = None
-    
+
     def _get_sort_attr(self, endpoint: str | None) -> str:
         """Get the schema of the endpoint."""
         if endpoint not in self.endpoints:
@@ -610,7 +609,7 @@ class HydroFabric(GeoConnex):
         self.prod_url = "https://api.water.usgs.gov/fabric/pygeoapi"
         self.dev = dev
         self.item = item
-    
+
     def _get_sort_attr(self, endpoint: str | None) -> str:
         """Get the schema of the endpoint."""
         if endpoint not in self.endpoints:
