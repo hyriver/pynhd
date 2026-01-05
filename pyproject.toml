@@ -27,6 +27,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Scientific/Engineering",
   "Topic :: Scientific/Engineering :: GIS",
   "Topic :: Scientific/Engineering :: Hydrology",
@@ -46,6 +47,11 @@ dependencies = [
   "pygeoogc>=0.19.3,<0.20",
   "pygeoutils>=0.19.5,<0.20",
   "shapely>=2",
+]
+optional-dependencies.dev = [
+  "ipykernel",
+  "ipywidgets",
+  "py7zr",
 ]
 optional-dependencies.lint = [
   "codespell",
@@ -276,7 +282,7 @@ reportAttributeAccessIssue = false
 reportInvalidTypeForm = false
 typeCheckingMode = "strict"
 
-[tool.pixi.project]
+[tool.pixi.workspace]
 channels = [ "conda-forge" ]
 platforms = [ "linux-64", "osx-64", "osx-arm64", "win-64" ]
 
@@ -300,18 +306,18 @@ hdf5 = "*"
 libnetcdf = "*"
 tomli = "*"
 
-[tool.pixi.feature.py313.dependencies]
-python = "~=3.13.0"
+[tool.pixi.feature.py314.dependencies]
+python = "~=3.14.0"
 libgdal-core = "*"
 hdf5 = "*"
 libnetcdf = "*"
 
 [tool.pixi.environments]
 test39 = { features = [ "test", "py39" ] }
-test313 = { features = [ "test", "py313" ] }
-dev = { features = [ "dev", "test", "py313" ] }
-typecheck = { features = [ "typecheck", "py313" ] }
-lint = { features = [ "lint", "py313" ], no-default-feature = true }
+test314 = { features = [ "test", "py314" ] }
+dev = { features = [ "dev", "test", "py314" ] }
+typecheck = { features = [ "typecheck", "py314" ] }
+lint = { features = [ "lint", "py314" ], no-default-feature = true }
 
 [tool.pixi.feature.test.tasks]
 test = { cmd = [
