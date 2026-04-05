@@ -2,7 +2,7 @@
 History
 =======
 
-0.20.0 (2026-XX-XX)
+0.20.0 (2026-04-05)
 -------------------
 
 New Features
@@ -14,13 +14,24 @@ New Features
   field/channel measurements, and reference code tables. The class
   reads the ``USGS_API_KEY`` environment variable automatically for
   higher rate limits.
+- Add ``NLDI.get_characteristics_byid`` method for retrieving local,
+  total, or divergence-routed catchment characteristics for a specific
+  feature directly from the NLDI API.
+- Add ``trim_tolerance`` parameter to ``NLDI.navigate_byid`` and
+  ``NLDI.navigate_bybox`` for controlling how aggressively the first
+  flowline is trimmed when ``trim_start=True``.
+- Add ``StreamCat.changelog``, ``StreamCat.data_dictionary``, and
+  ``StreamCat.all_metrics_bycomid`` methods to expose additional
+  StreamCat API endpoints.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
-- Refactor ``ogcapi`` module to introduce ``OGCAPIBase`` as a
-  reusable template class for OGC API services. ``GeoConnex`` and
-  ``FabricData`` now inherit from it, making it straightforward to
-  add new OGC API-based services.
+- Move ``GeoConnex`` and ``FabricData`` from ``core`` to the new
+  dedicated ``ogcapi`` module alongside the new ``NWIS`` class.
+- Introduce ``OGCAPIBase`` as a reusable base class for all OGC API
+  services. ``GeoConnex``, ``FabricData``, and ``NWIS`` now inherit
+  from it, making it straightforward to add further OGC API-based
+  services.
 - ``OGCAPIBase`` now sends a ``User-Agent`` header
   (``pynhd/<version>``) on every request so API providers can
   identify traffic from HyRiver.
@@ -29,8 +40,9 @@ Internal Changes
 - Error responses (e.g., rate-limit or server errors) are
   automatically evicted from the HTTP cache so they do not persist
   across retries.
-- Fix type annotations in ``_get_sort_attr`` and ``byid`` to
-  satisfy strict type-checking.
+- Fix type annotations across ``core``, ``network_tools``,
+  ``nhdplus_derived``, ``ogcapi``, ``pygeoapi``, and ``pynhd``
+  modules to pass strict Pyright type-checking.
 
 0.19.4 (2025-05-24)
 -------------------
