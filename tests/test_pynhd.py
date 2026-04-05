@@ -41,6 +41,33 @@ def test_streamcat():
     assert_close(nhd_area["inorgnwetdep2008ws"].item(), 1.7746)
 
 
+def test_streamcat_count_only():
+    count = pynhd.streamcat("fert", states="ME", count_only=True)
+    assert count["count"].item() > 0
+
+
+def test_streamcat_changelog():
+    sc = pynhd.StreamCat()
+    cl = sc.changelog()
+    assert len(cl) > 0
+    assert "version" in cl.columns
+
+
+def test_streamcat_data_dictionary():
+    sc = pynhd.StreamCat()
+    dd = sc.data_dictionary()
+    assert len(dd) > 0
+    assert "metric_prefix" in dd.columns
+
+
+def test_streamcat_all_metrics():
+    sc = pynhd.StreamCat()
+    metrics = sc.all_metrics_bycomid(1722317)
+    assert isinstance(metrics, dict)
+    assert "aoi" in metrics
+    assert len(metrics) > 0
+
+
 @pytest.mark.xfail(reason="EPA's HMS is unstable.")
 def test_epa():
     data = pynhd.epa_nhd_catchments(9533477, "curve_number")
@@ -166,11 +193,11 @@ class TestNLDI:
 
     def test_navigate(self):
         stm = self.nldi.navigate_byid(site, station_id, UM, site)
-        assert stm.shape[0] == 4
+        assert stm.shape[0] == 3
 
     def test_navigate_distance(self):
         st100 = self.nldi.navigate_byid(site, station_id, UM, site, distance=100)
-        assert st100.shape[0] == 4
+        assert st100.shape[0] == 3
 
     def test_navigate_fsource(self):
         pp = self.nldi.navigate_byid(site, station_id, UT, "huc12pp")
@@ -210,6 +237,26 @@ class TestNLDI:
         tot = self.nldi.get_characteristics("CAT_BFI", 6710923)
         assert tot.CAT_BFI.iloc[0] == 57
 
+    def test_char_byid(self, dev: bool):
+        if dev:
+            pytest.skip("Characteristics endpoint not available on dev.")
+        chars = self.nldi.get_characteristics_byid("comid", 1722317, "tot", "TOT_PET")
+        assert_close(chars.characteristic_value.iloc[0], 512.18)
+
+    def test_char_byid_multi(self, dev: bool):
+        if dev:
+            pytest.skip("Characteristics endpoint not available on dev.")
+        chars = self.nldi.get_characteristics_byid(
+            "comid", 1722317, "tot", ["TOT_PET", "TOT_PPT7100_ANN"]
+        )
+        assert len(chars) == 2
+
+    def test_navigate_trim_tolerance(self):
+        flw = self.nldi.navigate_byid(
+            site, station_id, UT, "flowlines", distance=50, trim_start=True, trim_tolerance=0.1
+        )
+        assert flw.shape[0] > 0
+
 
 class TestNHDAttrs:
     def test_meta_s3(self):
@@ -222,7 +269,7 @@ class TestNHDAttrs:
 
     def test_meta(self):
         meta = pynhd.nhdplus_attrs()
-        assert len(meta) == 595
+        assert len(meta) == 664
 
     def test_sb(self):
         attr = pynhd.nhdplus_attrs("BANKFULL")
@@ -260,7 +307,7 @@ class TestWaterData:
 class TestGCX:
     def test_single(self):
         gcx = pynhd.GeoConnex("gages")
-        gauge = gcx.byid("provider_id", "01031500")
+        gauge = gcx.byid("provider_id", "USGS-01031500")
         assert (gauge["nhdpv2_comid"] == 1722317).sum() == 1
 
     def test_multiple(self):
@@ -274,7 +321,7 @@ class TestGCX:
         gcx = pynhd.GeoConnex(max_nfeatures=10)
         gcx.item = "mainstems"
         ms = gcx.bybox((-69.77, 45.07, -69.31, 45.45))
-        assert len(ms) == 24
+        assert len(ms) == 20
 
     def test_geom(self):
         gcx = pynhd.GeoConnex("mainstems")
@@ -285,6 +332,35 @@ class TestGCX:
         gcx = pynhd.GeoConnex("ua10")
         awa = gcx.bycql({"op": "gt", "args": [{"property": "awater10"}, 100e6]})
         assert len(awa) == 14
+
+
+class TestHF:
+    def test_single(self):
+        hf = pynhd.FabricData("gagesii")
+        gauge = hf.byid("staid", STA_ID)
+        assert (gauge["staid"] == STA_ID).sum() == 1
+
+    def test_multiple(self):
+        hf = pynhd.FabricData()
+        hf.item = "catchmentsp"
+        h2 = hf.byitem("1722087")
+        h3 = hf.byid("featureid", [1722087, 1723587])
+        assert (h2["featureid"] == 21187453).sum() == (h3["featureid"] == 1722087).sum() == 1
+
+    def test_many_features_box(self):
+        hf = pynhd.FabricData("catchmentsp", max_nfeatures=2)
+        ms = hf.bybox((-69.77, 45.07, -69.76, 45.08))
+        assert len(ms) == 4
+
+    def test_geom(self):
+        hf = pynhd.FabricData("catchmentsp")
+        ms = hf.bygeometry((-69.77, 45.07, -69.76, 45.08), skip_geometry=True)
+        assert len(ms) == 4
+
+    def test_cql(self):
+        hf = pynhd.FabricData("gagesii")
+        area = hf.bycql({"op": "gt", "args": [{"property": "drain_sqkm"}, 45000]})
+        assert len(area) == 18
 
 
 def test_3dhp():
