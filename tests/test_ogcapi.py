@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 from shapely import Point
 
+import async_retriever as ar
 import pynhd
 from pynhd.exceptions import (
     InputRangeError,
@@ -117,7 +118,9 @@ MOCK_PROPERTIES = {
 
 
 def _collections_resp() -> list[dict[str, Any]]:
-    return _make_collections_response("test_item", "A test collection", MOCK_BBOX, MOCK_QUERYABLES_URL)
+    return _make_collections_response(
+        "test_item", "A test collection", MOCK_BBOX, MOCK_QUERYABLES_URL
+    )
 
 
 def _queryables_resp() -> list[dict[str, Any]]:
@@ -180,19 +183,23 @@ class TestOGCAPIBaseInit:
         assert dtypes["fid"] == "int64"
 
     def test_item_setter_invalid(self, base_instance: OGCAPIBase):
-        with patch("pynhd.ogcapi.ar.retrieve_json", side_effect=_side_effect_for_init):
-            with pytest.raises(InputValueError):
-                base_instance.item = "nonexistent"
+        with (
+            patch("pynhd.ogcapi.ar.retrieve_json", side_effect=_side_effect_for_init),
+            pytest.raises(InputValueError),
+        ):
+            base_instance.item = "nonexistent"
 
     def test_max_nfeatures_limit(self):
-        with pytest.raises(InputRangeError):
-            with patch("pynhd.ogcapi.ar.retrieve_json", side_effect=_side_effect_for_init):
-                OGCAPIBase(
-                    prod_url="https://example.com",
-                    dev_url="https://dev.example.com",
-                    max_nfeatures=20000,
-                    max_nfeatures_limit=10000,
-                )
+        with (
+            pytest.raises(InputRangeError),
+            patch("pynhd.ogcapi.ar.retrieve_json", side_effect=_side_effect_for_init),
+        ):
+            OGCAPIBase(
+                prod_url="https://example.com",
+                dev_url="https://dev.example.com",
+                max_nfeatures=20000,
+                max_nfeatures_limit=10000,
+            )
 
     def test_repr_no_item(self):
         with patch("pynhd.ogcapi.ar.retrieve_json", side_effect=_side_effect_for_init):
@@ -435,8 +442,6 @@ class TestErrorResponses:
 
     def test_zero_matched(self, base_instance: OGCAPIBase):
         with patch("pynhd.ogcapi.ar.retrieve_json") as mock_retrieve:
-            from pygeoutils.exceptions import EmptyResponseError
-
             mock_retrieve.side_effect = [
                 _schema_resp(),
                 [{"type": "FeatureCollection", "numberMatched": 0, "features": []}],
@@ -575,9 +580,11 @@ class TestGeoConnex:
         assert gcx._get_sort_attr("gages") == "uri"
 
     def test_invalid_item(self):
-        with patch("pynhd.ogcapi.ar.retrieve_json", side_effect=_gcx_side_effect):
-            with pytest.raises(InputValueError):
-                pynhd.GeoConnex("wrong")
+        with (
+            patch("pynhd.ogcapi.ar.retrieve_json", side_effect=_gcx_side_effect),
+            pytest.raises(InputValueError),
+        ):
+            pynhd.GeoConnex("wrong")
 
     def test_wrong_bounds(self):
         with patch("pynhd.ogcapi.ar.retrieve_json", side_effect=_gcx_side_effect):
@@ -590,7 +597,12 @@ class TestGeoConnex:
             gcx = pynhd.GeoConnex("gages")
         feature = _make_feature(
             1,
-            {"uri": "https://geoconnex.us/ref/gages/01031500", "name": "gauge1", "provider_id": "01031500", "nhdpv2_comid": 1722317},
+            {
+                "uri": "https://geoconnex.us/ref/gages/01031500",
+                "name": "gauge1",
+                "provider_id": "01031500",
+                "nhdpv2_comid": 1722317,
+            },
         )
         with patch("pynhd.ogcapi.ar.retrieve_json") as mock_retrieve:
             mock_retrieve.return_value = _make_items_response([feature])
@@ -602,7 +614,9 @@ class TestGeoConnex:
         with patch("pynhd.ogcapi.ar.retrieve_json", side_effect=_gcx_side_effect):
             gcx = pynhd.GeoConnex("gages")
         features = [
-            _make_feature(i, {"uri": f"uri{i}", "name": f"g{i}", "provider_id": f"id{i}", "nhdpv2_comid": i})
+            _make_feature(
+                i, {"uri": f"uri{i}", "name": f"g{i}", "provider_id": f"id{i}", "nhdpv2_comid": i}
+            )
             for i in range(5)
         ]
         with patch("pynhd.ogcapi.ar.retrieve_json") as mock_retrieve:
@@ -666,9 +680,11 @@ class TestFabricData:
         assert hf.api_key == "explicit-key"
 
     def test_max_nfeatures_limit(self):
-        with pytest.raises(InputRangeError):
-            with patch("pynhd.ogcapi.ar.retrieve_json", side_effect=_fabric_side_effect):
-                pynhd.FabricData("gagesii", max_nfeatures=2000)
+        with (
+            pytest.raises(InputRangeError),
+            patch("pynhd.ogcapi.ar.retrieve_json", side_effect=_fabric_side_effect),
+        ):
+            pynhd.FabricData("gagesii", max_nfeatures=2000)
 
     def test_byid(self):
         with patch("pynhd.ogcapi.ar.retrieve_json", side_effect=_fabric_side_effect):
@@ -804,9 +820,11 @@ class TestNWIS:
         assert nwis.api_key == "explicit-key"
 
     def test_max_nfeatures_limit(self):
-        with pytest.raises(InputRangeError):
-            with patch("pynhd.ogcapi.ar.retrieve_json", side_effect=_nwis_side_effect):
-                pynhd.NWIS("monitoring-locations", max_nfeatures=60000)
+        with (
+            pytest.raises(InputRangeError),
+            patch("pynhd.ogcapi.ar.retrieve_json", side_effect=_nwis_side_effect),
+        ):
+            pynhd.NWIS("monitoring-locations", max_nfeatures=60000)
 
     def test_byid(self):
         with patch("pynhd.ogcapi.ar.retrieve_json", side_effect=_nwis_side_effect):
@@ -896,10 +914,6 @@ class TestNWIS:
 # Run with: pytest -m network
 # Skip with: pytest -m "not network"
 # ============================================================================
-
-import async_retriever as ar
-
-from pynhd.ogcapi import OGCAPIBase
 
 
 def _fetch_items(service: OGCAPIBase, item: str, n: int = 10) -> list[dict[str, Any]]:
