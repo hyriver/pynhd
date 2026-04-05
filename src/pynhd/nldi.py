@@ -99,7 +99,9 @@ class NLDI:
         resp = ar.retrieve_json(urls, raise_status=False)
 
         try:
-            index, resp = zip(*((i, r) for i, r in enumerate(resp) if self._check_resp(r)))
+            index, resp = zip(
+                *((i, r) for i, r in enumerate(resp) if self._check_resp(r)), strict=False
+            )
         except ValueError as ex:
             raise ZeroMatchedError from ex
 
@@ -339,6 +341,70 @@ class NLDI:
         pyarrrow_filter = None if comids is None else pc.field("COMID").isin(comids)
         return derived.nhdplus_attrs_s3(char_list, pyarrrow_filter)
 
+    def get_characteristics_byid(
+        self,
+        fsource: str,
+        fid: str | int,
+        char_type: str,
+        char_ids: str | list[str] | None = None,
+    ) -> pd.DataFrame:
+        """Get characteristics for a specific feature from the NLDI API.
+
+        Parameters
+        ----------
+        fsource : str
+            The name of the feature source. The valid sources are the same
+            as those for :meth:`getfeature_byid`.
+        fid : str or int
+            The ID of the feature.
+        char_type : str
+            The characteristic type. Valid types are:
+
+            * ``local`` for local catchment characteristics.
+            * ``tot`` for total accumulated catchment characteristics.
+            * ``div`` for divergence routed catchment characteristics.
+
+        char_ids : str or list of str, optional
+            Specific characteristic IDs to retrieve, defaults to ``None``
+            which returns all available characteristics of the given type.
+
+        Returns
+        -------
+        pandas.DataFrame
+            The characteristics of the requested feature with columns:
+            ``characteristic_id``, ``characteristic_value``, and ``percent_nodata``.
+        """
+        self._validate_fsource(fsource)
+
+        valid_char_types = ("local", "tot", "div")
+        if char_type not in valid_char_types:
+            raise InputValueError("char_type", list(valid_char_types))
+
+        url = "/".join((self.base_url, "linked-data", fsource, str(fid), char_type))
+
+        if char_ids is not None:
+            if isinstance(char_ids, str):
+                char_ids = [char_ids]
+            query = "&".join(f"characteristicId={c}" for c in char_ids)
+            url = f"{url}?{query}"
+
+        resp = ar.retrieve_json([url])
+        resp = cast("list[dict[str, Any]]", resp)
+
+        if not resp or not resp[0]:
+            raise ZeroMatchedError
+
+        data = resp[0]
+        chars = data.get("characteristics", [])
+        if not chars:
+            raise ZeroMatchedError
+
+        df = pd.DataFrame(chars)
+        df["characteristic_value"] = pd.to_numeric(df["characteristic_value"])
+        df["percent_nodata"] = pd.to_numeric(df["percent_nodata"])
+        df["comid"] = data.get("comid", "")
+        return df
+
     def navigate_byid(
         self,
         fsource: str,
@@ -348,6 +414,7 @@ class NLDI:
         distance: float = 500,
         trim_start: bool = False,
         stop_comid: str | int | None = None,
+        trim_tolerance: float | None = None,
     ) -> gpd.GeoDataFrame:
         """Navigate the NHDPlus database from a single feature id up to a distance.
 
@@ -385,6 +452,10 @@ class NLDI:
             defaults to ``False``.
         stop_comid : str or int, optional
             The ComID to stop the navigationation, defaults to ``None``.
+        trim_tolerance : float, optional
+            Tolerance for trimming the starting flowline in km,
+            defaults to ``None``. Only applicable when ``source`` is
+            ``flowlines`` and ``trim_start`` is ``True``.
 
         Returns
         -------
@@ -396,8 +467,10 @@ class NLDI:
 
         self._validate_fsource(fsource)
 
-        url = "/".join((self.base_url, "linked-data", fsource, str(fid), "navigation"))
-        _, resp = self._get_urls(url, True)
+        nav_url = "/".join((self.base_url, "linked-data", fsource, str(fid), "navigation"))
+        if self._dev:
+            nav_url = f"{nav_url}?f=json"
+        _, resp = self._get_urls(nav_url, True)
         resp = cast("list[dict[str, str]]", resp)
         valid_navigations = resp[0]
         if not valid_navigations:
@@ -412,9 +485,13 @@ class NLDI:
         if source not in valid_sources:
             raise InputValueError("source", list(valid_sources))
 
-        payload = {"distance": str(round(distance)), "trimStart": str(trim_start).lower()}
+        payload: dict[str, str] = {"distance": str(distance)}
+        if trim_start:
+            payload["trimStart"] = "true"
         if stop_comid:
             payload["stopComid"] = str(stop_comid)
+        if trim_tolerance is not None:
+            payload["trimTolerance"] = str(trim_tolerance)
         url = f"{valid_sources[source]}?{URL.build(query=payload).query_string}"
         return self._get_urls(url, False)
 
@@ -424,9 +501,10 @@ class NLDI:
         navigation: str | None = None,
         source: str | None = None,
         loc_crs: CRSType = 4326,
-        distance: int = 500,
+        distance: float = 500,
         trim_start: bool = False,
         stop_comid: str | int | None = None,
+        trim_tolerance: float | None = None,
     ) -> gpd.GeoDataFrame:
         """Navigate the NHDPlus database from a coordinate.
 
@@ -449,7 +527,7 @@ class NLDI:
             an exception if ``comid_only`` is False.
         loc_crs : str, int, or pyproj.CRS, optional
             The spatial reference of the input coordinate, defaults to EPSG:4326.
-        distance : int, optional
+        distance : float, optional
             Limit the search for navigation up to a distance in km,
             defaults to 500 km. Note that this is an expensive request so you
             have be mindful of the value that you provide.
@@ -458,6 +536,10 @@ class NLDI:
             defaults to ``False``.
         stop_comid : str or int, optional
             The ComID to stop the navigationation, defaults to ``None``.
+        trim_tolerance : float, optional
+            Tolerance for trimming the starting flowline in km,
+            defaults to ``None``. Only applicable when ``source`` is
+            ``flowlines`` and ``trim_start`` is ``True``.
 
         Returns
         -------
@@ -471,5 +553,5 @@ class NLDI:
             raise MissingItemError(["navigation", "source"])
 
         return self.navigate_byid(
-            "comid", comid, navigation, source, distance, trim_start, stop_comid
+            "comid", comid, navigation, source, distance, trim_start, stop_comid, trim_tolerance
         )

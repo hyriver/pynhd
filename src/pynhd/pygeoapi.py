@@ -74,7 +74,7 @@ class PyGeoAPIBase:
         resp = cast("list[dict[str, Any]]", resp)
         nfeat = len(resp)
         try:
-            idx, resp = zip(*((i, r) for i, r in enumerate(resp) if "code" not in r))
+            idx, resp = zip(*((i, r) for i, r in enumerate(resp) if "code" not in r), strict=False)
             idx = cast("tuple[int]", idx)
             if len(idx) != nfeat:
                 _ = [
@@ -95,7 +95,7 @@ class PyGeoAPIBase:
                     UserWarning,
                     stacklevel=2,
                 )
-            gdf = gpd.GeoDataFrame(  # pyright: ignore[reportCallIssue]
+            gdf = gpd.GeoDataFrame(
                 pd.concat(
                     (geoutils.json2geodf(r) for r in resp), keys=[self.req_idx[i] for i in idx]
                 ),
@@ -107,9 +107,7 @@ class PyGeoAPIBase:
         except EmptyResponseError as ex:
             raise ZeroMatchedError from ex
         drop_cols = ["level_1", "spatial_ref"] if "spatial_ref" in gdf else ["level_1"]
-        return (  # pyright: ignore[reportReturnType]
-            gdf.reset_index().rename(columns={"level_0": "req_idx"}).drop(columns=drop_cols)
-        )
+        return gdf.reset_index().rename(columns={"level_0": "req_idx"}).drop(columns=drop_cols)
 
     @staticmethod
     def check_coords(
@@ -217,7 +215,7 @@ class PyGeoAPIBatch(PyGeoAPIBase):
         geo_iter = coords[["geometry", *attrs]].itertuples(index=False, name=None)
 
         if method == "endpoints_profile":
-            if any(len(g.geoms) != 2 for g in coords.geometry):
+            if any(len(g.geoms) != 2 for g in coords.geometry):  # pyright: ignore[reportAttributeAccessIssue]
                 raise InputTypeError("coords", "MultiPoint of length 2")
 
             return self.request_body(
@@ -226,7 +224,7 @@ class PyGeoAPIBatch(PyGeoAPIBase):
                         "lat": [round(g.y, 6) for g in mp.geoms],
                         "lon": [round(g.x, 6) for g in mp.geoms],
                     }
-                    | dict(zip(attrs, list(u)))
+                    | dict(zip(attrs, list(u), strict=False))
                     for mp, *u in geo_iter
                 ]
             )
@@ -237,14 +235,15 @@ class PyGeoAPIBatch(PyGeoAPIBase):
                     {
                         "path": [[round(x, 6), round(y, 6)] for x, y in line.coords],
                     }
-                    | dict(zip(attrs, list(u)))
+                    | dict(zip(attrs, list(u), strict=False))
                     for line, *u in geo_iter
                 ]
             )
 
         return self.request_body(
             [
-                {"lat": round(g.y, 6), "lon": round(g.x, 6)} | dict(zip(attrs, list(u)))
+                {"lat": round(g.y, 6), "lon": round(g.x, 6)}
+                | dict(zip(attrs, list(u), strict=False))
                 for g, *u in geo_iter
             ]
         )
@@ -415,7 +414,7 @@ class PyGeoAPI(PyGeoAPIBase):
         >>> print(gdf.iloc[-1, 1])  # doctest: +SKIP
         411.5906
         """
-        lons, lats = zip(*self.check_coords(coords, crs))
+        lons, lats = zip(*self.check_coords(coords, crs), strict=False)
 
         url = self.get_url("xsatendpts")
         payload = self.request_body(

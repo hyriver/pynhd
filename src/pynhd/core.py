@@ -299,8 +299,9 @@ class ScienceBase:
             tlz.pluck("name", resp[0]["files"]),
             tlz.pluck("url", resp[0]["files"]),
             tlz.pluck("metadataHtmlViewUri", resp[0]["files"], default=None),
+            strict=False,
         )
         return pd.DataFrame(
             urls,
-            columns=["name", "url", "metadata_url"],  # pyright: ignore[reportArgumentType]
+            columns=["name", "url", "metadata_url"],
         ).set_index("name")

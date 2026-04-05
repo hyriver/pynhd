@@ -20,7 +20,7 @@ from pyarrow.compute import Expression
 import async_retriever as ar
 import pygeoogc as ogc
 from pynhd.core import ScienceBase, get_parquet
-from pynhd.exceptions import InputTypeError, InputValueError, ServiceError
+from pynhd.exceptions import InputTypeError, InputValueError, ServiceError, ZeroMatchedError
 
 if TYPE_CHECKING:
     from pyarrow.dataset import FileSystemDataset
@@ -192,15 +192,57 @@ def nhdplus_vaa(
     return vaa
 
 
-def _get_files(item: str) -> dict[str, tuple[str, str]]:
-    """Get all the available zip files in an item."""
-    url = "https://www.sciencebase.gov/catalog/item"
+def _get_files_batch(
+    item_ids: list[str],
+) -> list[dict[str, tuple[str, str]]]:
+    """Get all the available zip files for multiple items in a single batch."""
+    base_url = "https://www.sciencebase.gov/catalog/item"
     payload = {"fields": "files,downloadUri", "format": "json"}
-    resp = ar.retrieve_json([f"{url}/{item}"], [{"params": payload}])
+    urls = [f"{base_url}/{item}" for item in item_ids]
+    payloads = [{"params": payload}] * len(urls)
+    resp = ar.retrieve_json(urls, payloads, raise_status=False)
     resp = cast("list[dict[str, Any]]", resp)
-    files_url = zip(tlz.pluck("name", resp[0]["files"]), tlz.pluck("url", resp[0]["files"]))
-    meta = list(tlz.pluck("metadataHtmlViewUri", resp[0]["files"], default=""))[-1]
-    return {f.replace("_CONUS.zip", ""): (u, meta) for f, u in files_url if ".zip" in f}
+
+    results = []
+    for r in resp:
+        if not r or "files" not in r or not r["files"]:
+            results.append({})
+            continue
+        files_url = zip(tlz.pluck("name", r["files"]), tlz.pluck("url", r["files"]), strict=False)
+        meta = list(tlz.pluck("metadataHtmlViewUri", r["files"], default=""))[-1]
+        results.append(
+            {f.replace("_CONUS.zip", ""): (u, meta) for f, u in files_url if ".zip" in f}
+        )
+    return results
+
+
+def _parse_sb_title(title: str) -> tuple[str, str]:
+    """Extract theme and description from a ScienceBase item title."""
+    m = re.match(r"Select\s+(.*?)\s+Attributes?\s*:\s*(.*)", title)
+    if m:
+        return m.group(1).strip(), m.group(2).strip()
+
+    if title.startswith("STATSGO"):
+        parts = title.split(":", 1)
+        desc = parts[1].strip() if len(parts) > 1 else title
+        return "STATSGO", desc
+
+    if title.startswith("SSURGO"):
+        parts = title.split(":", 1)
+        desc = parts[1].strip() if len(parts) > 1 else title
+        return "SSURGO", desc
+
+    if title.startswith("STATSGO2"):
+        parts = title.split(":", 1)
+        desc = parts[1].strip() if len(parts) > 1 else title
+        return "STATSGO", desc
+
+    if "ClimGRID" in title or title.startswith("Average Monthly"):
+        parts = title.split(":", 1)
+        desc = parts[1].strip() if len(parts) > 1 else title
+        return "Climate and Water Balance Model", desc
+
+    return "Other", title
 
 
 def nhdplus_attrs(attr_name: str | None = None) -> pd.DataFrame:
@@ -222,46 +264,35 @@ def nhdplus_attrs(attr_name: str | None = None) -> pd.DataFrame:
     pandas.DataFrame
         The staged data as a DataFrame.
     """
-    sb = ScienceBase()
-    r = sb.get_children("5669a79ee4b08895842a1d47")
+    parent_id = "5669a79ee4b08895842a1d47"
+    url = "https://www.sciencebase.gov/catalog/items"
+    all_items: list[dict[str, Any]] = []
+    offset = 0
+    while True:
+        payload = {
+            "parentId": parent_id,
+            "fields": "title,id",
+            "format": "json",
+            "max": 100,
+            "offset": offset,
+        }
+        resp = ar.retrieve_json([url], [{"params": payload}])
+        resp = cast("list[dict[str, Any]]", resp)
+        items = resp[0].get("items", [])
+        all_items.extend(items)
+        if len(items) < 100:
+            break
+        offset += 100
 
-    titles = tlz.pluck("title", r["items"])
-    titles = tlz.concat(tlz.map(tlz.partial(re.findall, "Select(.*?)Attributes"), titles))
-    titles = tlz.map(str.strip, titles)
+    item_ids = [item["id"] for item in all_items]
+    all_files = _get_files_batch(item_ids)
 
-    main_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-
-    files = {}
-    soil = main_items.pop("Soil")
-    for i, item in main_items.items():
-        r = sb.get_children(item)
-
-        titles = tlz.pluck("title", r["items"])
-        titles = tlz.map(lambda s: s.split(":")[1].strip() if ":" in s else s, titles)
-
-        child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-        files[i] = {t: _get_files(c) for t, c in child_items.items()}
-
-    r = sb.get_children(soil)
-    titles = tlz.pluck("title", r["items"])
-    titles = tlz.map(lambda s: s.split(":")[1].strip() if ":" in s else s, titles)
-
-    child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-    stat = child_items.pop("STATSGO Soil Characteristics")
-    ssur = child_items.pop("SSURGO Soil Characteristics")
-    files["Soil"] = {t: _get_files(c) for t, c in child_items.items()}
-
-    r = sb.get_children(stat)
-    titles = tlz.pluck("title", r["items"])
-    titles = tlz.map(lambda s: s.split(":")[1].split(",")[1].strip(), titles)
-    child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-    files["STATSGO"] = {t: _get_files(c) for t, c in child_items.items()}
-
-    r = sb.get_children(ssur)
-    titles = tlz.pluck("title", r["items"])
-    titles = tlz.map(lambda s: s.split(":")[1].strip(), titles)
-    child_items = dict(zip(titles, tlz.pluck("id", r["items"])))
-    files["SSURGO"] = {t: _get_files(c) for t, c in child_items.items()}
+    files: dict[str, dict[str, dict[str, tuple[str, str]]]] = {}
+    for item, item_files in zip(all_items, all_files, strict=True):
+        if not item_files:
+            continue
+        theme, description = _parse_sb_title(item["title"])
+        files.setdefault(theme, {})[description] = item_files
 
     chars = []
     types = {"CAT": "local", "TOT": "upstream_acc", "ACC": "div_routing"}
@@ -346,7 +377,7 @@ def nhdplus_attrs_s3(
 
     attr_names = attr_names if isinstance(attr_names, (list, tuple)) else [attr_names]
     if any(a not in urls for a in attr_names):
-        raise InputValueError("attr_names", list(urls))
+        raise InputValueError("attr_names", cast("list[str]", list(urls)))
     ids = tlz.merge_with(list, ({urls[c]: c} for c in attr_names))
 
     s3 = fs.S3FileSystem(anonymous=True, region="us-west-2")
@@ -362,7 +393,9 @@ def nhdplus_attrs_s3(
                 cols.append(next(c for c in ds_columns if "NODATA" in c))
         return ds.to_table(columns=cols, filter=pyarrow_filter).to_pandas().set_index("COMID")
 
-    return pd.concat((to_pandas(d, c, nodata) for d, c in zip(datasets, ids.values())), axis=1)
+    return pd.concat(
+        (to_pandas(d, c, nodata) for d, c in zip(datasets, ids.values(), strict=False)), axis=1
+    )
 
 
 def nhdplus_h12pp(gpkg_path: Path | str | None = None) -> pd.DataFrame:
@@ -384,8 +417,10 @@ def nhdplus_h12pp(gpkg_path: Path | str | None = None) -> pd.DataFrame:
     geopandas.GeoDataFrame
         A geodataframe of HUC12 pour points.
     """
-    url = ScienceBase.get_file_urls("65cbc0b3d34ef4b119cb37e9").loc["102020wbd_outlets.gpkg"].url
-    url = cast("str", url)
+    url = (
+        "https://prod-is-usgs-sb-prod-publish.s3.amazonaws.com"
+        "/65cbc0b3d34ef4b119cb37e9/102020wbd_outlets.gpkg"
+    )
     gpkg_path = Path("cache", "102020wbd_outlets.gpkg") if gpkg_path is None else Path(gpkg_path)
     gpkg_path = ogc.streaming_download(url, fnames=gpkg_path)
     if gpkg_path is None:
@@ -400,9 +435,17 @@ def nhdplus_h12pp(gpkg_path: Path | str | None = None) -> pd.DataFrame:
         raise ServiceError(msg)
     h12pp = gpd.read_file(gpkg_path, engine="pyogrio")
     h12pp = h12pp[
-        ["COMID", "REACHCODE", "REACH_meas", "offset", "HUC12", "LevelPathI", "geometry"]
+        [
+            "COMID",
+            "REACHCODE",
+            "REACH_meas",
+            "offset",
+            "2020WBD_HUC12",
+            "lp_mainstem_v3",
+            "geometry",
+        ]
     ].copy()
-    h12pp[["COMID", "LevelPathI"]] = h12pp[["COMID", "LevelPathI"]].astype("uint32")
+    h12pp[["COMID", "lp_mainstem_v3"]] = h12pp[["COMID", "lp_mainstem_v3"]].astype("uint32")
     return h12pp
 
 
@@ -468,21 +511,24 @@ def epa_nhd_catchments(
                 {"params": f_kwd | {"comid": comid}},
             )
             for comid in clist
-        ]
+        ],
+        strict=False,
     )
     urls = cast("list[str]", urls)
     kwds = cast("list[dict[str, Any]]", kwds)
     resp = ar.retrieve_json(urls, kwds)
     resp = cast("list[dict[str, Any]]", resp)
     info = pd.DataFrame.from_dict(
-        {i: pd.Series(r["metadata"]) for i, r in zip(clist, resp)}, orient="index"
+        {i: pd.Series(r["metadata"]) for i, r in zip(clist, resp, strict=False)}, orient="index"
     )
     for c in info:
         info[c] = pd.to_numeric(info[c], errors="coerce")
 
     if feature == "curve_number":
         data = pd.DataFrame.from_dict(
-            {i: r["curve_number"] for i, r in zip(clist, resp)}, orient="index", dtype="f8"
+            {i: r["curve_number"] for i, r in zip(clist, resp, strict=False)},
+            orient="index",
+            dtype="f8",
         )
         return {"comid_info": info, "curve_number": data}
 
@@ -539,22 +585,21 @@ class StreamCat:
         return {k: sorted(v) for k, v in slopes.items()}
 
     def __init__(self, lakes_only: bool = False) -> None:
-        url = "https://api.epa.gov/StreamCat/{}/{}"
         self.lakes_only = lakes_only
         if self.lakes_only:
-            self.url_metrics = url.format("lakes", "metrics")
-            url_vars = url.format("lakes", "variable_info")
+            self.base_url = "https://api.epa.gov/StreamCat/lakes"
         else:
-            self.url_metrics = url.format("streams", "metrics")
-            url_vars = url.format("streams", "variable_info")
+            self.base_url = "https://api.epa.gov/StreamCat/streams"
+        self.url_metrics = f"{self.base_url}/metrics"
+        url_vars = f"{self.base_url}/variable_info"
         resp = ar.retrieve_json([self.url_metrics])
         resp = cast("list[dict[str, Any]]", resp)
         params = resp[0]["items"][0]
 
         self.valid_names = list(tlz.pluck("name", params["name_options"]))
         self.valid_regions = list(tlz.pluck("regionid", params["region_options"]))
-        self.valid_states = pd.DataFrame(params["state_options"])
-        self.valid_counties = pd.DataFrame(params["county_options"])
+        self.valid_states = pd.DataFrame(params["state_options"]).set_index("st_abbr")
+        self.valid_counties = pd.DataFrame(params["county_options"]).set_index("fips_str")
         self.valid_aois = list(tlz.pluck("id", params["areas_of_interest"]))
         self.valid_slopes = self._get_slopes(self.valid_names)
 
@@ -573,12 +618,75 @@ class StreamCat:
         self.metrics_df = names
 
         years = names.set_index("METRIC_NAME").YEAR.dropna()
-        self.valid_years = {
-            str(v): list(range(*(int(y) for y in yrs.split("-"))))
-            if "-" in yrs
-            else [int(y) for y in yrs.split(",")]
-            for v, yrs in years.items()
-        }
+        self.valid_years = {}
+        for v, yrs in years.items():
+            yr_str = str(yrs).strip()
+            if "-" in yr_str:
+                start, end = (int(y) for y in yr_str.split("-"))
+                self.valid_years[str(v)] = list(range(start, end))
+            elif ":" in yr_str:
+                start, end = (int(y) for y in yr_str.split(":"))
+                self.valid_years[str(v)] = list(range(start, end + 1))
+            else:
+                self.valid_years[str(v)] = [int(y) for y in yr_str.split(",")]
+
+    def changelog(self) -> pd.DataFrame:
+        """Get the changelog of the StreamCat/LakeCat API.
+
+        Returns
+        -------
+        pandas.DataFrame
+            A dataframe of changelog entries with columns:
+            ``version``, ``public_description``, and ``date_updated``.
+        """
+        url = f"{self.base_url}/changelog"
+        resp = ar.retrieve_json([url])
+        resp = cast("list[dict[str, Any]]", resp)
+        return pd.DataFrame(resp[0]["items"])
+
+    def data_dictionary(self) -> pd.DataFrame:
+        """Get the data dictionary of the StreamCat/LakeCat metrics.
+
+        Returns
+        -------
+        pandas.DataFrame
+            A dataframe of metric metadata with columns such as
+            ``metric_prefix``, ``short_display_name``, ``dataset_name``,
+            and ``available_aois``.
+        """
+        url = f"{self.base_url}/datadictionary"
+        resp = ar.retrieve_json([url])
+        resp = cast("list[dict[str, Any]]", resp)
+        return pd.DataFrame(resp[0]["items"])
+
+    def all_metrics_bycomid(self, comid: int) -> dict[str, pd.DataFrame]:
+        """Get all available metrics for a single ComID.
+
+        This uses the ``waters_streamcat`` endpoint to retrieve
+        all metrics at once for a given ComID, organized by category.
+
+        Parameters
+        ----------
+        comid : int
+            NHDPlus ComID.
+
+        Returns
+        -------
+        dict of pandas.DataFrame
+            A dictionary where keys are metric categories and
+            values are DataFrames with the corresponding metrics.
+        """
+        if self.lakes_only:
+            raise ServiceError(
+                "waters_streamcat endpoint is only available for streams, not lakes."
+            )
+        url = f"{self.base_url}/waters_streamcat"
+        resp = ar.retrieve_json([url], [{"params": {"comid": str(comid)}}])
+        resp = cast("list[dict[str, Any]]", resp)
+        items = resp[0].get("items", [])
+        if not items:
+            raise ZeroMatchedError
+        return {k: pd.DataFrame(v) for k, v in items[0].items()}
 
 
 class StreamCatValidator(StreamCat):
@@ -656,6 +764,7 @@ def streamcat(
     conus: bool = False,
     percent_full: bool = False,
     area_sqkm: bool = False,
+    count_only: bool = False,
     lakes_only: bool = False,
 ) -> pd.DataFrame:
     """Get various metrics for NHDPlusV2 catchments from EPA's StreamCat.
@@ -712,6 +821,9 @@ def streamcat(
         the metric.
     area_sqkm : bool, optional
         If ``True``, return the area in square kilometers.
+    count_only : bool, optional
+        If ``True``, return only the count of matching records instead
+        of the full data. Defaults to ``False``.
     lakes_only : bool, optional
         If ``True``, only return metrics for lakes and their associated catchments
         from the LakeCat dataset.
@@ -743,8 +855,11 @@ def streamcat(
     if area_sqkm:
         params["showareasqkm"] = "true"
 
+    if count_only:
+        params["countOnly"] = "true"
+
     resp = ar.retrieve_json([sc.url_metrics], [{"json": params}], request_method="post")
     try:
-        return pd.DataFrame(resp[0]["items"])
+        return pd.DataFrame(cast("dict[str, Any]", resp[0])["items"])
     except (ArrowInvalid, KeyError) as ex:
-        raise ServiceError(resp[0]) from ex
+        raise ServiceError(str(resp[0])) from ex

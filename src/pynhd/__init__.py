@@ -32,7 +32,7 @@ from pynhd.nhdplus_derived import (
     streamcat,
 )
 from pynhd.nldi import NLDI
-from pynhd.ogcapi import GeoConnex, HydroFabric
+from pynhd.ogcapi import NWIS, FabricData, GeoConnex, OGCAPIBase
 from pynhd.print_versions import show_versions
 from pynhd.pygeoapi import PyGeoAPI, pygeoapi
 from pynhd.pynhd import HP3D, NHD, NHDPlusHR, WaterData
@@ -46,11 +46,13 @@ __all__ = [
     "HP3D",
     "NHD",
     "NLDI",
+    "NWIS",
     "AGRBase",
+    "FabricData",
     "GeoConnex",
-    "HydroFabric",
     "NHDPlusHR",
     "NHDTools",
+    "OGCAPIBase",
     "PyGeoAPI",
     "ScienceBase",
     "StreamCat",

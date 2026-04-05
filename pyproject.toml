@@ -1,6 +1,5 @@
 [build-system]
 build-backend = "hatchling.build"
-
 requires = [
   "hatch-vcs",
   "hatchling",
@@ -66,30 +65,103 @@ optional-dependencies.test = [
   "pytest-sugar",
 ]
 optional-dependencies.typecheck = [
+  "pandas-stubs",
   "pyright",
+  "scipy-stubs",
+  "types-geopandas",
+  "types-networkx",
+  "types-pyyaml",
+  "types-shapely",
 ]
 urls.Changelog = "https://docs.hyriver.io/changelogs/pynhd.html"
 urls.CI = "https://github.com/hyriver/pynhd/actions"
 urls.Homepage = "https://docs.hyriver.io/readme/pynhd.html"
 urls.Issues = "https://github.com/hyriver/pynhd/issues"
 
-[tool.hatch.version]
-source = "vcs"
-
-[tool.hatch.build.targets.wheel]
-packages = [
+[tool.hatch]
+build.targets.wheel.packages = [
   "src/pynhd",
 ]
+version.source = "vcs"
+
+[tool.pixi.environments]
+test310 = { features = [ "test", "py310" ] }
+test314 = { features = [ "test", "py314" ] }
+dev = { features = [ "dev", "test", "py314" ] }
+typecheck = { features = [ "typecheck", "py314" ] }
+lint = { features = [ "lint", "py314" ], no-default-feature = true }
+
+[tool.pixi.feature.dev.pypi-dependencies]
+async_retriever = { git = "https://github.com/hyriver/async-retriever" }
+pygeoutils = { git = "https://github.com/hyriver/pygeoutils" }
+pygeoogc = { git = "https://github.com/hyriver/pygeoogc" }
+
+[tool.pixi.feature.lint.tasks]
+lint = "pre-commit run --all-files"
+pcupdate = "pre-commit autoupdate"
+spell = "codespell -w"
+
+[tool.pixi.feature.py310.dependencies]
+python = "~=3.10.0"
+libgdal-core = "*"
+hdf5 = "*"
+libnetcdf = "*"
+tomli = "*"
+
+[tool.pixi.feature.py314.dependencies]
+python = "~=3.14.0"
+libgdal-core = "*"
+hdf5 = "*"
+libnetcdf = "*"
+
+[tool.pixi.feature.test.pypi-dependencies]
+async_retriever = { git = "https://github.com/hyriver/async-retriever" }
+pygeoutils = { git = "https://github.com/hyriver/pygeoutils" }
+pygeoogc = { git = "https://github.com/hyriver/pygeoogc" }
+
+[tool.pixi.feature.test.tasks]
+test = { cmd = [
+  "pytest",
+  "-m",
+  "not network",
+  "--cov",
+  "--cov-append",
+  "--cov-branch",
+  "--cov-report=xml",
+  "--junitxml=junit.xml",
+  "--durations=5",
+] }
+test-network = { cmd = [
+  "pytest",
+  "-m",
+  "network",
+  "--cov",
+  "--cov-append",
+  "--cov-branch",
+  "--cov-report=xml",
+  "--junitxml=junit.xml",
+  "--durations=5",
+] }
+report = { cmd = [ "coverage", "report" ], depends-on = [ "test" ] }
+html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
+
+[tool.pixi.feature.typecheck.tasks]
+typecheck = "pyright"
+
+[tool.pixi.pypi-dependencies]
+pynhd = { path = ".", editable = true }
+
+[tool.pixi.workspace]
+channels = [ "conda-forge" ]
+platforms = [ "linux-64", "osx-64", "osx-arm64", "win-64" ]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 100
-
 exclude = [
   ".nox",
   "__pycache__",
 ]
-
 lint.select = [
   # flake8-bugbear
   "B",
@@ -155,7 +227,6 @@ lint.select = [
   # flake8-2020
   "YTT",
 ]
-
 lint.ignore = [
   "D103",
   "D105",
@@ -192,6 +263,8 @@ lint.per-file-ignores."tests/*.py" = [
   "S101",
 ]
 lint.extend-safe-fixes = [
+  # zip with strict=True
+  "B905",
   # module level imports
   "E402",
   # break down assert
@@ -215,22 +288,38 @@ lint.isort.known-first-party = [
   "tiny_retriever",
 ]
 lint.isort.required-imports = [ "from __future__ import annotations" ]
-
 lint.pydocstyle.convention = "numpy"
 
 [tool.codespell]
 skip = "__pycache__,_build,.mypy_cache,.git,./htmlcov,.nox,**/us_abbrs.py,cache"
 ignore-words-list = "gage,gages,paramss,trough"
 
-[tool.pytest.ini_options]
-addopts = [
+[tool.pyproject-fmt]
+expand_tables = [ "tool.pixi" ]
+
+[tool.pyright]
+pythonVersion = "3.11"
+include = [ "src" ]
+typeCheckingMode = "strict"
+reportMissingSuperCall = false
+reportMissingTypeStubs = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+reportUnknownParameterType = false
+reportMissingTypeArgument = false
+reportUnnecessaryIsInstance = false
+reportUnnecessaryTypeIgnoreComment = true
+
+[tool.pytest]
+ini_options.addopts = [
   "--import-mode=importlib",
   "--doctest-modules",
   "-v",
   "--durations=5",
 ]
-doctest_optionflags = 'NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER'
-filterwarnings = [
+ini_options.doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER"
+ini_options.filterwarnings = [
   "ignore:.*distutils.*",
   "ignore:.*--rsyncdir command line argument.*",
   "ignore:.*numpy.ndarray size changed.*",
@@ -238,104 +327,25 @@ filterwarnings = [
   "ignore:.*Ensure you extract a single element.*",
   "ignore:.*Deprecated in Pydantic V2.0.*",
 ]
-testpaths = [
+ini_options.markers = [
+  "network: tests that make real network calls to external services (deselect with '-m \"not network\"')",
+]
+ini_options.testpaths = [
   "tests",
 ]
 
-[tool.coverage.report]
-exclude_lines = [
-  'raise ServiceUnavailableError',
-  "if TYPE_CHECKING:",
-]
-ignore_errors = true
-omit = [
-  "**/__init__.py",
-]
-
-[tool.coverage.paths]
-source = [ "src", "*/site-packages" ]
-
-[tool.coverage.run]
-branch = true
-parallel = true
-source_pkgs = [
+[tool.coverage]
+run.branch = true
+run.parallel = true
+run.source_pkgs = [
   "pynhd",
 ]
-
-[tool.pyright]
-exclude = [
-  "**/__pycache__",
+paths.source = [ "src", "*/site-packages" ]
+report.exclude_lines = [
+  "if TYPE_CHECKING:",
+  "raise ServiceUnavailableError",
+]
+report.ignore_errors = true
+report.omit = [
   "**/__init__.py",
 ]
-include = [
-  "src/pynhd",
-]
-reportMissingTypeStubs = false
-reportUnknownArgumentType = false
-reportUnknownLambdaType = false
-reportUnknownMemberType = false
-reportUnknownParameterType = false
-reportUnknownVariableType = false
-reportUnnecessaryIsInstance = false
-reportUntypedFunctionDecorator = false
-reportAttributeAccessIssue = false
-reportInvalidTypeForm = false
-typeCheckingMode = "strict"
-
-[tool.pixi.workspace]
-channels = [ "conda-forge" ]
-platforms = [ "linux-64", "osx-64", "osx-arm64", "win-64" ]
-
-[tool.pixi.pypi-dependencies]
-pynhd = { path = ".", editable = true }
-
-[tool.pixi.feature.dev.pypi-dependencies]
-async_retriever = { git = "https://github.com/hyriver/async-retriever" }
-pygeoutils = { git = "https://github.com/hyriver/pygeoutils" }
-pygeoogc = { git = "https://github.com/hyriver/pygeoogc" }
-
-[tool.pixi.feature.test.pypi-dependencies]
-async_retriever = { git = "https://github.com/hyriver/async-retriever" }
-pygeoutils = { git = "https://github.com/hyriver/pygeoutils" }
-pygeoogc = { git = "https://github.com/hyriver/pygeoogc" }
-
-[tool.pixi.feature.py39.dependencies]
-python = "~=3.9.0"
-libgdal-core = "*"
-hdf5 = "*"
-libnetcdf = "*"
-tomli = "*"
-
-[tool.pixi.feature.py314.dependencies]
-python = "~=3.14.0"
-libgdal-core = "*"
-hdf5 = "*"
-libnetcdf = "*"
-
-[tool.pixi.environments]
-test39 = { features = [ "test", "py39" ] }
-test314 = { features = [ "test", "py314" ] }
-dev = { features = [ "dev", "test", "py314" ] }
-typecheck = { features = [ "typecheck", "py314" ] }
-lint = { features = [ "lint", "py314" ], no-default-feature = true }
-
-[tool.pixi.feature.test.tasks]
-test = { cmd = [
-  "pytest",
-  "--cov",
-  "--cov-append",
-  "--cov-branch",
-  "--cov-report=xml",
-  "--junitxml=junit.xml",
-  "--durations=5",
-] }
-report = { cmd = [ "coverage", "report" ], depends-on = [ "test" ] }
-html = { cmd = [ "coverage", "html" ], depends-on = [ "report" ] }
-
-[tool.pixi.feature.lint.tasks]
-lint = "pre-commit run --all-files"
-pcupdate = "pre-commit autoupdate"
-spell = "codespell -w"
-
-[tool.pixi.feature.typecheck.tasks]
-typecheck = "pyright"

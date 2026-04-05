@@ -2,6 +2,36 @@
 History
 =======
 
+0.20.0 (2026-XX-XX)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Add ``NWIS`` class for accessing the new USGS Water Data OGC API
+  (https://api.waterdata.usgs.gov/ogcapi/v0). USGS is migrating its
+  web services to the OGC API standard; this class provides access
+  to monitoring locations, daily/continuous observations,
+  field/channel measurements, and reference code tables. The class
+  reads the ``USGS_API_KEY`` environment variable automatically for
+  higher rate limits.
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+- Refactor ``ogcapi`` module to introduce ``OGCAPIBase`` as a
+  reusable template class for OGC API services. ``GeoConnex`` and
+  ``FabricData`` now inherit from it, making it straightforward to
+  add new OGC API-based services.
+- ``OGCAPIBase`` now sends a ``User-Agent`` header
+  (``pynhd/<version>``) on every request so API providers can
+  identify traffic from HyRiver.
+- ``FabricData`` and ``NWIS`` read the ``USGS_API_KEY`` environment
+  variable when no explicit ``api_key`` is passed.
+- Error responses (e.g., rate-limit or server errors) are
+  automatically evicted from the HTTP cache so they do not persist
+  across retries.
+- Fix type annotations in ``_get_sort_attr`` and ``byid`` to
+  satisfy strict type-checking.
+
 0.19.4 (2025-05-24)
 -------------------
 

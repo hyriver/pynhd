@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import io
 import warnings
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Union, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import cytoolz.curried as tlz
 import geopandas as gpd
@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     import pyproj
     from pandas._libs.missing import NAType
 
-    CRSType = Union[str, int, pyproj.CRS]
+    CRSType = str | int | pyproj.CRS
 
 
 __all__ = [
@@ -65,7 +65,7 @@ def nhdflw2nx(
     id_col: str = "comid",
     toid_col: str = "tocomid",
     edge_attr: str | list[str] | bool | None = None,
-) -> nx.DiGraph:  # pyright: ignore[reportMissingTypeArgument]
+) -> nx.DiGraph:
     """Convert NHDPlus flowline database to networkx graph.
 
     Parameters
@@ -141,7 +141,7 @@ class NHDTools:
         self.flw.columns = self.flw.columns.str.lower()
 
         if self.is_hr:
-            self.flw = self.flw.rename(columns={"nhdplusid": "comid"})  # pyright: ignore[reportCallIssue]
+            self.flw = self.flw.rename(columns={"nhdplusid": "comid"})
 
         if not ("fcode" in self.flw and "ftype" in self.flw):
             raise MissingItemError(["fcode", "ftype"])
@@ -224,9 +224,11 @@ class NHDTools:
 
         if min_path_size > 0:
             short_paths = self.flw.groupby("levelpathi")[["hydroseq", "totdasqkm"]].apply(
-                lambda x: (x.hydroseq == x.hydroseq.min())
-                & (x.totdasqkm < min_path_size)
-                & (x.totdasqkm >= 0)
+                lambda x: (
+                    (x.hydroseq == x.hydroseq.min())
+                    & (x.totdasqkm < min_path_size)
+                    & (x.totdasqkm >= 0)
+                )
             )
             short_idx = short_paths.index.get_level_values("levelpathi")[short_paths]
             self.flw = self.flw[~self.flw.levelpathi.isin(short_idx)]
@@ -270,7 +272,7 @@ class NHDTools:
 
         def tocomid(grp: pd.DataFrame) -> pd.DataFrame:
             g_merged = pd.merge(
-                grp[["comid", "tonode"]],  # pyright: ignore[reportArgumentType]
+                grp[["comid", "tonode"]],
                 grp[["comid", "fromnode"]].rename(columns={"comid": "tocomid"}),
                 left_on="tonode",
                 right_on="fromnode",
@@ -278,10 +280,7 @@ class NHDTools:
             g_merged = g_merged[["comid", "tocomid"]].astype("Int64")
             return grp.merge(g_merged, on="comid", how="left")
 
-        self.flw = pd.concat(  # pyright: ignore[reportCallIssue]
-            tocomid(g)  # pyright: ignore[reportArgumentType]
-            for _, g in self.flw.groupby("terminalpa")  # pyright: ignore[reportArgumentType]
-        )
+        self.flw = pd.concat(tocomid(g) for _, g in self.flw.groupby("terminalpa"))
         self.flw = self.flw.reset_index(drop=True)
 
     @staticmethod
@@ -399,7 +398,7 @@ def prepare_nhdplus(
     return nhd.flw
 
 
-def _create_subgraph(graph: nx.DiGraph, nodes: set[int]) -> nx.DiGraph:  # pyright: ignore[reportMissingTypeArgument]
+def _create_subgraph(graph: nx.DiGraph, nodes: set[int]) -> nx.DiGraph:
     """Create a subgraph from a list of nodes."""
     subgraph = graph.__class__()
     subgraph.add_nodes_from((n, graph.nodes[n]) for n in nodes)
@@ -420,7 +419,7 @@ def topoogical_sort(
     largest_only: bool = False,
     id_col: str = "ID",
     toid_col: str = "toID",
-) -> tuple[list[np.int64 | NAType], dict[int, list[int]], nx.DiGraph]:  # pyright: ignore[reportMissingTypeArgument]
+) -> tuple[list[np.int64 | NAType], dict[int, list[int]], nx.DiGraph]:
     """Topological sorting of a river network.
 
     Parameters
@@ -449,7 +448,7 @@ def topoogical_sort(
     """
     network = nhdflw2nx(flowlines, id_col, toid_col, edge_attr)
     if largest_only:
-        nodes = max(nx.weakly_connected_components(network), key=len)  # pyright: ignore[reportArgumentType]
+        nodes = max(nx.weakly_connected_components(network), key=len)
         network = _create_subgraph(network, nodes)
     topo_sorted = list(nx.topological_sort(network))
     up_nodes = {i: list(network.predecessors(i)) for i in network}
@@ -540,11 +539,11 @@ def vector_accumulation(
     )
 
 
-def _get_idx(d_sp: npt.NDArray[np.float64], distance: float) -> npt.NDArray[np.int64]:
+def _get_idx(d_sp: npt.NDArray[Any], distance: float) -> npt.NDArray[np.int64]:
     """Get the index of the closest points based on a given distance."""
-    dis = pd.DataFrame(d_sp, columns=["distance"]).reset_index()  # pyright: ignore[reportArgumentType]
+    dis = pd.DataFrame(d_sp, columns=["distance"]).reset_index()
     bins = np.arange(0, dis["distance"].max() + distance, distance)
-    grouper = pd.cut(dis["distance"], bins)
+    grouper = pd.cut(dis["distance"], bins.tolist())
     idx = dis.groupby(grouper, observed=True).last()["index"].to_numpy("int64")
     return np.append(0, idx)
 
@@ -552,9 +551,9 @@ def _get_idx(d_sp: npt.NDArray[np.float64], distance: float) -> npt.NDArray[np.i
 def _get_spline_params(
     line: LineString, n_seg: int, distance: float, smoothing: float | None
 ) -> tuple[
-    npt.NDArray[np.float64],
-    npt.NDArray[np.float64],
-    npt.NDArray[np.float64],
+    npt.NDArray[Any],
+    npt.NDArray[Any],
+    npt.NDArray[Any],
 ]:
     """Get Spline parameters (x, y, phi)."""
     _n_seg = n_seg
@@ -624,7 +623,7 @@ def _xs_planar(
     vn_right = np.c_[np.sin(phi), -np.cos(phi)]
     vn_left = np.c_[-np.sin(phi), np.cos(phi)]
 
-    _lines = zip(xy + half_width * vn_left, xy + half_width * vn_right)
+    _lines = zip(xy + half_width * vn_left, xy + half_width * vn_right, strict=False)
     return shapely.linestrings(list(_lines))  # pyright: ignore[reportReturnType]
 
 
@@ -652,7 +651,7 @@ def __check_flw(flw: gpd.GeoDataFrame, req_cols: list[str]) -> None:
 
 def __merge_flowlines(flw: gpd.GeoDataFrame) -> LineString:
     """Merge flowlines."""
-    line = ops.linemerge(flw.geometry.tolist())
+    line = ops.linemerge(cast("list[LineString]", flw.geometry.tolist()))
 
     if not isinstance(line, LineString):
         raise InputValueError("flw.geometry", "mergeable to a single line")
@@ -692,17 +691,16 @@ def flowline_resample(
     n_seg = int(np.ceil(line.length / spacing)) * 100
     line = pgu.smooth_linestring(line, smoothing, n_seg)
 
-    lines = shapely.linestrings(list(zip(line.coords[:-1], line.coords[1:])))
+    lines = shapely.linestrings(list(zip(line.coords[:-1], line.coords[1:], strict=False)))
     resampled = gpd.GeoDataFrame(geometry=lines, crs=flw.crs)
     rs_idx, flw_idx = flw.sindex.nearest(resampled.geometry, max_distance=spacing, return_all=False)
-    merged_idx = tlz.merge_with(list, ({t: i} for t, i in zip(flw_idx, rs_idx)))
+    merged_idx = tlz.merge_with(list, ({t: i} for t, i in zip(flw_idx, rs_idx, strict=False)))
 
     resampled[id_col] = 0
     for fi, ci in merged_idx.items():
         resampled.loc[ci, id_col] = flw.iloc[fi][id_col]
     resampled = resampled.dissolve(by=id_col)
     resampled["geometry"] = shapely.line_merge(resampled.geometry)
-    resampled = cast("gpd.GeoDataFrame", resampled)
     return resampled
 
 
@@ -733,7 +731,7 @@ def network_resample(
         Resampled flowlines.
     """
     __check_flw(flw, [id_col, "levelpathi", "geometry"])
-    cs = pd.concat(  # pyright: ignore[reportCallIssue]
+    cs = pd.concat(
         flowline_resample(f, spacing, id_col, smoothing)  # pyright: ignore[reportArgumentType]
         for _, f in flw.groupby("levelpathi")
     )
@@ -778,7 +776,7 @@ def flowline_xsection(
     """
     __check_flw(flw, ["geometry", id_col])
     half_width = width * 0.5
-    lines = ops.linemerge(flw.geometry.tolist())
+    lines = ops.linemerge(cast("list[LineString]", flw.geometry.tolist()))
     if isinstance(lines, LineString):
         lines = [lines]
     elif isinstance(lines, MultiLineString):
@@ -789,12 +787,12 @@ def flowline_xsection(
     n_segments = (int(np.ceil(ln.length / distance)) * 100 for ln in lines)
     main_split = tlz.concat(
         _xs_planar(ln, n_seg, half_width, distance, smoothing)
-        for ln, n_seg in zip(lines, n_segments)
+        for ln, n_seg in zip(lines, n_segments, strict=False)
     )
 
     cs = gpd.GeoDataFrame(geometry=list(main_split), crs=flw.crs)
     cs_idx, flw_idx = flw.sindex.query(cs.geometry)
-    merged_idx = tlz.merge_with(list, ({t: i} for t, i in zip(flw_idx, cs_idx)))
+    merged_idx = tlz.merge_with(list, ({t: i} for t, i in zip(flw_idx, cs_idx, strict=False)))
 
     cs[id_col] = 0
     for fi, ci in merged_idx.items():
@@ -839,7 +837,7 @@ def network_xsection(
         the given spacing distance.
     """
     __check_flw(flw, [id_col, "levelpathi", "geometry"])
-    cs = pd.concat(  # pyright: ignore[reportCallIssue]
+    cs = pd.concat(
         flowline_xsection(f, distance, width, id_col, smoothing)  # pyright: ignore[reportArgumentType]
         for _, f in flw.groupby("levelpathi")
     )
@@ -883,16 +881,19 @@ def enhd_flowlines_nx() -> tuple[nx.DiGraph, dict[int, int], list[int]]:
             source=id_col,
             target=toid_col,
             create_using=nx.DiGraph,
-            edge_attr=enhd.columns.drop([id_col, toid_col]).tolist(),
+            edge_attr=cast("list[str | int]", enhd.columns.drop([id_col, toid_col]).tolist()),
         ),
         label_attribute="str_id",
     )
     graph = cast("nx.DiGraph", graph)
 
     label2comid = nx.get_node_attributes(graph, "str_id")
-    s_map = {label2comid[i]: r for i, r in zip(nx.topological_sort(graph), range(len(graph)))}
+    s_map = {
+        label2comid[i]: r
+        for i, r in zip(nx.topological_sort(graph), range(len(graph)), strict=False)
+    }
     onnetwork_sorted = sorted(set(enhd[id_col]).intersection(s_map), key=lambda i: s_map[i])
-    return graph, label2comid, onnetwork_sorted  # type: ignore[reportReturnType]
+    return graph, label2comid, onnetwork_sorted
 
 
 def mainstem_huc12_nx() -> tuple[nx.DiGraph, dict[int, str], list[str]]:
@@ -940,16 +941,18 @@ def mainstem_huc12_nx() -> tuple[nx.DiGraph, dict[int, str], list[str]]:
             source="HUC12",
             target="TOHUC",
             create_using=nx.DiGraph,
-            edge_attr=ms.columns.drop(["HUC12", "TOHUC"]).tolist(),
+            edge_attr=cast("list[str | int]", ms.columns.drop(["HUC12", "TOHUC"]).tolist()),
         ),
         label_attribute="str_id",
     )
     graph = cast("nx.DiGraph", graph)
 
     label2huc = nx.get_node_attributes(graph, "str_id")
-    s_map = {label2huc[i]: r for i, r in zip(nx.topological_sort(graph), range(len(graph)))}
+    s_map = {
+        label2huc[i]: r for i, r in zip(nx.topological_sort(graph), range(len(graph)), strict=False)
+    }
     onnetwork_sorted = sorted(set(ms.HUC12).intersection(s_map), key=lambda i: s_map[i])
-    return graph, label2huc, onnetwork_sorted  # type: ignore[reportReturnType]
+    return graph, label2huc, onnetwork_sorted
 
 
 def nhdplus_l48(
@@ -1021,7 +1024,7 @@ def nhdplus_l48(
         A dataframe with all the NHDPlus data.
     """
     try:
-        import py7zr
+        import py7zr  # pyright: ignore[reportMissingImports]
         import pyogrio
     except ImportError as ex:
         raise DependencyError("nhdplus_l48", ["pyogrio", "py7zr"]) from ex

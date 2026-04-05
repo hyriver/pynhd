@@ -429,8 +429,10 @@ class WaterData:
         if _coords.shape != (2,):
             raise InputTypeError("coords", "tuple of length 2", "(x, y)")
 
-        x, y = geoutils.geometry_reproject(_coords, loc_crs, self.wfs.crs)[0]
-        geom_name = self.wfs.schema[self.layer].get("geometry_column", "the_geom")
+        x, y = geoutils.geometry_reproject(_coords, loc_crs, self.wfs.crs)[0]  # pyright: ignore[reportArgumentType]
+        geom_name = cast("dict[str, Any]", self.wfs.schema[self.layer]).get(
+            "geometry_column", "the_geom"
+        )
         cql_filter = f"DWITHIN({geom_name},POINT({y:.6f} {x:.6f}),{distance},meters)"
         resp = self.wfs.getfeature_byfilter(
             cql_filter,

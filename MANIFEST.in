@@ -1,5 +1,0 @@
-include LICENSE
-include README.rst
-
-global-exclude .DS_Store
-global-exclude *.py[cod]
