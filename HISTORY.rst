@@ -5,6 +5,17 @@ History
 0.20.0 (2026-04-05)
 -------------------
 
+This release introduces a dedicated ``ogcapi`` module that consolidates all
+OGC API-based web service clients under a single, extensible framework.
+The module exposes a new ``OGCAPIBase`` base class that handles pagination,
+CQL filtering, geometry queries, feature ID lookups, bounding-box queries,
+``User-Agent`` identification, optional API-key injection, and automatic
+cache eviction for error responses. The existing ``GeoConnex`` and
+``FabricData`` classes have been refactored to inherit from ``OGCAPIBase``,
+and a new ``NWIS`` class has been added to access the USGS Water Data OGC
+API (https://api.waterdata.usgs.gov/ogcapi/v0) as USGS migrates its
+services to the OGC API standard.
+
 New Features
 ~~~~~~~~~~~~
 - Add ``NWIS`` class for accessing the new USGS Water Data OGC API
